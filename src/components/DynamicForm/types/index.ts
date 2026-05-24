@@ -2,6 +2,8 @@ import type { FieldErrors } from 'react-hook-form';
 import type { ExtendedJSONSchema, FieldOption } from './schema';
 import type { LinkageFunction } from './linkage';
 
+export type { WidgetPreset, PartialWidgetPreset, WidgetRegistry } from './widgets';
+
 /**
  * DynamicForm 组件对外暴露的方法
  * 通过 ref 访问这些方法
