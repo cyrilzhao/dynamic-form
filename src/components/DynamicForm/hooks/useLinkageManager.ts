@@ -301,6 +301,8 @@ export function useLinkageManager({
 
   // 保存最新的 formData（用于解决 setValues 批量更新时的时序问题）
   const latestFormDataRef = useRef<Record<string, any>>({});
+  // 延迟执行 processQueue 的定时器（用于批量更新场景）
+  const processQueueTimerRef = useRef<number | null>(null);
   // 跳过联动处理的标志（用于外部直接赋值时不触发联动）
   const skipLinkageRef = useRef(false);
 
@@ -345,12 +347,24 @@ export function useLinkageManager({
         return;
       }
 
-      // 触发队列处理
-      processQueue();
+      // 延迟触发队列处理，等待批量 setValue 完成
+      // 使用 setTimeout(0) 将执行延迟到下一个事件循环
+      if (processQueueTimerRef.current !== null) {
+        clearTimeout(processQueueTimerRef.current);
+      }
+      processQueueTimerRef.current = window.setTimeout(() => {
+        processQueueTimerRef.current = null;
+        processQueue();
+      }, 0);
     });
 
     return () => {
       subscription.unsubscribe();
+      // 清除延迟执行的定时器
+      if (processQueueTimerRef.current !== null) {
+        clearTimeout(processQueueTimerRef.current);
+        processQueueTimerRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watch, linkages, dependencyGraph]);
