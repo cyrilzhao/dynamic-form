@@ -1,11 +1,15 @@
 import React from 'react';
 import { FieldRegistry } from '../FieldRegistry';
+import { blueprintPreset } from '../../presets/blueprint';
 
 describe('FieldRegistry', () => {
   // 保存原始的 widgets 状态，以便测试后恢复
   const originalWidgets: Array<[string, React.ComponentType<any>]> = [];
 
   beforeAll(() => {
+    // 初始化默认预设
+    FieldRegistry.setDefaultPreset(blueprintPreset);
+
     // 记录所有默认注册的 widgets
     const defaultTypes = [
       'text',
