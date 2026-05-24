@@ -1,0 +1,60 @@
+.linkage-editor {
+  .bp5-form-group {
+    margin-bottom: 16px;
+  }
+
+  .bp5-form-helper-text {
+    font-size: 12px;
+    color: #5c7080;
+  }
+
+  .dependency-item {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    align-items: center;
+
+    .bp5-input-group {
+      flex: 1;
+    }
+  }
+
+  .condition-editor,
+  .effect-editor {
+    .bp5-card {
+      background-color: #f5f8fa;
+      border: 1px solid #d3dce6;
+    }
+
+    .bp5-form-group {
+      margin-bottom: 12px;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+  }
+
+  .bp5-callout {
+    h5 {
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    ul {
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .bp5-tag {
+      font-family: monospace;
+      font-size: 12px;
+    }
+  }
+
+  .bp5-divider {
+    border-color: #d3dce6;
+  }
+}

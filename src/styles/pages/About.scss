@@ -1,0 +1,23 @@
+.about-page {
+  padding: 2rem;
+  text-align: center;
+
+  h1 {
+    color: #333;
+    margin-bottom: 1rem;
+  }
+
+  p {
+    color: #666;
+    margin-bottom: 1rem;
+  }
+
+  a {
+    color: #007bff;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}

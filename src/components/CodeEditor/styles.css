@@ -1,0 +1,105 @@
+/* ==================== CodeMirror 基础样式 ==================== */
+.code-mirror-view {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.code-mirror-view .cm-editor {
+  height: 100%;
+}
+
+.code-mirror-view .cm-scroller {
+  font-family: inherit;
+}
+
+/* ==================== 预览态样式 ==================== */
+.code-editor-preview {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  background: white;
+}
+
+.code-editor-preview:hover {
+  border-color: #9ca3af;
+}
+
+.code-editor-preview.has-error {
+  border-color: #ef4444;
+}
+
+.code-editor-preview.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  background: #f9fafb;
+}
+
+/* 预览头部 */
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.language-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.line-count {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.edit-button {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #3b82f6;
+  background: white;
+  border: 1px solid #3b82f6;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.edit-button:hover {
+  background: #3b82f6;
+  color: white;
+}
+
+/* 预览内容区 */
+.preview-content {
+  position: relative;
+  overflow: hidden;
+}
+
+.preview-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(to bottom, transparent, white);
+  pointer-events: none;
+}
+
+/* 错误信息 */
+.error-message {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #ef4444;
+  background: #fef2f2;
+  border-top: 1px solid #fecaca;
+}

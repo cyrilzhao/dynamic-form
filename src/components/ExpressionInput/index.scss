@@ -1,0 +1,246 @@
+.expression-input-container {
+  position: relative;
+  width: 100%;
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+
+  .editor-wrapper {
+    position: relative;
+    flex: 1;
+    min-height: 38px;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    overflow: hidden;
+    transition:
+      border-color 0.2s,
+      box-shadow 0.2s;
+
+    &:focus-within {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    }
+  }
+
+  // 表达式模式下的装饰器样式
+  .expression-decorator {
+    position: absolute;
+    color: #7c3aed;
+    font-weight: 600;
+    font-size: 13px;
+    z-index: 3;
+    pointer-events: none;
+    user-select: none;
+
+    &.left {
+      top: 8px;
+      left: 8px;
+    }
+
+    &.right {
+      bottom: 10px;
+      right: 8px;
+    }
+  }
+
+  // 表达式模式特殊样式
+  &.expression-mode {
+    .editor-wrapper {
+      border-color: #7c3aed;
+      background: rgba(124, 58, 237, 0.02);
+
+      &:focus-within {
+        border-color: #7c3aed;
+        box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.2);
+      }
+    }
+
+    .expression-textarea {
+      padding-left: 28px;
+      padding-right: 20px;
+    }
+
+    .highlights {
+      padding-left: 28px;
+      padding-right: 20px;
+    }
+  }
+
+  // Common styles for both textarea and highlights
+  .editor-content {
+    width: 100%;
+    min-height: 38px;
+    padding: 8px 12px;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    box-sizing: border-box;
+    margin: 0;
+    border: none;
+  }
+
+  .backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none; // Allow clicks to pass through to textarea
+    background: transparent;
+    z-index: 1;
+    color: transparent; // Hide default text
+    overflow: hidden; // Backdrop should not scroll itself, only sync with textarea
+
+    // Hide scrollbar but keep scrolling functionality
+    scrollbar-width: none; // Firefox
+    -ms-overflow-style: none; // IE and Edge
+
+    &::-webkit-scrollbar {
+      display: none; // Chrome, Safari, Opera
+    }
+  }
+
+  .highlights {
+    // This is where we render the colored text
+    // Must match textarea styles exactly for perfect alignment
+    width: 100%;
+    min-height: 38px;
+    padding: 8px 12px;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    box-sizing: border-box;
+    margin: 0;
+    border: none;
+    color: black;
+
+    .token-variable {
+      color: #7c3aed; // violet-600
+      // background-color: rgba(124, 58, 237, 0.1);
+      border-radius: 3px;
+      padding: 0 2px;
+      margin: 0 -2px; // Compensate padding to keep alignment
+      font-weight: 500;
+    }
+  }
+
+  .expression-textarea {
+    @extend .editor-content;
+    position: relative;
+    z-index: 2;
+    background: transparent;
+    color: inherit; // Or transparent if we want perfect overlay, but usually we keep text visible unless tokenized
+    // For overlay approach:
+    // If we want FULL highlighting, textarea text should be transparent (color: transparent; caret-color: black;)
+    // But caret-color support is good.
+    color: transparent;
+    // color: black; // Base text transparent
+
+    caret-color: #374151; // Visible cursor
+    resize: vertical;
+    outline: none;
+    display: block; // Fix weird spacing
+    scrollbar-width: thin; /* 细滚动条 */
+  }
+
+  .variable-trigger-btn {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    // margin-top: 3px;
+    border: none;
+    background: #fff;
+    // border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    color: #6b7280;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+
+    &:hover {
+      background-color: #f9fafb;
+      border-color: #d1d5db;
+      color: #374151;
+    }
+
+    &.active {
+      background-color: #f5f3ff;
+      border-color: #7c3aed;
+      color: #7c3aed;
+
+      &:hover {
+        background-color: #ede9fe;
+      }
+    }
+  }
+}
+
+.variable-picker-popover {
+  // Position is set via inline style (fixed positioning via Portal)
+  width: 250px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  z-index: 9999;
+
+  .variable-group {
+    .group-title {
+      padding: 6px 12px;
+      background: #f9fafb;
+      font-size: 11px;
+      font-weight: 600;
+      color: #6b7280;
+      text-transform: uppercase;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .variable-item {
+      padding: 8px 12px;
+      font-size: 12px;
+      color: #374151;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      &:hover {
+        background: #eff6ff;
+        color: #3b82f6;
+      }
+
+      &.active {
+        background: #eff6ff;
+        color: #3b82f6;
+      }
+
+      .var-type {
+        font-size: 10px;
+        color: #9ca3af;
+        background: #f3f4f6;
+        padding: 1px 4px;
+        border-radius: 3px;
+      }
+    }
+  }
+
+  .empty-vars {
+    padding: 12px;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 12px;
+    font-style: italic;
+  }
+}

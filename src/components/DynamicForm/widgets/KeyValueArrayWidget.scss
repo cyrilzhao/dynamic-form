@@ -1,0 +1,116 @@
+.key-value-array-widget {
+  width: 100%;
+
+  .key-value-array-header {
+    display: grid;
+    grid-template-columns: 1fr 40px 1fr 40px;
+    gap: 10px;
+    padding: 8px 0;
+    font-weight: 600;
+    font-size: 13px;
+    color: #5c7080;
+    border-bottom: 1px solid #e1e8ed;
+    margin-bottom: 8px;
+
+    .col-key,
+    .col-value {
+      padding: 0 8px;
+    }
+
+    .col-arrow,
+    .col-action {
+      text-align: center;
+    }
+  }
+
+  .key-value-array-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .key-value-array-item {
+    display: grid;
+    grid-template-columns: 1fr 40px 1fr 40px;
+    gap: 10px;
+    align-items: center;
+
+    .field-group {
+      input {
+        width: 100%;
+        padding: 6px 10px;
+        border: 1px solid #d3dce6;
+        border-radius: 4px;
+        font-size: 14px;
+        transition: border-color 0.2s;
+
+        &:focus {
+          outline: none;
+          border-color: #2b95d6;
+          box-shadow: 0 0 0 3px rgba(43, 149, 214, 0.1);
+        }
+
+        &:disabled,
+        &:read-only {
+          background-color: #f5f8fa;
+          color: #5c7080;
+          cursor: not-allowed;
+        }
+
+        &::placeholder {
+          color: #a7b6c2;
+        }
+      }
+    }
+
+    .arrow {
+      text-align: center;
+      color: #5c7080;
+      font-weight: 500;
+      font-size: 16px;
+    }
+
+    .delete-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      color: #db3737;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s;
+
+      &:hover:not(:disabled) {
+        background-color: #fef2f2;
+        color: #c23030;
+      }
+
+      &:active:not(:disabled) {
+        background-color: #fee2e2;
+      }
+
+      &:disabled {
+        color: #bfccd6;
+        cursor: not-allowed;
+      }
+
+      svg {
+        pointer-events: none;
+      }
+    }
+  }
+
+  .key-value-array-empty {
+    padding: 20px;
+    text-align: center;
+    color: #a7b6c2;
+    font-size: 14px;
+    background-color: #f5f8fa;
+    border-radius: 4px;
+    border: 1px dashed #d3dce6;
+  }
+}

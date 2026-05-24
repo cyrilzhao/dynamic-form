@@ -1,0 +1,118 @@
+// Tree 组件样式
+
+// 颜色变量
+$tree-text-color: #1c2127;
+$tree-icon-color: #5c7080;
+$tree-secondary-color: #8a9ba8;
+$tree-hover-bg: rgba(143, 153, 168, 0.15);
+$tree-selected-bg: rgba(45, 114, 210, 0.2);
+$tree-selected-hover-bg: rgba(45, 114, 210, 0.3);
+
+.tree {
+  font-size: 14px;
+  color: $tree-text-color;
+}
+
+.tree-root,
+.tree-node-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+// 节点容器
+.tree-node {
+  display: block;
+
+  // 选中状态
+  &-selected > .tree-node-content {
+    background-color: $tree-selected-bg;
+
+    &:hover {
+      background-color: $tree-selected-hover-bg;
+    }
+  }
+
+  // 禁用状态
+  &-disabled > .tree-node-content {
+    cursor: not-allowed;
+    opacity: 0.5;
+
+    &:hover {
+      background-color: transparent;
+    }
+  }
+}
+
+// 节点内容区域
+.tree-node-content {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding-right: 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background-color 0.1s ease;
+
+  &:hover {
+    background-color: $tree-hover-bg;
+  }
+}
+
+// 展开/折叠箭头
+.tree-node-caret {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+
+  &-hidden {
+    visibility: hidden;
+  }
+
+  &-visible {
+    cursor: pointer;
+  }
+
+  &-icon {
+    color: $tree-icon-color;
+    transition: transform 0.2s ease;
+  }
+
+  &-closed {
+    transform: rotate(0deg);
+  }
+
+  &-open {
+    transform: rotate(90deg);
+  }
+}
+
+// 节点图标
+.tree-node-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+  color: $tree-icon-color;
+  flex-shrink: 0;
+}
+
+// 节点标签
+.tree-node-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
+}
+
+// 次要标签
+.tree-node-secondary-label {
+  margin-left: 8px;
+  color: $tree-secondary-color;
+  font-size: 12px;
+  flex-shrink: 0;
+}

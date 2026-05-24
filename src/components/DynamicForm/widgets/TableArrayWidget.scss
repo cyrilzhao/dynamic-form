@@ -1,0 +1,111 @@
+.table-array-widget {
+  width: 100%;
+
+  .table-container {
+    border: 1px solid #d3dce6;
+    border-radius: 4px;
+    overflow: hidden;
+    background: white;
+  }
+
+  .table-empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: #a7b6c2;
+    font-size: 14px;
+    background-color: #f5f8fa;
+    border: 1px dashed #d3dce6;
+    border-radius: 4px;
+  }
+
+  .table-header {
+    background-color: #f5f8fa;
+    border-bottom: 2px solid #d3dce6;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+
+    .table-row {
+      display: flex;
+      align-items: center;
+      min-height: 40px;
+      padding: 0;
+    }
+
+    .table-cell {
+      font-weight: 600;
+      font-size: 13px;
+      color: #5c7080;
+      padding: 10px 12px;
+    }
+  }
+
+  .table-body {
+    .table-row {
+      display: flex;
+      align-items: center;
+      min-height: 50px;
+      border-bottom: 1px solid #e1e8ed;
+      transition: background-color 0.2s;
+
+      &:hover {
+        background-color: #f9fafb;
+      }
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+
+    .table-cell {
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+  }
+
+  .table-cell {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+
+    &.index-cell {
+      flex: 0 0 50px;
+      text-align: center;
+      color: #5c7080;
+      font-weight: 500;
+    }
+
+    &.action-cell {
+      flex: 0 0 80px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 5px;
+    }
+  }
+
+  // 输入框样式
+  input,
+  textarea,
+  select {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #d3dce6;
+    border-radius: 3px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+
+    &:focus {
+      outline: none;
+      border-color: #2b95d6;
+      box-shadow: 0 0 0 2px rgba(43, 149, 214, 0.1);
+    }
+
+    &:disabled,
+    &:read-only {
+      background-color: #f5f8fa;
+      color: #5c7080;
+      cursor: not-allowed;
+    }
+  }
+}
