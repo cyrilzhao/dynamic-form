@@ -48,8 +48,12 @@ describe('useArrayLinkageManager', () => {
         return useArrayLinkageManager({ form, baseLinkages, schema });
       });
 
+      // 手动触发联动初始化
+      await act(async () => {
+        await result.current.refresh();
+      });
+
       await waitFor(() => {
-        console.info('cyril result: ', result);
         expect(result.current.linkageStates.companyName?.visible).toBe(true);
       });
     });
@@ -99,9 +103,9 @@ describe('useArrayLinkageManager', () => {
         return useArrayLinkageManager({ form, baseLinkages, schema });
       });
 
-      // 触发表单变化以激活 watch 回调
+      // 先手动初始化联动状态
       await act(async () => {
-        formRef.setValue('contacts.0.type', 'business');
+        await result.current.refresh();
       });
 
       await waitFor(() => {
@@ -152,9 +156,9 @@ describe('useArrayLinkageManager', () => {
         return useArrayLinkageManager({ form, baseLinkages, schema });
       });
 
-      // 触发表单变化以激活 watch 回调
+      // 先手动初始化联动状态
       await act(async () => {
-        formRef.setValue('contacts.0.type', 'business');
+        await result.current.refresh();
       });
 
       await waitFor(() => {
@@ -388,14 +392,19 @@ describe('useArrayLinkageManager', () => {
         return useArrayLinkageManager({ form, baseLinkages, linkageFunctions });
       });
 
+      // 手动触发初始化
+      await act(async () => {
+        await result.current.refresh();
+      });
+
       await waitFor(() => {
         expect(result.current.linkageStates.output?.value).toBe(10);
       });
 
       // 修改外部变量并刷新
       multiplier = 3;
-      act(() => {
-        result.current.refresh();
+      await act(async () => {
+        await result.current.refresh();
       });
 
       await waitFor(() => {

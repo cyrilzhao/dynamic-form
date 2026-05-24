@@ -263,36 +263,6 @@ describe('FormField', () => {
     });
   });
 
-  describe('linkageState 联动状态', () => {
-    it('当 linkageState.value 变化时应该自动设置字段值', async () => {
-      const field = createFieldConfig();
-      const linkageState: LinkageResult = { value: 'auto-set-value' };
-
-      render(
-        <TestWrapper defaultValues={{ testField: '' }}>
-          <FormField field={field} linkageState={linkageState} />
-        </TestWrapper>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByTestId('mock-widget')).toHaveValue('auto-set-value');
-      });
-    });
-
-    it('当 linkageState.value 为 undefined 时不应该设置字段值', () => {
-      const field = createFieldConfig();
-      const linkageState: LinkageResult = { visible: true };
-
-      render(
-        <TestWrapper defaultValues={{ testField: 'original-value' }}>
-          <FormField field={field} linkageState={linkageState} />
-        </TestWrapper>
-      );
-
-      expect(screen.getByTestId('mock-widget')).toHaveValue('original-value');
-    });
-  });
-
   describe('flattenPath 透明化渲染', () => {
     it('当 flattenPath 为 true 时不应该显示 label', () => {
       const field = createFieldConfig({

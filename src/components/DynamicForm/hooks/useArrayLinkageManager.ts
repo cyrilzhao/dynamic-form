@@ -106,7 +106,7 @@ export function useArrayLinkageManager({
   // ✅ 优化：使用 useRef 做引用稳定化，避免内容未变时产生新对象触发下游重算。
   // 背景：baseLinkages 会因 parentLinkageStates 变化而产生新引用（即使内容不变），
   // 若直接将其传入 useLinkageManager，会导致 dependencyGraph → init useEffect 不断重跑，形成死循环。
-  const allLinkagesRef = useRef<Record<string, LinkageConfig[]>>(baseLinkages);
+  const allLinkagesRef = useRef<Record<string, LinkageConfig[]>>({});
 
   const allLinkages = useMemo(() => {
     // ✅ 优化：dynamicLinkages 为空时直接返回 baseLinkages 引用，避免产生新对象。
@@ -169,6 +169,28 @@ export function useArrayLinkageManager({
     linkageFunctions,
   });
 
+  // 监听 allLinkages 变化，自动触发联动刷新
+  const allLinkagesKeysRef = useRef<string>('');
+  const lastRefreshCounterRef = useRef<number>(0);
+
+  useEffect(() => {
+    const currentKeys = Object.keys(allLinkages).sort().join(',');
+    const prevKeys = allLinkagesKeysRef.current;
+    const isKeysChanged = currentKeys !== prevKeys && currentKeys !== '';
+    const isRefreshCounterChanged = refreshCounter !== lastRefreshCounterRef.current && refreshCounter > 0;
+
+    // 如果 keys 发生变化或 refreshCounter 变化，触发联动刷新
+    if (isKeysChanged || isRefreshCounterChanged) {
+      allLinkagesKeysRef.current = currentKeys;
+      lastRefreshCounterRef.current = refreshCounter;
+      baseLinkageRefresh();
+    } else if (prevKeys === '') {
+      // 首次初始化，记录状态但不触发刷新
+      allLinkagesKeysRef.current = currentKeys;
+      lastRefreshCounterRef.current = refreshCounter;
+    }
+  }, [allLinkages, refreshCounter, baseLinkageRefresh]);
+
   // 监听表单数据变化，动态注册数组元素的联动
   useEffect(() => {
     // ✅ 如果没有基础联动配置，不需要监听字段变化
@@ -202,7 +224,7 @@ export function useArrayLinkageManager({
    * 2. 更新 refreshCounter 触发 allLinkages 重新计算
    * 3. 调用基础联动管理器的 refresh 触发联动重新初始化
    */
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     // 步骤1: 重新生成动态联动配置
     const newDynamicLinkages = generateDynamicLinkages();
     setDynamicLinkages(newDynamicLinkages);
@@ -210,12 +232,10 @@ export function useArrayLinkageManager({
     // 步骤2: 更新计数器，触发 allLinkages 重新计算
     setRefreshCounter(prev => prev + 1);
 
-    // 步骤3: 调用基础联动管理器的 refresh
-    // 注意：需要在下一个 tick 执行，确保 allLinkages 已经重新计算
-    setTimeout(() => {
-      baseLinkageRefresh();
-    }, 0);
-  }, [generateDynamicLinkages, baseLinkageRefresh]);
+    // 步骤3: 等待状态更新完成
+    // allLinkages 的变化会通过 useEffect 自动触发 baseLinkageRefresh
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }, [generateDynamicLinkages]);
 
   return { linkageStates, refresh, setValueWithoutLinkage };
 }

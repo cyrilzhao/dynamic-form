@@ -398,8 +398,13 @@ export const ArrayFieldWidget = forwardRef<HTMLDivElement, ArrayFieldWidgetProps
               return (
                 <div className="checkbox-group">
                   {enumValues.map((enumValue, index) => {
-                    // 直接比较值（不处理对象包装）
-                    const isChecked = currentValue.includes(enumValue);
+                    // 处理对象包装格式 { value: xxx }
+                    const isChecked = currentValue.some((item: any) => {
+                      if (item && typeof item === 'object' && 'value' in item) {
+                        return item.value === enumValue;
+                      }
+                      return item === enumValue;
+                    });
                     const label = String(enumNames[index] || enumValue);
 
                     return (

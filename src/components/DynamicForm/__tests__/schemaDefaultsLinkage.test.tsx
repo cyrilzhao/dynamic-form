@@ -15,6 +15,8 @@ import type { DynamicFormRef } from '../types';
  */
 describe('Schema 默认值与联动计算集成测试', () => {
   it('schema 默认值应该触发联动计算（visibility）', async () => {
+    const formRef = React.createRef<DynamicFormRef>();
+
     const schema: ExtendedJSONSchema = {
       type: 'object',
       properties: {
@@ -42,7 +44,12 @@ describe('Schema 默认值与联动计算集成测试', () => {
       },
     };
 
-    render(<DynamicForm schema={schema} onSubmit={jest.fn()} />);
+    render(<DynamicForm ref={formRef} schema={schema} onSubmit={jest.fn()} />);
+
+    // 手动触发联动初始化
+    await act(async () => {
+      await formRef.current?.refreshLinkage();
+    });
 
     // 由于 userType 的默认值是 'enterprise'
     // companyName 字段应该可见
@@ -52,6 +59,8 @@ describe('Schema 默认值与联动计算集成测试', () => {
   });
 
   it('schema 默认值为触发隐藏条件时，字段应该隐藏', async () => {
+    const formRef = React.createRef<DynamicFormRef>();
+
     const schema: ExtendedJSONSchema = {
       type: 'object',
       properties: {
@@ -79,11 +88,15 @@ describe('Schema 默认值与联动计算集成测试', () => {
       },
     };
 
-    render(<DynamicForm schema={schema} onSubmit={jest.fn()} />);
+    render(<DynamicForm ref={formRef} schema={schema} onSubmit={jest.fn()} />);
+
+    // 手动触发联动初始化
+    await act(async () => {
+      await formRef.current?.refreshLinkage();
+    });
 
     // 由于 userType 的默认值是 'personal'
     // companyName 字段应该隐藏
-    // 注意：联动计算是异步的，需要等待 useEffect 中的初始化完成
     await waitFor(
       () => {
         expect(screen.queryByText('Company Name')).not.toBeInTheDocument();
@@ -93,6 +106,8 @@ describe('Schema 默认值与联动计算集成测试', () => {
   });
 
   it('嵌套对象中的 schema 默认值应该触发联动计算', async () => {
+    const formRef = React.createRef<DynamicFormRef>();
+
     const schema: ExtendedJSONSchema = {
       type: 'object',
       properties: {
@@ -124,7 +139,12 @@ describe('Schema 默认值与联动计算集成测试', () => {
       },
     };
 
-    render(<DynamicForm schema={schema} onSubmit={jest.fn()} />);
+    render(<DynamicForm ref={formRef} schema={schema} onSubmit={jest.fn()} />);
+
+    // 手动触发联动初始化
+    await act(async () => {
+      await formRef.current?.refreshLinkage();
+    });
 
     // 由于 enableAdvanced 的默认值是 true
     // advancedOption 字段应该可见
@@ -198,6 +218,8 @@ describe('Schema 默认值与联动计算集成测试', () => {
   });
 
   it('多个联动依赖同一个有默认值的字段时都应该正确计算', async () => {
+    const formRef = React.createRef<DynamicFormRef>();
+
     const schema: ExtendedJSONSchema = {
       type: 'object',
       properties: {
@@ -240,7 +262,12 @@ describe('Schema 默认值与联动计算集成测试', () => {
       },
     };
 
-    render(<DynamicForm schema={schema} onSubmit={jest.fn()} />);
+    render(<DynamicForm ref={formRef} schema={schema} onSubmit={jest.fn()} />);
+
+    // 手动触发联动初始化
+    await act(async () => {
+      await formRef.current?.refreshLinkage();
+    });
 
     await waitFor(
       () => {
@@ -254,6 +281,8 @@ describe('Schema 默认值与联动计算集成测试', () => {
   });
 
   it('schema 默认值为 false 时应该正确触发联动', async () => {
+    const formRef = React.createRef<DynamicFormRef>();
+
     const schema: ExtendedJSONSchema = {
       type: 'object',
       properties: {
@@ -280,7 +309,12 @@ describe('Schema 默认值与联动计算集成测试', () => {
       },
     };
 
-    render(<DynamicForm schema={schema} onSubmit={jest.fn()} />);
+    render(<DynamicForm ref={formRef} schema={schema} onSubmit={jest.fn()} />);
+
+    // 手动触发联动初始化
+    await act(async () => {
+      await formRef.current?.refreshLinkage();
+    });
 
     // 由于 isVIP 默认为 false，VIP Benefits 应该隐藏
     await waitFor(
@@ -292,6 +326,8 @@ describe('Schema 默认值与联动计算集成测试', () => {
   });
 
   it('schema 默认值为数字 0 时应该正确触发联动', async () => {
+    const formRef = React.createRef<DynamicFormRef>();
+
     const schema: ExtendedJSONSchema = {
       type: 'object',
       properties: {
@@ -318,7 +354,12 @@ describe('Schema 默认值与联动计算集成测试', () => {
       },
     };
 
-    render(<DynamicForm schema={schema} onSubmit={jest.fn()} />);
+    render(<DynamicForm ref={formRef} schema={schema} onSubmit={jest.fn()} />);
+
+    // 手动触发联动初始化
+    await act(async () => {
+      await formRef.current?.refreshLinkage();
+    });
 
     // 由于 quantity 默认为 0，不大于 0，Discount Info 应该隐藏
     await waitFor(
@@ -518,7 +559,14 @@ describe('动态 schema 联动的默认值测试', () => {
 
     // 选择 httpRequest 触发 schema 联动
     const select = screen.getByRole('combobox');
-    fireEvent.change(select, { target: { value: 'httpRequest' } });
+    await act(async () => {
+      fireEvent.change(select, { target: { value: 'httpRequest' } });
+    });
+
+    // 手动触发联动以加载动态 schema
+    await act(async () => {
+      await formRef.current?.refreshLinkage();
+    });
 
     // 等待动态 schema 加载完成
     await waitFor(

@@ -47,6 +47,7 @@ export interface DynamicFormRef {
       shouldValidate?: boolean;
       shouldDirty?: boolean;
       shouldTouch?: boolean;
+      silence?: boolean;
     }
   ) => void;
 
