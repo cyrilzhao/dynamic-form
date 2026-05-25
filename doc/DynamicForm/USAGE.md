@@ -1357,11 +1357,17 @@ console.log(formState);
 
 **`refreshLinkage()` - Manual Linkage Refresh**
 
-This method allows you to manually re-trigger all linkage calculations. This is particularly useful when:
+> **⚠️ IMPORTANT**: DynamicForm does **NOT** automatically execute linkage initialization on mount. You **MUST** manually call `refreshLinkage()` to trigger linkage calculations when:
+> - The form is first mounted and has linkage configurations
+> - Linkage functions depend on asynchronously loaded data
+> - External state used by linkage functions changes
 
-1. **Async Data Loading**: Linkage functions depend on data loaded asynchronously (e.g., from APIs)
-2. **External State Changes**: Data used by linkage functions is updated outside the form
-3. **Dynamic Function Updates**: Linkage functions themselves are updated dynamically
+This method allows you to manually trigger all linkage calculations. Common use cases:
+
+1. **Initial Linkage Trigger**: Call after form mount to initialize linkage states
+2. **Async Data Loading**: Linkage functions depend on data loaded asynchronously (e.g., from APIs)
+3. **External State Changes**: Data used by linkage functions is updated outside the form
+4. **Dynamic Function Updates**: Linkage functions themselves are updated dynamically
 
 **Usage Example with Async Data:**
 
@@ -1465,6 +1471,7 @@ function EmployeeForm() {
 
 **Important Notes:**
 
+- **DynamicForm does NOT auto-initialize linkage** - You must manually call `refreshLinkage()` after mount
 - `refreshLinkage()` is asynchronous and returns a Promise
 - It re-calculates all linkage states based on current form values
 - Best practice: Call it after async data has been loaded and state updated
