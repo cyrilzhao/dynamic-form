@@ -216,7 +216,22 @@ export class SchemaParser {
     const errorMessages = schema.ui?.errorMessages || {};
 
     if (required) {
-      rules.required = errorMessages.required || 'This field is required';
+      // 使用自定义验证函数替代内置 required 规则
+      // 避免 false 值被误判为空值
+      rules.validate = rules.validate || {};
+      rules.validate.required = (value: any) => {
+        // 严格检查：只有 null、undefined 和空字符串才算空值
+        if (value === null || value === undefined) {
+          return errorMessages.required || 'This field is required';
+        }
+        if (typeof value === 'string' && value.trim() === '') {
+          return errorMessages.required || 'This field is required';
+        }
+        if (Array.isArray(value) && value.length === 0) {
+          return errorMessages.required || 'This field is required';
+        }
+        return true;
+      };
     }
 
     if (schema.minLength) {
@@ -271,7 +286,8 @@ export class SchemaParser {
         const formatName = schema.format;
         rules.validate = rules.validate || {};
         rules.validate[formatName] = (value: string) => {
-          if (!value) return true; // 空值由 required 规则处理
+          // 空值由 required 规则处理，严格检查 null/undefined/空字符串
+          if (value === null || value === undefined || value === '') return true;
           const isValid = this.customFormats[formatName](value);
           return isValid || errorMessages.format || `Invalid ${formatName} format`;
         };

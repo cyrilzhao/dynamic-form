@@ -1,0 +1,81 @@
+<html>
+  <head>
+    <style>
+      .container {
+        display: flex;
+      }
+
+      .left {
+        flex-grow: 1;
+        min-width: 50%;
+      }
+
+      .right {
+        flex-grow: 1;
+      }
+
+      .row {
+        width: 100%;
+        display: flex;
+        overflow: hidden;
+      }
+
+      .label {
+        width: 100px;
+        flex-shrink: 0;
+        background-color: blue;
+      }
+
+      .content {
+        flex-grow: 1;
+        background-color: red;
+        display: flex;
+        min-width: 0;
+      }
+
+      .text {
+        flex-grow: 1;
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      .text > div {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .operation {
+        flex-shrink: 0;
+        background-color: yellow;
+        display: flex;
+        gap: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="left">
+        <div class="row-wrap">
+          <div class="row">
+            <div class="label">aaa</div>
+            <div class="content">
+              <div class="text">
+                <div>
+                  dawodjawiodjaodjawoidjadjadawodjawiodjaodjawoidjadjadawodjawiodjaodjawoidjadjadawodjawiodjaodjawoidjadjadawodjawiodjaodjawoidjadjadawodjawiodjaodjawoidjadjadawodjawiodjaodjawoidjadjadawodjawiodjaodjawoidjadja
+                </div>
+              </div>
+              <div class="operation">
+                <div>aaaaa</div>
+                <div>bbbbb</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="right">
+        rightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanelrightpanel
+      </div>
+    </div>
+  </body>
+</html>
