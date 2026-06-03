@@ -549,7 +549,9 @@ describe('SchemaParser', () => {
         };
 
         const fields = SchemaParser.parse(schema);
-        expect(fields[0].validation?.required).toBe('This field is required');
+        // 现在 required 是一个 validate 函数，而不是简单的字符串
+        expect(fields[0].validation?.validate?.required).toBeDefined();
+        expect(typeof fields[0].validation?.validate?.required).toBe('function');
       });
 
       it('应该使用自定义的 required 错误消息', () => {
@@ -569,7 +571,10 @@ describe('SchemaParser', () => {
         };
 
         const fields = SchemaParser.parse(schema);
-        expect(fields[0].validation?.required).toBe('请输入邮箱地址');
+        const validator = fields[0].validation?.validate?.required;
+        expect(validator).toBeDefined();
+        // 测试自定义错误消息
+        expect(validator!(null)).toBe('请输入邮箱地址');
       });
 
       it('应该为非必填字段不添加 required 规则', () => {
@@ -582,6 +587,68 @@ describe('SchemaParser', () => {
 
         const fields = SchemaParser.parse(schema);
         expect(fields[0].validation?.required).toBeUndefined();
+      });
+
+      it('应该正确处理 false 值（不应被判断为空值）', () => {
+        const schema: ExtendedJSONSchema = {
+          type: 'boolean',
+          ui: {
+            errorMessages: {
+              required: 'This field is required',
+            },
+          },
+        };
+
+        const rules = SchemaParser.getValidationRules(schema, true);
+        const validator = rules.validate?.required;
+
+        expect(validator).toBeDefined();
+        expect(validator!(false)).toBe(true); // false 是有效值
+        expect(validator!(true)).toBe(true); // true 是有效值
+        expect(validator!(null)).toBe('This field is required'); // null 无效
+        expect(validator!(undefined)).toBe('This field is required'); // undefined 无效
+      });
+
+      it('应该正确处理 0 值（不应被判断为空值）', () => {
+        const schema: ExtendedJSONSchema = {
+          type: 'number',
+        };
+
+        const rules = SchemaParser.getValidationRules(schema, true);
+        const validator = rules.validate?.required;
+
+        expect(validator).toBeDefined();
+        expect(validator!(0)).toBe(true); // 0 是有效值
+        expect(validator!(1)).toBe(true); // 1 是有效值
+        expect(validator!(null)).toBe('This field is required'); // null 无效
+        expect(validator!(undefined)).toBe('This field is required'); // undefined 无效
+      });
+
+      it('应该正确处理空字符串（应被判断为空值）', () => {
+        const schema: ExtendedJSONSchema = {
+          type: 'string',
+        };
+
+        const rules = SchemaParser.getValidationRules(schema, true);
+        const validator = rules.validate?.required;
+
+        expect(validator).toBeDefined();
+        expect(validator!('')).toBe('This field is required'); // 空字符串无效
+        expect(validator!('  ')).toBe('This field is required'); // 空白字符串无效
+        expect(validator!('text')).toBe(true); // 非空字符串有效
+      });
+
+      it('应该正确处理空数组（应被判断为空值）', () => {
+        const schema: ExtendedJSONSchema = {
+          type: 'array',
+        };
+
+        const rules = SchemaParser.getValidationRules(schema, true);
+        const validator = rules.validate?.required;
+
+        expect(validator).toBeDefined();
+        expect(validator!([])).toBe('This field is required'); // 空数组无效
+        expect(validator!(['item'])).toBe(true); // 非空数组有效
       });
     });
 

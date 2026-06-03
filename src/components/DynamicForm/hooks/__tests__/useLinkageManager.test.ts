@@ -800,6 +800,95 @@ describe('useLinkageManager', () => {
       });
     });
 
+    it('应该支持静态 options 联动（不使用 function）', async () => {
+      const linkages: Record<string, LinkageConfig[]> = {
+        category: [
+          {
+            type: 'options',
+            dependencies: ['type'],
+            when: {
+              field: 'type',
+              operator: '==',
+              value: 'electronics',
+            },
+            fulfill: {
+              options: [
+                { label: 'Laptop', value: 'laptop' },
+                { label: 'Phone', value: 'phone' },
+              ],
+            },
+            otherwise: {
+              options: [
+                { label: 'Fiction', value: 'fiction' },
+                { label: 'Non-Fiction', value: 'nonfiction' },
+              ],
+            },
+          },
+        ],
+      };
+
+      const { result } = renderHook(() => {
+        const form = useForm({ defaultValues: { type: 'electronics', category: '' } });
+        return useLinkageManager({ form, linkages, linkageFunctions: {} });
+      });
+
+      await act(async () => {
+        await result.current.refreshLinkage();
+      });
+
+      await waitFor(() => {
+        expect(result.current.linkageStates.category?.options).toHaveLength(2);
+        expect(result.current.linkageStates.category?.options?.[0].value).toBe('laptop');
+      });
+    });
+
+    it('应该在 options 变化后自动清理无效值', async () => {
+      const linkages: Record<string, LinkageConfig[]> = {
+        city: [
+          {
+            type: 'options',
+            dependencies: ['country'],
+            fulfill: { function: 'getCityOptions' },
+          },
+        ],
+      };
+
+      const linkageFunctions = {
+        getCityOptions: (formData: Record<string, any>) => {
+          if (formData.country === 'China') {
+            return [
+              { label: 'Beijing', value: 'beijing' },
+              { label: 'Shanghai', value: 'shanghai' },
+            ];
+          }
+          return [{ label: 'New York', value: 'ny' }];
+        },
+      };
+
+      const { result } = renderHook(() => {
+        const form = useForm({ defaultValues: { country: 'China', city: 'beijing' } });
+        const linkageManager = useLinkageManager({ form, linkages, linkageFunctions });
+        return { form, ...linkageManager };
+      });
+
+      await act(async () => {
+        await result.current.refreshLinkage();
+      });
+
+      // 初始状态：city = 'beijing' 在 China 的 options 中，有效
+      expect(result.current.form.getValues('city')).toBe('beijing');
+
+      // 切换 country 到 'USA'，触发 options 变化
+      await act(async () => {
+        result.current.form.setValue('country', 'USA');
+      });
+
+      // 等待联动处理完成，city 应被自动清空（因为 'beijing' 不在新 options 中）
+      await waitFor(() => {
+        expect(result.current.form.getValues('city')).toBeUndefined();
+      });
+    });
+
     it('应该支持 disabled 类型的函数联动', async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         submitBtn: [
