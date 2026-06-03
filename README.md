@@ -7,6 +7,10 @@
 3. [Quick Start](#quick-start)
 4. [Basic Usage](#basic-usage)
 5. [Schema Definition](#schema-definition)
+   - [Basic Field Types](#1-basic-field-types)
+   - [Field Validation](#2-field-validation)
+   - [Field Linkage](#3-field-linkage)
+   - [UI Configuration](#4-ui-configuration)
 6. [Advanced Features](#advanced-features)
 7. [API Reference](#api-reference)
 8. [Examples](#examples)
@@ -199,7 +203,9 @@ DynamicForm supports three layout modes:
 
 ## Schema Definition
 
-### Basic Field Types
+This section explains how to define form schemas using JSON Schema with DynamicForm-specific extensions.
+
+### 1. Basic Field Types
 
 #### String Fields
 
@@ -731,9 +737,32 @@ The `ui` field provides extensive customization options:
 | `code-editor`   | string              | Code editor with syntax highlight |
 | `object-editor` | object              | JSON object editor                |
 
-### Validation Rules
+### 2. Field Validation
 
-#### Built-in Validation
+DynamicForm provides comprehensive validation capabilities based on JSON Schema standard with custom extensions.
+
+#### Built-in Validation Rules
+
+JSON Schema provides a rich set of built-in validation keywords:
+
+**String Validation:**
+- `minLength` / `maxLength` - Length constraints
+- `pattern` - Regular expression matching
+- `format` - Predefined formats (email, uri, date, etc.)
+
+**Number Validation:**
+- `minimum` / `maximum` - Range constraints
+- `exclusiveMinimum` / `exclusiveMaximum` - Exclusive range
+- `multipleOf` - Must be a multiple of specified value
+
+**Array Validation:**
+- `minItems` / `maxItems` - Item count constraints
+- `uniqueItems` - Ensure unique items
+
+**Required Fields:**
+- Add field names to schema's `required` array
+
+**Example:**
 
 ```typescript
 {
@@ -743,14 +772,19 @@ The `ui` field provides extensive customization options:
   maxLength: 20,             // Maximum length
   pattern: '^[a-zA-Z0-9_]+$', // Regex pattern
   format: 'email',           // Predefined format
-  ui: {
-    errorMessages: {
-      required: 'Username is required',
-      minLength: 'Username must be at least 3 characters',
-      maxLength: 'Username cannot exceed 20 characters',
-      pattern: 'Username can only contain letters, numbers and underscores'
-    }
-  }
+}
+```
+
+#### Custom Error Messages
+
+#### Custom Error Messages
+
+You can customize error messages for each validation rule using `ui.errorMessages`:
+
+```typescript
+{
+  type: 'string',
+  title: 'Username',
 }
 ```
 
@@ -781,13 +815,697 @@ Use JSON Schema's conditional validation keywords:
 }
 ```
 
+#### Custom Validation Functions
+
+For complex validation logic beyond JSON Schema's built-in rules, you can use custom validation functions:
+
+```typescript
+const formRef = useRef<DynamicFormRef>(null);
+
+// Add custom validation after form creation
+const handleValidatePasswords = () => {
+  const password = formRef.current?.getValue('password');
+  const confirmPassword = formRef.current?.getValue('confirmPassword');
+
+  if (password !== confirmPassword) {
+    formRef.current?.setError('confirmPassword', {
+      type: 'manual',
+      message: 'Passwords do not match',
+    });
+  }
+};
+```
+
+#### Custom Format Validators
+
+Extend the `format` keyword with custom validators using `customFormats`:
+
+```typescript
+const customFormats = {
+  // Custom phone number format
+  phone: (value: string) => {
+    return /^\d{3}-\d{3}-\d{4}$/.test(value);
+  },
+  // Custom URL format
+  customUrl: (value: string) => {
+    try {
+      new URL(value);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+};
+
+const schema = {
+  type: 'object',
+  properties: {
+    phone: {
+      type: 'string',
+      title: 'Phone Number',
+      format: 'phone',
+      ui: {
+        placeholder: '123-456-7890',
+        errorMessages: {
+          format: 'Please enter a valid phone number (XXX-XXX-XXXX)',
+        },
+      },
+    },
+  },
+};
+
+<DynamicForm
+  schema={schema}
+  customFormats={customFormats}
+  onSubmit={handleSubmit}
+/>
+```
+
+---
+
+### 3. Field Linkage
+
+Field linkage enables dynamic form behavior where fields can automatically respond to changes in other fields' values. This is essential for creating interactive, context-aware forms.
+
+#### Why Use Linkage?
+
+Common use cases include:
+- **Conditional Fields**: Show/hide fields based on other selections
+- **Dynamic Options**: Update dropdown options based on parent field
+- **Computed Values**: Calculate field values automatically
+- **Contextual Validation**: Apply different validation rules based on context
+- **UI State Control**: Enable/disable or make fields readonly dynamically
+
+#### Linkage Types
+
+DynamicForm supports 6 types of linkage:
+
+**1. visibility** - Control field visibility
+
+```typescript
+{
+  type: 'object',
+  properties: {
+    hasAddress: {
+      type: 'boolean',
+      title: 'Provide Address'
+    },
+    address: {
+      type: 'string',
+      title: 'Address',
+      ui: {
+        linkages: [{
+          type: 'visibility',
+          dependencies: ['#/properties/hasAddress'],
+          when: {
+            field: '#/properties/hasAddress',
+            operator: '==',
+            value: true
+          },
+          fulfill: { state: { visible: true } },
+          otherwise: { state: { visible: false } }
+        }]
+      }
+    }
+  }
+}
+```
+
+**2. disabled** - Control field disabled state
+
+```typescript
+{
+  agreed: {
+    type: 'boolean',
+    title: 'I agree to terms'
+  },
+  submitButton: {
+    type: 'string',
+    title: 'Submit',
+    ui: {
+      linkages: [{
+        type: 'disabled',
+        dependencies: ['#/properties/agreed'],
+        when: {
+          field: '#/properties/agreed',
+          operator: '==',
+          value: false
+        },
+        fulfill: { state: { disabled: true } },
+        otherwise: { state: { disabled: false } }
+      }]
+    }
+  }
+}
+```
+
+**3. readonly** - Control field readonly state
+
+```typescript
+{
+  isEditing: {
+    type: 'boolean',
+    title: 'Enable Editing'
+  },
+  userName: {
+    type: 'string',
+    title: 'User Name',
+    ui: {
+      linkages: [{
+        type: 'readonly',
+        dependencies: ['#/properties/isEditing'],
+        when: {
+          field: '#/properties/isEditing',
+          operator: '==',
+          value: false
+        },
+        fulfill: { state: { readonly: true } }
+      }]
+    }
+  }
+}
+```
+
+**4. value** - Computed field values
+
+```typescript
+const schema = {
+  type: 'object',
+  properties: {
+    price: { type: 'number', title: 'Price' },
+    quantity: { type: 'number', title: 'Quantity' },
+    total: {
+      type: 'number',
+      title: 'Total',
+      ui: {
+        readonly: true,
+        linkages: [{
+          type: 'value',
+          dependencies: ['#/properties/price', '#/properties/quantity'],
+          fulfill: { function: 'calculateTotal' }
+        }]
+      }
+    }
+  }
+};
+
+const linkageFunctions = {
+  calculateTotal: (formData: any) => {
+    return (formData.price || 0) * (formData.quantity || 0);
+  }
+};
+
+<DynamicForm
+  schema={schema}
+  linkageFunctions={linkageFunctions}
+  onSubmit={handleSubmit}
+/>
+```
+
+**5. options** - Dynamic dropdown options
+
+Options linkage supports both static and dynamic (function-based) configurations.
+
+**Using Functions (Dynamic):**
+
+```typescript
+const schema = {
+  type: 'object',
+  properties: {
+    country: {
+      type: 'string',
+      title: 'Country',
+      enum: ['china', 'usa'],
+      enumNames: ['China', 'USA']
+    },
+    province: {
+      type: 'string',
+      title: 'Province/State',
+      ui: {
+        linkages: [{
+          type: 'options',
+          dependencies: ['#/properties/country'],
+          fulfill: { function: 'getProvinceOptions' }
+        }]
+      }
+    }
+  }
+};
+
+const linkageFunctions = {
+  getProvinceOptions: (formData: any) => {
+    if (formData.country === 'china') {
+      return [
+        { label: 'Beijing', value: 'beijing' },
+        { label: 'Shanghai', value: 'shanghai' }
+      ];
+    } else if (formData.country === 'usa') {
+      return [
+        { label: 'California', value: 'ca' },
+        { label: 'New York', value: 'ny' }
+      ];
+    }
+    return [];
+  }
+};
+```
+
+**Using Static Values:**
+
+```typescript
+{
+  category: {
+    type: 'string',
+    title: 'Category',
+    enum: ['electronics', 'books']
+  },
+  subcategory: {
+    type: 'string',
+    title: 'Subcategory',
+    ui: {
+      linkages: [{
+        type: 'options',
+        dependencies: ['#/properties/category'],
+        when: {
+          field: '#/properties/category',
+          operator: '==',
+          value: 'electronics'
+        },
+        fulfill: {
+          options: [
+            { label: 'Laptop', value: 'laptop' },
+            { label: 'Phone', value: 'phone' }
+          ]
+        },
+        otherwise: {
+          options: [
+            { label: 'Fiction', value: 'fiction' },
+            { label: 'Non-Fiction', value: 'nonfiction' }
+          ]
+        }
+      }]
+    }
+  }
+}
+```
+
+**Automatic Value Cleanup:**
+
+When options change, DynamicForm automatically clears the field value if it's no longer valid in the new options list. This ensures data integrity:
+
+```typescript
+// Example: User selects category='electronics' and subcategory='laptop'
+// Then changes category to 'books'
+// → subcategory is automatically cleared (laptop not in books options)
+```
+
+**6. schema** - Dynamic schema switching
+
+Dynamically change nested form structure based on field values:
+
+```typescript
+const userSchemas = {
+  personal: {
+    type: 'object',
+    properties: {
+      firstName: { type: 'string', title: 'First Name' },
+      lastName: { type: 'string', title: 'Last Name' }
+    }
+  },
+  company: {
+    type: 'object',
+    properties: {
+      companyName: { type: 'string', title: 'Company Name' },
+      taxId: { type: 'string', title: 'Tax ID' }
+    }
+  }
+};
+
+const schema = {
+  type: 'object',
+  properties: {
+    userType: {
+      type: 'string',
+      title: 'User Type',
+      enum: ['personal', 'company'],
+      enumNames: ['Personal', 'Company']
+    },
+    details: {
+      type: 'object',
+      title: 'Details',
+      ui: {
+        widget: 'nested-form',
+        linkages: [{
+          type: 'schema',
+          dependencies: ['userType'],
+          fulfill: { function: 'loadUserSchema' }
+        }]
+      }
+    }
+  }
+};
+
+const linkageFunctions = {
+  loadUserSchema: (formData: any) => {
+    return userSchemas[formData.userType] || { type: 'object', properties: {} };
+  }
+};
+```
+
+#### Static vs Dynamic Linkage
+
+Linkage effects can be configured in two ways:
+
+**Static Linkage** - Direct value assignment:
+```typescript
+fulfill: {
+  state: { visible: true },
+  options: [
+    { label: 'Option 1', value: '1' },
+    { label: 'Option 2', value: '2' }
+  ]
+}
+```
+
+**Dynamic Linkage** - Function-based computation:
+```typescript
+fulfill: {
+  function: 'myLinkageFunction'
+}
+
+// Register the function
+const linkageFunctions = {
+  myLinkageFunction: (formData: any) => {
+    // Compute and return the result
+    return calculatedValue;
+  }
+};
+```
+
+Use static linkage for simple, predetermined values. Use dynamic linkage when the result depends on complex logic or multiple field values.
+
+**Async Linkage Functions:**
+
+Linkage functions can be asynchronous, which is useful for fetching data from APIs:
+
+```typescript
+const linkageFunctions = {
+  // Async function to load options from API
+  loadCityOptions: async (formData: any) => {
+    const countryId = formData.country;
+    if (!countryId) return [];
+
+    const response = await fetch(`/api/cities?country=${countryId}`);
+    const cities = await response.json();
+
+    return cities.map((city: any) => ({
+      label: city.name,
+      value: city.id
+    }));
+  },
+
+  // Async function to validate and compute value
+  calculateShipping: async (formData: any) => {
+    const { weight, destination } = formData;
+    if (!weight || !destination) return 0;
+
+    const response = await fetch('/api/calculate-shipping', {
+      method: 'POST',
+      body: JSON.stringify({ weight, destination })
+    });
+    const { cost } = await response.json();
+
+    return cost;
+  }
+};
+
+const schema = {
+  type: 'object',
+  properties: {
+    country: {
+      type: 'string',
+      title: 'Country'
+    },
+    city: {
+      type: 'string',
+      title: 'City',
+      ui: {
+        linkages: [{
+          type: 'options',
+          dependencies: ['#/properties/country'],
+          fulfill: { function: 'loadCityOptions' }
+        }]
+      }
+    }
+  }
+};
+```
+
+**Important:** Async functions are automatically handled - just return a Promise or use `async/await`.
+
+#### Linkage Conditions
+
+Control when linkage effects are applied using the `when`/`fulfill`/`otherwise` pattern:
+
+```typescript
+{
+  ui: {
+    linkages: [{
+      type: 'visibility',
+      dependencies: ['#/properties/userType'],
+      when: {
+        field: '#/properties/userType',
+        operator: '==',
+        value: 'premium'
+      },
+      fulfill: {
+        state: { visible: true }
+      },
+      otherwise: {
+        state: { visible: false }
+      }
+    }]
+  }
+}
+```
+
+**Supported Operators:**
+- `==` - Equal (strict equality)
+- `!=` - Not equal
+- `>` - Greater than
+- `<` - Less than
+- `>=` - Greater than or equal
+- `<=` - Less than or equal
+- `in` - Value in array (checks if fieldValue is in compareValue array)
+- `notIn` - Value not in array
+- `includes` - Array includes value (checks if fieldValue array includes compareValue)
+- `notIncludes` - Array not includes value
+- `isEmpty` - Field is empty (null, undefined, '', or empty array)
+- `isNotEmpty` - Field has a value
+
+**Without `when` condition**, the `fulfill` effect is always applied.
+
+#### Linkage Dependencies
+
+Declare which fields the linkage depends on using JSON Pointer format:
+
+```typescript
+{
+  ui: {
+    linkages: [{
+      type: 'value',
+      dependencies: [
+        '#/properties/price',           // Top-level field
+        '#/properties/address/city',    // Nested object field
+        '#/properties/items/0/name'     // Array element field
+      ],
+      fulfill: { function: 'calculate' }
+    }]
+  }
+}
+```
+
+**Rules:**
+- Use `#/properties/` prefix for top-level fields
+- Use `/` for nested paths
+- Dependencies determine when linkage recalculates
+- Empty dependencies array means linkage runs only on initial load
+
+---
+
+### 4. UI Configuration
+
+Configure field appearance, behavior, and layout using the `ui` field.
+
+#### Widget Selection
+
+**Built-in Widgets:**
+
+DynamicForm automatically selects appropriate widgets based on field type, but you can override this:
+
+| Widget          | Field Type          | Description                       |
+| --------------- | ------------------- | --------------------------------- |
+| `text`          | string              | Single-line text input            |
+| `textarea`      | string              | Multi-line text input             |
+| `password`      | string              | Password input                    |
+| `email`         | string              | Email input                       |
+| `number`        | number/integer      | Number input                      |
+| `select`        | string/number/array | Dropdown select                   |
+| `radio`         | string/number       | Radio buttons                     |
+| `checkboxes`    | array               | Multiple checkboxes               |
+| `checkbox`      | boolean             | Single checkbox                   |
+| `switch`        | boolean             | Toggle switch                     |
+| `date`          | string              | Date picker                       |
+| `nested-form`   | object              | Nested form (auto for objects)    |
+| `array`         | array               | Array widget (auto for arrays)    |
+| `code-editor`   | string              | Code editor with syntax highlight |
+| `object-editor` | object              | JSON object editor                |
+
+**Example:**
+```typescript
+{
+  type: 'string',
+  title: 'Bio',
+  ui: {
+    widget: 'textarea'  // Override default 'text' widget
+  }
+}
+```
+
+**Custom Widgets:**
+
+Register custom widgets to extend DynamicForm's capabilities:
+
+```typescript
+import { CustomInputWidget } from './widgets/CustomInputWidget';
+
+<DynamicForm
+  schema={schema}
+  widgets={{
+    'custom-input': CustomInputWidget,
+    'advanced-select': AdvancedSelectWidget
+  }}
+  onSubmit={handleSubmit}
+/>
+
+// Use in schema
+{
+  type: 'string',
+  title: 'Custom Field',
+  ui: {
+    widget: 'custom-input'
+  }
+}
+```
+
+#### Layout Configuration
+
+Control form layout at global or field level:
+
+**Global Layout:**
+```typescript
+<DynamicForm
+  schema={schema}
+  layout="horizontal"
+  labelWidth={120}
+  onSubmit={handleSubmit}
+/>
+```
+
+**Field-Level Override:**
+```typescript
+{
+  type: 'string',
+  title: 'Email',
+  ui: {
+    layout: 'horizontal',  // Override global layout
+    labelWidth: 150         // Custom label width for this field
+  }
+}
+```
+
+**Layout Options:**
+- `vertical` - Label above input (default)
+- `horizontal` - Label beside input
+- `inline` - Compact inline layout
+
+#### Field Path Flattening
+
+Simplify deeply nested parameter display while maintaining data structure:
+
+```typescript
+{
+  type: 'object',
+  properties: {
+    auth: {
+      type: 'object',
+      title: 'Authentication',
+      ui: {
+        flattenPath: true,      // Flatten this level
+        flattenPrefix: true     // Add parent title as prefix
+      },
+      properties: {
+        content: {
+          type: 'object',
+          ui: { flattenPath: true },
+          properties: {
+            apiKey: {
+              type: 'string',
+              title: 'API Key'
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Result:**
+- Display: "Authentication - API Key" (flattened)
+- Submit: `{ auth: { content: { apiKey: 'xxx' } } }` (nested)
+
+#### Other UI Options
+
+Additional UI customization options:
+
+```typescript
+{
+  type: 'string',
+  title: 'Email',
+  ui: {
+    placeholder: 'Enter your email',     // Input placeholder
+    help: 'We will never share your email', // Help text below field
+    className: 'custom-field',           // Custom CSS class
+    disabled: false,                     // Disable field
+    readonly: false,                     // Make field readonly
+    hidden: false                        // Hide field
+  }
+}
+```
+
+**All UI Options:**
+
+| Option        | Type      | Description                        |
+| ------------- | --------- | ---------------------------------- |
+| `widget`      | `string`  | Widget type                        |
+| `placeholder` | `string`  | Input placeholder text             |
+| `help`        | `string`  | Help text below field              |
+| `className`   | `string`  | Custom CSS class                   |
+| `disabled`    | `boolean` | Disable field                      |
+| `readonly`    | `boolean` | Make field readonly                |
+| `hidden`      | `boolean` | Hide field                         |
+| `layout`      | `string`  | Layout override                    |
+| `labelWidth`  | `number`  | Label width (horizontal layout)    |
+| `linkages`    | `array`   | Field linkage configurations       |
+| `flattenPath` | `boolean` | Flatten nested path                |
+| `flattenPrefix` | `boolean` | Add parent title as prefix       |
+| `errorMessages` | `object` | Custom error messages            |
+| `widgetProps` | `object`  | Props passed to widget component   |
+
 ---
 
 ## Advanced Features
-
-### UI Linkage
-
-UI linkage allows fields to dynamically change based on other field values.
 
 #### Field Visibility
 
