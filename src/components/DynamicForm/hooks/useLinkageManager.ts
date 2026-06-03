@@ -216,6 +216,32 @@ export function useLinkageManager({
             });
           }
         }
+
+        // 处理 options 联动：检查当前值是否在新 options 中，如果不在则清空
+        const hasOptionsLinkage = linkageArray?.some(linkage => linkage.type === 'options');
+        if (hasOptionsLinkage && states[fieldName]?.options) {
+          const newOptions = states[fieldName].options;
+          const currentValue = getValues(fieldName);
+
+          // 检查当前值是否在新 options 中
+          if (currentValue !== undefined && currentValue !== null && currentValue !== '') {
+            const optionValues = newOptions.map((opt: any) => opt.value);
+            const isValidValue = Array.isArray(currentValue)
+              ? currentValue.every(v => optionValues.includes(v))
+              : optionValues.includes(currentValue);
+
+            // 如果当前值不在新 options 中，清空该值
+            if (!isValidValue) {
+              if (!preMarkFields) {
+                taskQueue.markFieldUpdating(fieldName);
+              }
+              setValue(fieldName, Array.isArray(currentValue) ? [] : undefined, {
+                shouldValidate: false,
+                shouldDirty: false,
+              });
+            }
+          }
+        }
       });
 
       await new Promise(resolve => setTimeout(resolve, 0));

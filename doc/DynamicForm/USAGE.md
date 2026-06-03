@@ -869,6 +869,8 @@ const linkageFunctions = {
 
 #### Dynamic Options
 
+**Using Functions (Dynamic):**
+
 ```typescript
 const schema = {
   type: 'object',
@@ -913,6 +915,63 @@ const linkageFunctions = {
     return [];
   },
 };
+```
+
+**Using Static Values:**
+
+You can also set options directly without using functions:
+
+```typescript
+const schema = {
+  type: 'object',
+  properties: {
+    category: {
+      type: 'string',
+      title: 'Category',
+      enum: ['electronics', 'books'],
+      enumNames: ['Electronics', 'Books'],
+    },
+    subcategory: {
+      type: 'string',
+      title: 'Subcategory',
+      ui: {
+        linkages: [
+          {
+            type: 'options',
+            dependencies: ['#/properties/category'],
+            when: {
+              field: '#/properties/category',
+              operator: '==',
+              value: 'electronics',
+            },
+            fulfill: {
+              options: [
+                { label: 'Laptop', value: 'laptop' },
+                { label: 'Phone', value: 'phone' },
+              ],
+            },
+            otherwise: {
+              options: [
+                { label: 'Fiction', value: 'fiction' },
+                { label: 'Non-Fiction', value: 'nonfiction' },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  },
+};
+```
+
+**Automatic Value Cleanup:**
+
+When options change, the form automatically clears the field value if it's no longer in the new options list. This ensures data validity:
+
+```typescript
+// If user selects category='electronics' and subcategory='laptop',
+// then changes category to 'books', the subcategory field will be
+// automatically cleared since 'laptop' is not in the books options.
 ```
 
 ### Nested Forms
