@@ -1140,7 +1140,7 @@ export const calculatePercentage: LinkageFunction = (
 
 ### 6.0 类型定义
 
-**文件位置**：`src/types/linkage.ts`
+**文件位置**：`src/components/DynamicForm/types/linkage.ts`
 
 ```typescript
 /**
@@ -1174,7 +1174,7 @@ export type LinkageFunction = (
 
 #### 6.1.1 路径判断和解析
 
-**文件位置**：`src/utils/arrayLinkageHelper.ts`
+**文件位置**：`src/components/DynamicForm/utils/arrayLinkageHelper.ts`
 
 ```typescript
 /**
@@ -1216,6 +1216,8 @@ export function extractArrayInfo(path: string): {
 
 #### 6.1.2 JSON Pointer 解析
 
+**文件位置**：`src/components/DynamicForm/utils/arrayLinkageHelper.ts`
+
 ```typescript
 /**
  * 解析 JSON Pointer 为逻辑路径
@@ -1238,6 +1240,10 @@ export function parseJsonPointer(pointer: string): string {
 
 /**
  * 解析相对路径为绝对路径（仅支持同级字段）
+ *
+ * 注意：此函数实际位于 src/components/DynamicForm/utils/pathTransformer.ts
+ * arrayLinkageHelper.ts 通过 import 引入使用
+ *
  * @param relativePath - 相对路径（如 './type'）
  * @param currentPath - 当前字段的完整路径（如 'contacts.0.companyName'）
  * @returns 解析后的绝对路径（如 'contacts.0.type'）
@@ -1582,6 +1588,70 @@ function parseSchemaRecursive(
 - 数组元素的路径不包含索引（模板路径）
 - 在运行时为每个数组元素实例化联动配置
 
+#### 6.2.1 路径转换辅助函数（支持嵌套表单）
+
+除了基本的 Schema 解析功能，`schemaLinkageParser.ts` 还提供了一组辅助函数，用于支持**嵌套表单联动状态传递方案**（第 3.1 节）。这些函数在 NestedFormWidget 创建子 DynamicForm 时使用，将相对路径转换为绝对路径。
+
+```typescript
+/**
+ * 将联动配置的字段路径转换为绝对路径
+ * @param linkages - 原始联动配置（相对路径，数组格式）
+ * @param pathPrefix - 路径前缀（如 'contacts.0'）
+ * @returns 转换后的联动配置（绝对路径，数组格式）
+ */
+export function transformToAbsolutePaths(
+  linkages: Record<string, LinkageConfig[]>,
+  pathPrefix: string
+): Record<string, LinkageConfig[]>;
+
+/**
+ * 转换联动配置内部的路径引用
+ * @param linkage - 原始联动配置
+ * @param pathPrefix - 路径前缀
+ * @param fieldPath - 当前字段的完整路径（用于相对路径解析）
+ * @returns 转换后的联动配置
+ */
+function transformLinkageConfigPaths(
+  linkage: LinkageConfig,
+  pathPrefix: string,
+  fieldPath: string
+): LinkageConfig;
+
+/**
+ * 递归转换条件表达式中的路径
+ */
+function transformConditionPaths(
+  condition: any,
+  pathPrefix: string,
+  fieldPath: string
+): any;
+```
+
+**使用场景**：当 ArrayFieldWidget 渲染对象类型数组元素时，通过 NestedFormWidget 创建新的 DynamicForm 实例。这些辅助函数将内层 DynamicForm 的相对路径联动配置转换为外层表单可识别的绝对路径。
+
+**示例**：
+```typescript
+// 原始联动配置（相对路径）
+const linkages = {
+  'companyName': [{
+    type: 'visibility',
+    dependencies: ['./type'],
+    when: { field: './type', operator: '==', value: 'work' }
+  }]
+};
+
+// 转换为绝对路径
+const absoluteLinkages = transformToAbsolutePaths(linkages, 'contacts.0');
+// 结果：
+// {
+//   'contacts.0.companyName': [{
+//     type: 'visibility',
+//     dependencies: ['contacts.0.type'],
+//     when: { field: 'contacts.0.type', operator: '==', value: 'work' }
+//   }]
+// }
+```
+
 ### 6.3 运行时联动管理
 
 **文件位置**：`src/components/DynamicForm/hooks/useArrayLinkageManager.ts`
@@ -1749,6 +1819,91 @@ export function useArrayLinkageManager({
 7. **循环依赖检测**：在合并联动配置时检测循环依赖
 8. **合并联动配置**：动态生成的联动配置与基础联动配置合并
 9. **执行联动逻辑**：使用基础联动管理器按拓扑层级并行执行联动
+
+#### 6.3.1 性能优化措施
+
+代码实现中包含了多项性能优化措施，确保大数组场景下的稳定性和性能：
+
+**1. 引用稳定化（Reference Stabilization）**
+
+使用 `useRef` 和深度比对避免不必要的重新计算：
+
+```typescript
+const allLinkagesRef = useRef<Record<string, LinkageConfig[]>>({});
+
+const allLinkages = useMemo(() => {
+  const candidate = Object.keys(dynamicLinkages).length === 0
+    ? baseLinkages
+    : { ...baseLinkages, ...dynamicLinkages };
+
+  // 引用稳定化：key 集合和 value 引用双重比对
+  const prev = allLinkagesRef.current;
+  const prevKeys = Object.keys(prev);
+  const nextKeys = Object.keys(candidate);
+  const isSame = prevKeys.length === nextKeys.length &&
+    nextKeys.every(k => k in prev && prev[k] === candidate[k]);
+
+  if (isSame) {
+    return prev; // 返回旧引用，避免触发下游重新计算
+  }
+
+  allLinkagesRef.current = candidate;
+  return candidate;
+}, [baseLinkages, dynamicLinkages, ...]);
+```
+
+**2. 避免死循环**
+
+当 `dynamicLinkages` 为空时直接返回 `baseLinkages` 引用，防止 React 18 Strict Mode 重挂载导致的问题：
+
+```typescript
+const candidate = Object.keys(dynamicLinkages).length === 0
+  ? baseLinkages  // 直接返回引用，避免产生新对象
+  : { ...baseLinkages, ...dynamicLinkages };
+```
+
+**3. 智能刷新机制**
+
+监听 `allLinkages` keys 变化，自动触发联动刷新，避免重复刷新：
+
+```typescript
+useEffect(() => {
+  const currentKeys = Object.keys(allLinkages).sort().join(',');
+  const prevKeys = allLinkagesKeysRef.current;
+  const isKeysChanged = currentKeys !== prevKeys && currentKeys !== '';
+
+  if (isKeysChanged) {
+    allLinkagesKeysRef.current = currentKeys;
+    baseLinkageRefresh();
+  }
+}, [allLinkages, baseLinkageRefresh]);
+```
+
+**4. Key 集合比对**
+
+在 `watch` 回调中使用函数式更新 + key 集合比对，保持引用稳定：
+
+```typescript
+const subscription = watch(() => {
+  setDynamicLinkages(prev => {
+    const next = generateDynamicLinkages();
+    const prevKeys = Object.keys(prev);
+    const nextKeys = Object.keys(next);
+
+    // 只有 keys 集合变化（数组增减元素）时才更新
+    if (prevKeys.length === nextKeys.length && nextKeys.every(k => k in prev)) {
+      return prev;
+    }
+    return next;
+  });
+});
+```
+
+**优化效果**：
+- 避免不必要的联动初始化 useEffect 重复执行
+- 防止 value 联动意外重置字段值
+- 提升大数组场景（100+ 元素）的性能和稳定性
+- 解决 React 18 Strict Mode 下的死循环问题
 
 ### 6.4 集成到 DynamicForm
 

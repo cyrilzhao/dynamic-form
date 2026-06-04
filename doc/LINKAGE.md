@@ -150,21 +150,23 @@ type ConditionOperator =
       "type": "string",
       "title": "详细地址",
       "ui": {
-        "linkage": {
-          "type": "visibility",
-          "dependencies": ["#/properties/hasAddress"],
-          "when": {
-            "field": "#/properties/hasAddress",
-            "operator": "==",
-            "value": true
-          },
-          "fulfill": {
-            "state": { "visible": true }
-          },
-          "otherwise": {
-            "state": { "visible": false }
+        "linkages": [
+          {
+            "type": "visibility",
+            "dependencies": ["#/properties/hasAddress"],
+            "when": {
+              "field": "#/properties/hasAddress",
+              "operator": "==",
+              "value": true
+            },
+            "fulfill": {
+              "state": { "visible": true }
+            },
+            "otherwise": {
+              "state": { "visible": false }
+            }
           }
-        }
+        ]
       }
     }
   }
@@ -186,21 +188,23 @@ type ConditionOperator =
       "type": "boolean",
       "title": "高级功能",
       "ui": {
-        "linkage": {
-          "type": "disabled",
-          "dependencies": ["#/properties/accountType"],
-          "when": {
-            "field": "#/properties/accountType",
-            "operator": "==",
-            "value": "free"
-          },
-          "fulfill": {
-            "state": { "disabled": true }
-          },
-          "otherwise": {
-            "state": { "disabled": false }
+        "linkages": [
+          {
+            "type": "disabled",
+            "dependencies": ["#/properties/accountType"],
+            "when": {
+              "field": "#/properties/accountType",
+              "operator": "==",
+              "value": "free"
+            },
+            "fulfill": {
+              "state": { "disabled": true }
+            },
+            "otherwise": {
+              "state": { "disabled": false }
+            }
           }
-        }
+        ]
       }
     }
   }
@@ -226,13 +230,15 @@ type ConditionOperator =
       "title": "总价",
       "ui": {
         "readonly": true,
-        "linkage": {
-          "type": "value",
-          "dependencies": ["#/properties/price", "#/properties/quantity"],
-          "fulfill": {
-            "function": "calculateTotal"
+        "linkages": [
+          {
+            "type": "value",
+            "dependencies": ["#/properties/price", "#/properties/quantity"],
+            "fulfill": {
+              "function": "calculateTotal"
+            }
           }
-        }
+        ]
       }
     }
   }
@@ -264,13 +270,15 @@ const linkageFunctions = {
       "type": "string",
       "title": "省份/州",
       "ui": {
-        "linkage": {
-          "type": "options",
-          "dependencies": ["#/properties/country"],
-          "fulfill": {
-            "function": "getProvinceOptions"
+        "linkages": [
+          {
+            "type": "options",
+            "dependencies": ["#/properties/country"],
+            "fulfill": {
+              "function": "getProvinceOptions"
+            }
           }
-        }
+        ]
       }
     }
   }
@@ -330,14 +338,16 @@ const linkageFunctions = {
       "type": "string",
       "title": "省份/州",
       "ui": {
-        "linkage": {
-          "type": "options",
-          "dependencies": ["#/properties/country"],
-          "enableCache": true,
-          "fulfill": {
-            "function": "loadProvinceOptions"
+        "linkages": [
+          {
+            "type": "options",
+            "dependencies": ["#/properties/country"],
+            "enableCache": true,
+            "fulfill": {
+              "function": "loadProvinceOptions"
+            }
           }
-        }
+        ]
       }
     }
   }
@@ -418,17 +428,19 @@ const linkageFunctions = {
       "properties": {},
       "ui": {
         "widget": "nested-form",
-        "linkage": {
-          "type": "schema",
-          "dependencies": ["#/properties/productType"],
-          "when": {
-            "field": "#/properties/productType",
-            "operator": "isNotEmpty"
-          },
-          "fulfill": {
-            "function": "loadProductSchema"
+        "linkages": [
+          {
+            "type": "schema",
+            "dependencies": ["#/properties/productType"],
+            "when": {
+              "field": "#/properties/productType",
+              "operator": "isNotEmpty"
+            },
+            "fulfill": {
+              "function": "loadProductSchema"
+            }
           }
-        }
+        ]
       }
     }
   },
@@ -493,30 +505,32 @@ const linkageFunctions = {
       "type": "number",
       "title": "可贷款额度",
       "ui": {
-        "linkage": {
-          "type": "visibility",
-          "dependencies": ["#/properties/age", "#/properties/income"],
-          "when": {
-            "and": [
-              {
-                "field": "#/properties/age",
-                "operator": ">=",
-                "value": 18
-              },
-              {
-                "field": "#/properties/income",
-                "operator": ">=",
-                "value": 50000
-              }
-            ]
-          },
-          "fulfill": {
-            "state": { "visible": true }
-          },
-          "otherwise": {
-            "state": { "visible": false }
+        "linkages": [
+          {
+            "type": "visibility",
+            "dependencies": ["#/properties/age", "#/properties/income"],
+            "when": {
+              "and": [
+                {
+                  "field": "#/properties/age",
+                  "operator": ">=",
+                  "value": 18
+                },
+                {
+                  "field": "#/properties/income",
+                  "operator": ">=",
+                  "value": 50000
+                }
+              ]
+            },
+            "fulfill": {
+              "state": { "visible": true }
+            },
+            "otherwise": {
+              "state": { "visible": false }
+            }
           }
-        }
+        ]
       }
     }
   }
@@ -547,51 +561,53 @@ const linkageFunctions = {
       "type": "string",
       "title": "身份证号",
       "ui": {
-        "linkage": {
-          "type": "visibility",
-          "dependencies": ["#/properties/userType", "#/properties/country", "#/properties/age"],
-          "when": {
-            "and": [
-              {
-                "field": "#/properties/userType",
-                "operator": "==",
-                "value": "individual"
-              },
-              {
-                "or": [
-                  {
-                    "and": [
-                      {
-                        "field": "#/properties/country",
-                        "operator": "==",
-                        "value": "china"
-                      },
-                      {
-                        "field": "#/properties/age",
-                        "operator": ">=",
-                        "value": 16
-                      }
-                    ]
-                  },
-                  {
-                    "and": [
-                      {
-                        "field": "#/properties/country",
-                        "operator": "==",
-                        "value": "japan"
-                      },
-                      {
-                        "field": "#/properties/age",
-                        "operator": ">=",
-                        "value": 20
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
+        "linkages": [
+          {
+            "type": "visibility",
+            "dependencies": ["#/properties/userType", "#/properties/country", "#/properties/age"],
+            "when": {
+              "and": [
+                {
+                  "field": "#/properties/userType",
+                  "operator": "==",
+                  "value": "individual"
+                },
+                {
+                  "or": [
+                    {
+                      "and": [
+                        {
+                          "field": "#/properties/country",
+                          "operator": "==",
+                          "value": "china"
+                        },
+                        {
+                          "field": "#/properties/age",
+                          "operator": ">=",
+                          "value": 16
+                        }
+                      ]
+                    },
+                    {
+                      "and": [
+                        {
+                          "field": "#/properties/country",
+                          "operator": "==",
+                          "value": "japan"
+                        },
+                        {
+                          "field": "#/properties/age",
+                          "operator": ">=",
+                          "value": 20
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
           }
-        }
+        ]
       }
     }
   }
@@ -617,15 +633,17 @@ UI 联动和数据验证是独立的：
       "title": "详细地址",
       "minLength": 5,
       "ui": {
-        "linkage": {
-          "type": "visibility",
-          "dependencies": ["#/properties/hasAddress"],
-          "when": {
-            "field": "#/properties/hasAddress",
-            "operator": "==",
-            "value": true
+        "linkages": [
+          {
+            "type": "visibility",
+            "dependencies": ["#/properties/hasAddress"],
+            "when": {
+              "field": "#/properties/hasAddress",
+              "operator": "==",
+              "value": true
+            }
           }
-        }
+        ]
       }
     }
   },

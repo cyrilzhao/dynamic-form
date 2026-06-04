@@ -301,9 +301,7 @@ const linkageFunctions = {
 #### 8.3.1 安装依赖
 
 ```bash
-npm install react-hook-form
-npm install ajv ajv-formats
-npm install @types/json-schema
+npm install react-hook-form @types/json-schema
 ```
 
 #### 8.3.2 项目配置

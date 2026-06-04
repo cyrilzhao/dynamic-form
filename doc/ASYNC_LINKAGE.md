@@ -162,7 +162,7 @@ t3: 请求 A 完成
 
 ```typescript
 class LinkageTaskQueue {
-  private queue: Array<{ fieldName: string; timestamp: number }> = [];
+  private queue: Array<{ fieldName: string; timestamp: number; affectedFields: string[] }> = [];
   private isProcessing = false;
   private latestTaskMap = new Map<string, number>();
 

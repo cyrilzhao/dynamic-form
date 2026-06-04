@@ -229,15 +229,17 @@ const onSubmit = (data) => console.log(data);
 }
 ```
 
-### 2.3 辅助库
+### 2.3 验证实现
 
-#### @hookform/resolvers
-- 用途: 集成第三方验证库
-- 支持: Yup, Zod, Joi, Ajv 等
-
-#### ajv (Another JSON Schema Validator)
+#### 自定义 SchemaValidator
 - 用途: JSON Schema 验证
-- 特点: 快速、标准兼容
+- 实现: 自定义验证器类，直接实现 JSON Schema 规范
+- 特点:
+  - 无第三方验证库依赖
+  - 支持完整的条件验证逻辑
+  - 支持 dependencies, if/then/else, allOf/anyOf/oneOf
+  - 支持递归验证嵌套字段
+  - 支持自定义格式验证
 
 #### @rjsf/core (可选)
 - 用途: 参考实现

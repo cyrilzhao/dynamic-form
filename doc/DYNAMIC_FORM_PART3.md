@@ -40,7 +40,7 @@ export interface UIConfig {
   style?: React.CSSProperties;
   order?: string[];
   errorMessages?: ErrorMessages;
-  linkage?: LinkageConfig; // UI 联动配置（详见 UI_LINKAGE_DESIGN.md）
+  linkages?: LinkageConfig[]; // UI 联动配置（支持多个联动规则，详见 UI_LINKAGE_DESIGN.md）
   labelWidth?: number | string; // 标签宽度（仅在 horizontal layout 下生效）
   layout?: 'vertical' | 'horizontal' | 'inline'; // 布局方式（优先级高于全局配置）
 
@@ -663,7 +663,7 @@ export interface FieldConfig {
 >
 > - `schema` 字段保留了完整的 ExtendedJSONSchema，包括 `ui` 配置（如 layout、labelWidth 等）
 > - 这使得 FormField 组件可以访问字段级别的布局配置，实现布局优先级覆盖
-> - UI 联动配置（如 linkage）在 schema 的 `ui` 字段中定义，不在 FieldConfig 中
+> - UI 联动配置（如 linkages）在 schema 的 `ui` 字段中定义，不在 FieldConfig 中
 > - JSON Schema 的条件验证（if/then/else、allOf/anyOf/oneOf）由 react-hook-form 和 JSON Schema 验证器处理
 > - 完整的 UI 联动设计和实现请参考：[UI 联动设计文档](./UI_LINKAGE_DESIGN.md)
 

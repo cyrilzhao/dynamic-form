@@ -732,21 +732,10 @@ FormField 组件会将 `widgetProps` 中的所有属性展开传递给 widget：
 }
 ```
 
-对应的验证器注册：
+对应的验证器配置：
 
 ```typescript
-import Ajv from 'ajv';
-import addFormats from 'ajv-formats';
-
-const ajv = new Ajv();
-addFormats(ajv);
-
-// 自定义手机号格式
-ajv.addFormat('phone', {
-  validate: (data: string) => /^1[3-9]\d{9}$/.test(data)
-});
-
-// 在 DynamicForm 中使用
+// 在 DynamicForm 中配置自定义格式验证
 <DynamicForm
   schema={schema}
   customFormats={{
@@ -755,70 +744,62 @@ ajv.addFormat('phone', {
 />
 ```
 
-#### 5.5.2 自定义关键字验证
+**说明**：
+- `customFormats` 是一个对象，键为格式名称，值为验证函数
+- 验证函数接收字符串值，返回布尔值表示是否通过验证
+- 验证器会在字段 `format` 属性匹配时自动调用
 
-```typescript
-ajv.addKeyword({
-  keyword: 'isAdult',
-  validate: (schema: boolean, data: number) => {
-    return schema ? data >= 18 : true;
-  },
-});
-```
+#### 5.5.2 跨字段验证
 
-使用：
+跨字段验证可以通过 JSON Schema 的标准条件验证机制实现，如 `dependencies`、`if/then/else` 等。
 
-```json
-{
-  "type": "integer",
-  "title": "年龄",
-  "isAdult": true
-}
-```
+> **完整文档**：关于条件验证的详细说明，请参考 [JSON Schema 定义规范 - 条件验证机制](./JSON_SCHEMA_DEFINITION.md#条件验证机制)。
 
-#### 5.5.3 跨字段验证
+**示例：使用 dependencies 实现字段依赖**
 
 ```json
 {
   "type": "object",
   "properties": {
-    "password": {
+    "paymentMethod": {
       "type": "string",
-      "title": "密码",
-      "minLength": 6
+      "title": "支付方式",
+      "enum": ["credit_card", "paypal", "bank_transfer"]
     },
-    "confirmPassword": {
+    "cardNumber": {
       "type": "string",
-      "title": "确认密码",
-      "ui": {
-        "widget": "password",
-        "validation": {
-          "function": "matchPassword",
-          "dependencies": ["password"]
+      "title": "卡号"
+    },
+    "paypalEmail": {
+      "type": "string",
+      "title": "PayPal 邮箱"
+    }
+  },
+  "dependencies": {
+    "paymentMethod": {
+      "oneOf": [
+        {
+          "properties": {
+            "paymentMethod": { "const": "credit_card" }
+          },
+          "required": ["cardNumber"]
+        },
+        {
+          "properties": {
+            "paymentMethod": { "const": "paypal" }
+          },
+          "required": ["paypalEmail"]
         }
-      }
+      ]
     }
   }
 }
 ```
 
-对应的验证函数：
-
-```typescript
-const customValidators = {
-  matchPassword: (value: string, formData: any) => {
-    if (value !== formData.password) {
-      return '两次密码输入不一致';
-    }
-    return true;
-  }
-};
-
-<DynamicForm
-  schema={schema}
-  customValidators={customValidators}
-/>
-```
+**说明**：
+- 当 `paymentMethod` 为 `credit_card` 时，`cardNumber` 必填
+- 当 `paymentMethod` 为 `paypal` 时，`paypalEmail` 必填
+- 使用标准 JSON Schema 机制，无需额外的验证函数
 
 ---
 
