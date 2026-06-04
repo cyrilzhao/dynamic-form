@@ -15,7 +15,7 @@ export const SelectWidget = forwardRef<HTMLElement, FieldWidgetProps>(
           value: opt.value,
           disabled: opt.disabled,
         }))}
-        value={value ?? ''}
+        value={value}
         onChange={onChange}
         placeholder={placeholder}
         disabled={disabled || readonly}
