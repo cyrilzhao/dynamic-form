@@ -1,0 +1,151 @@
+.select {
+  position: relative;
+  width: 100%;
+}
+
+.select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.2s;
+
+  &:hover {
+    border-color: #999;
+  }
+
+  &--open {
+    border-color: #4CAF50;
+  }
+
+  &--disabled {
+    background: #f5f5f5;
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  &__value {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__icons {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+  }
+
+  &__clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    font-size: 18px;
+    line-height: 1;
+    color: #999;
+    cursor: pointer;
+
+    &:hover {
+      background-color: #e0e0e0;
+      color: #333;
+    }
+  }
+
+  &__loading {
+    display: inline-block;
+    animation: spin 1s linear infinite;
+    color: #4CAF50;
+  }
+
+  &__arrow {
+    color: #666;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.select-dropdown {
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  overflow-y: auto;
+}
+
+.select-search {
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+
+  &__input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    font-size: 14px;
+    outline: none;
+
+    &:focus {
+      border-color: #4CAF50;
+    }
+  }
+}
+
+.select-option {
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: #f0f0f0;
+  }
+
+  &--selected {
+    background-color: #e8f5e9;
+    font-weight: 500;
+  }
+
+  &--focused {
+    background-color: #f5f5f5;
+  }
+
+  &--disabled {
+    color: #999;
+    cursor: not-allowed;
+    opacity: 0.6;
+
+    &:hover {
+      background-color: transparent;
+    }
+  }
+}
+
+.select-option-group {
+  &__label {
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    background-color: #f9f9f9;
+  }
+
+  &__options {
+    // 选项样式继承自 .select-option
+  }
+}

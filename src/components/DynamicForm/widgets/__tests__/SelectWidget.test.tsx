@@ -16,38 +16,40 @@ describe('SelectWidget', () => {
   describe('基本渲染', () => {
     it('应该渲染下拉选择框', () => {
       render(<SelectWidget {...defaultProps} />);
-      expect(screen.getByRole('combobox')).toBeInTheDocument();
+      expect(screen.getByRole('button')).toBeInTheDocument();
     });
 
-    it('应该渲染所有选项', () => {
+    it('应该在点击后渲染所有选项', () => {
       render(<SelectWidget {...defaultProps} />);
+      const trigger = screen.getByRole('button');
+      fireEvent.click(trigger);
+
+      expect(document.querySelector('.select-option')).toBeInTheDocument();
       expect(screen.getByText('选项A')).toBeInTheDocument();
       expect(screen.getByText('选项B')).toBeInTheDocument();
       expect(screen.getByText('选项C')).toBeInTheDocument();
     });
 
-    it('应该显示 placeholder 作为第一个选项', () => {
+    it('应该显示 placeholder', () => {
       render(<SelectWidget {...defaultProps} placeholder="请选择" />);
-      const options = screen.getAllByRole('option');
-      expect(options[0]).toHaveTextContent('请选择');
-      expect(options[0]).toHaveValue('');
+      expect(screen.getByText('请选择')).toBeInTheDocument();
     });
   });
 
   describe('选中状态', () => {
-    it('应该选中指定的值', () => {
+    it('应该显示选中的值', () => {
       render(<SelectWidget {...defaultProps} value="b" />);
-      expect(screen.getByRole('combobox')).toHaveValue('b');
+      expect(screen.getByText('选项B')).toBeInTheDocument();
     });
 
-    it('value 为 undefined 且有 placeholder 时应该选中空值', () => {
+    it('value 为 undefined 且有 placeholder 时应该显示 placeholder', () => {
       render(<SelectWidget {...defaultProps} value={undefined} placeholder="请选择" />);
-      expect(screen.getByRole('combobox')).toHaveValue('');
+      expect(screen.getByText('请选择')).toBeInTheDocument();
     });
 
-    it('value 为 undefined 且无 placeholder 时应该选中第一个选项', () => {
+    it('value 为 undefined 且无 placeholder 时应该显示默认文本', () => {
       render(<SelectWidget {...defaultProps} value={undefined} />);
-      expect(screen.getByRole('combobox')).toHaveValue('a');
+      expect(screen.getByText('Select...')).toBeInTheDocument();
     });
   });
 
@@ -55,7 +57,13 @@ describe('SelectWidget', () => {
     it('选择选项时应该触发 onChange', () => {
       const onChange = jest.fn();
       render(<SelectWidget {...defaultProps} onChange={onChange} />);
-      fireEvent.change(screen.getByRole('combobox'), { target: { value: 'b' } });
+
+      const trigger = screen.getByRole('button');
+      fireEvent.click(trigger);
+
+      const optionB = screen.getByText('选项B');
+      fireEvent.click(optionB);
+
       expect(onChange).toHaveBeenCalledWith('b');
     });
   });
@@ -63,12 +71,14 @@ describe('SelectWidget', () => {
   describe('禁用状态', () => {
     it('disabled 时应该禁用', () => {
       render(<SelectWidget {...defaultProps} disabled={true} />);
-      expect(screen.getByRole('combobox')).toBeDisabled();
+      const trigger = screen.getByRole('button');
+      expect(trigger).toHaveAttribute('aria-disabled', 'true');
     });
 
     it('readonly 时应该禁用', () => {
       render(<SelectWidget {...defaultProps} readonly={true} />);
-      expect(screen.getByRole('combobox')).toBeDisabled();
+      const trigger = screen.getByRole('button');
+      expect(trigger).toHaveAttribute('aria-disabled', 'true');
     });
 
     it('单个选项可以被禁用', () => {
@@ -77,9 +87,13 @@ describe('SelectWidget', () => {
         { label: '选项B', value: 'b', disabled: true },
       ];
       render(<SelectWidget {...defaultProps} options={options} />);
+
+      const trigger = screen.getByRole('button');
+      fireEvent.click(trigger);
+
       const optionElements = screen.getAllByRole('option');
-      expect(optionElements[0]).not.toBeDisabled();
-      expect(optionElements[1]).toBeDisabled();
+      expect(optionElements[0]).not.toHaveAttribute('aria-disabled', 'true');
+      expect(optionElements[1]).toHaveAttribute('aria-disabled', 'true');
     });
   });
 });

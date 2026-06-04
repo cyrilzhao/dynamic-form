@@ -1,30 +1,26 @@
 import { forwardRef } from 'react';
-import { HTMLSelect } from '@blueprintjs/core';
+import { Select } from '../../Select';
 import type { FieldWidgetProps } from '../types';
 import type { FieldOption } from '../types/schema';
 
-export const SelectWidget = forwardRef<HTMLSelectElement, FieldWidgetProps>(
+export const SelectWidget = forwardRef<HTMLElement, FieldWidgetProps>(
   (
     { name, placeholder, disabled, readonly, options = [], error, value, onChange, ...rest },
     ref
   ) => {
     return (
-      <HTMLSelect
-        ref={ref}
-        name={name}
-        disabled={disabled || readonly}
-        fill
+      <Select
+        options={options.map((opt: FieldOption) => ({
+          label: opt.label,
+          value: opt.value,
+          disabled: opt.disabled,
+        }))}
         value={value ?? ''}
-        onChange={e => onChange?.(e.target.value)}
+        onChange={onChange}
+        placeholder={placeholder}
+        disabled={disabled || readonly}
         {...rest}
-      >
-        {placeholder && <option value="">{placeholder}</option>}
-        {options.map((option: FieldOption) => (
-          <option key={option.value} value={option.value} disabled={option.disabled}>
-            {option.label}
-          </option>
-        ))}
-      </HTMLSelect>
+      />
     );
   }
 );
