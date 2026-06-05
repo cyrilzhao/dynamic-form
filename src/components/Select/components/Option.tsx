@@ -15,6 +15,7 @@ export const Option: React.FC<OptionProps> = ({
   onClick,
 }) => {
   const handleClick = () => {
+    console.log('[Option handleClick]', { option, disabled: option.disabled });
     if (!option.disabled) {
       onClick();
     }

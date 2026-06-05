@@ -40,7 +40,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
     if (isOpen && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
       setPosition({
-        top: rect.bottom + 4,
+        top: rect.bottom,
         left: rect.left,
         width: rect.width,
       });
@@ -92,7 +92,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
         <Option
           key={option.value}
           option={option}
-          isSelected={selectedValues.includes(option.value)}
+          isSelected={selectedValues.some(v => v == option.value)}
           isFocused={index === focusedIndex}
           onClick={() => onSelect(option)}
         />
@@ -106,7 +106,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
               <Option
                 key={option.value}
                 option={option}
-                isSelected={selectedValues.includes(option.value)}
+                isSelected={selectedValues.some(v => v == option.value)}
                 isFocused={groupStartIndex + index === focusedIndex}
                 onClick={() => onSelect(option)}
               />

@@ -46,18 +46,26 @@ export const Select: React.FC<SelectProps> = ({
   }, [value]);
 
   // 获取选中的选项对象
+  // 使用宽松比较（==）以处理类型不一致的情况（如字符串"1"和数字1）
   const selectedOptions = useMemo(() => {
-    return options.filter(opt => selectedValues.includes(opt.value));
+    return options.filter(opt =>
+      selectedValues.some(v => v == opt.value)
+    );
   }, [options, selectedValues]);
 
   const handleSelect = useCallback(
     (option: SelectOption) => {
+      console.log('[Select handleSelect]', { option, multiple, selectedValues });
       if (multiple) {
-        const newValues = selectedValues.includes(option.value)
-          ? selectedValues.filter(v => v !== option.value)
+        // 使用宽松比较处理类型不一致的情况
+        const isSelected = selectedValues.some(v => v == option.value);
+        const newValues = isSelected
+          ? selectedValues.filter(v => v != option.value)
           : [...selectedValues, option.value];
+        console.log('[Select handleSelect] calling onChange with', newValues);
         onChange?.(newValues);
       } else {
+        console.log('[Select handleSelect] calling onChange with', option.value);
         onChange?.(option.value);
         setIsOpen(false);
       }
