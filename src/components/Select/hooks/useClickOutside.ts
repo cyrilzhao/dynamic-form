@@ -11,9 +11,20 @@ interface UseClickOutsideParams {
 export function useClickOutside({ ref, handler }: UseClickOutsideParams) {
   useEffect(() => {
     const listener = (event: MouseEvent) => {
-      if (!ref.current?.contains(event.target as Node)) {
-        handler();
+      const target = event.target as Node;
+
+      // 检查是否点击在 ref 容器内
+      if (ref.current?.contains(target)) {
+        return;
       }
+
+      // 检查是否点击在下拉菜单内（通过 portal 渲染到 body）
+      const clickedElement = target as HTMLElement;
+      if (clickedElement.closest?.('.select-dropdown')) {
+        return;
+      }
+
+      handler();
     };
 
     document.addEventListener('mousedown', listener);

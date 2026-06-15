@@ -38,7 +38,7 @@ export const Trigger = forwardRef<HTMLDivElement, TriggerProps>(
         aria-expanded={isOpen}
       >
         <span className="select-trigger__value">{displayText}</span>
-        <div className="select-trigger__icons">
+        <div className="select-trigger__icons" style={{ borderLeft: '1px solid #d1d5db', paddingLeft: '8px' }}>
           {loading && <span className="select-trigger__loading">⟳</span>}
           {showClearButton && (
             <span className="select-trigger__clear" onClick={handleClear}>
