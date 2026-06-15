@@ -1,16 +1,16 @@
-import type { ExtendedJSONSchema } from '../types/schema';
+import type { ExtendedJSONSchema } from '../types/schema'
 
 /**
  * Schema 级别验证器
  * 负责处理 JSON Schema 中的条件验证机制
  */
 export class SchemaValidator {
-  private schema: ExtendedJSONSchema;
-  private rootSchema: ExtendedJSONSchema;
+  private schema: ExtendedJSONSchema
+  private rootSchema: ExtendedJSONSchema
 
   constructor(schema: ExtendedJSONSchema, rootSchema?: ExtendedJSONSchema) {
-    this.schema = schema;
-    this.rootSchema = rootSchema || schema;
+    this.schema = schema
+    this.rootSchema = rootSchema || schema
   }
 
   /**
@@ -27,51 +27,57 @@ export class SchemaValidator {
    * @param recursive - 是否递归验证嵌套字段（默认 false，只验证当前层）
    * @returns 验证错误对象，键为字段名，值为错误信息
    */
-  validate(formData: Record<string, any>, recursive: boolean = false): Record<string, string> {
-    const errors: Record<string, string> = {};
+  validate(
+    formData: Record<string, any>,
+    recursive: boolean = false
+  ): Record<string, string> {
+    const errors: Record<string, string> = {}
 
     // 1. 验证 required 字段
     if (this.schema.required && Array.isArray(this.schema.required)) {
       for (const requiredField of this.schema.required) {
         if (!this.hasValue(formData[requiredField])) {
-          errors[requiredField] = `${this.getFieldTitle(requiredField)} is required`;
+          errors[requiredField] =
+            `${this.getFieldTitle(requiredField)} is required`
         }
       }
     }
 
     // 2. 验证 properties 中的约束
     if (this.schema.properties) {
-      for (const [fieldName, fieldSchema] of Object.entries(this.schema.properties)) {
-        if (typeof fieldSchema === 'boolean') continue;
+      for (const [fieldName, fieldSchema] of Object.entries(
+        this.schema.properties
+      )) {
+        if (typeof fieldSchema === 'boolean') continue
 
-        const fieldValue = formData[fieldName];
+        const fieldValue = formData[fieldName]
         const fieldErrors = this.validateFieldValue({
           value: fieldValue,
           schema: fieldSchema,
           fieldName,
           parentSchema: this.schema,
           recursive,
-        });
-        Object.assign(errors, fieldErrors);
+        })
+        Object.assign(errors, fieldErrors)
       }
     }
 
     // 3. 处理 dependencies
-    this.validateDependencies(formData, errors, recursive);
+    this.validateDependencies(formData, errors, recursive)
 
     // 4. 处理 if/then/else
-    this.validateConditional(formData, errors, recursive);
+    this.validateConditional(formData, errors, recursive)
 
     // 5. 处理 allOf
-    this.validateAllOf(formData, errors, recursive);
+    this.validateAllOf(formData, errors, recursive)
 
     // 6. 处理 anyOf
-    this.validateAnyOf(formData, errors, recursive);
+    this.validateAnyOf(formData, errors, recursive)
 
     // 7. 处理 oneOf
-    this.validateOneOf(formData, errors, recursive);
+    this.validateOneOf(formData, errors, recursive)
 
-    return errors;
+    return errors
   }
 
   /**
@@ -80,10 +86,10 @@ export class SchemaValidator {
    * @returns 如果值存在返回 true，否则返回 false
    */
   private hasValue(value: any): boolean {
-    if (value === null || value === undefined) return false;
-    if (typeof value === 'string' && value.trim() === '') return false;
-    if (Array.isArray(value) && value.length === 0) return false;
-    return true;
+    if (value === null || value === undefined) return false
+    if (typeof value === 'string' && value.trim() === '') return false
+    if (Array.isArray(value) && value.length === 0) return false
+    return true
   }
 
   /**
@@ -94,18 +100,21 @@ export class SchemaValidator {
    * @param schema - 可选的 Schema，用于查找字段标题
    * @returns 字段标题，如果找不到则返回字段名称本身
    */
-  private getFieldTitle(fieldName: string, schema?: ExtendedJSONSchema): string {
+  private getFieldTitle(
+    fieldName: string,
+    schema?: ExtendedJSONSchema
+  ): string {
     // 优先从根 schema 查找（包含所有字段的 title）
-    const title = this.findFieldTitle(fieldName, this.rootSchema);
-    if (title) return title;
+    const title = this.findFieldTitle(fieldName, this.rootSchema)
+    if (title) return title
 
     // 如果根 schema 没找到，再从传入的 schema 查找
     if (schema) {
-      const schemaTitle = this.findFieldTitle(fieldName, schema);
-      if (schemaTitle) return schemaTitle;
+      const schemaTitle = this.findFieldTitle(fieldName, schema)
+      if (schemaTitle) return schemaTitle
     }
 
-    return fieldName;
+    return fieldName
   }
 
   /**
@@ -116,27 +125,38 @@ export class SchemaValidator {
    * @param schema - 要查找的 Schema
    * @returns 字段标题，如果找不到则返回 null
    */
-  private findFieldTitle(fieldName: string, schema: ExtendedJSONSchema): string | null {
-    if (!schema.properties) return null;
+  private findFieldTitle(
+    fieldName: string,
+    schema: ExtendedJSONSchema
+  ): string | null {
+    if (!schema.properties) return null
 
     // 直接查找当前层级
-    const fieldSchema = schema.properties[fieldName];
-    if (fieldSchema && typeof fieldSchema === 'object' && 'title' in fieldSchema) {
-      const title = fieldSchema.title;
+    const fieldSchema = schema.properties[fieldName]
+    if (
+      fieldSchema &&
+      typeof fieldSchema === 'object' &&
+      'title' in fieldSchema
+    ) {
+      const title = fieldSchema.title
       if (title && typeof title === 'string') {
-        return title;
+        return title
       }
     }
 
     // 递归查找嵌套的 object 类型字段
     for (const [_, propSchema] of Object.entries(schema.properties)) {
-      if (typeof propSchema === 'object' && propSchema.type === 'object' && propSchema.properties) {
-        const nestedTitle = this.findFieldTitle(fieldName, propSchema);
-        if (nestedTitle) return nestedTitle;
+      if (
+        typeof propSchema === 'object' &&
+        propSchema.type === 'object' &&
+        propSchema.properties
+      ) {
+        const nestedTitle = this.findFieldTitle(fieldName, propSchema)
+        if (nestedTitle) return nestedTitle
       }
     }
 
-    return null;
+    return null
   }
 
   /**
@@ -145,9 +165,12 @@ export class SchemaValidator {
    * @param schema - 要匹配的 JSON Schema
    * @returns 如果数据匹配 schema 返回 true，否则返回 false
    */
-  private matchesSchema(formData: Record<string, any>, schema: ExtendedJSONSchema): boolean {
-    const errors = this.validateAgainstSchema(formData, schema, false);
-    return Object.keys(errors).length === 0;
+  private matchesSchema(
+    formData: Record<string, any>,
+    schema: ExtendedJSONSchema
+  ): boolean {
+    const errors = this.validateAgainstSchema(formData, schema, false)
+    return Object.keys(errors).length === 0
   }
 
   /**
@@ -164,10 +187,12 @@ export class SchemaValidator {
     errors: Record<string, string>,
     recursive: boolean
   ): void {
-    const dependencies = this.schema.dependencies;
-    if (!dependencies) return;
+    const dependencies = this.schema.dependencies
+    if (!dependencies) return
 
-    for (const [triggerField, dependentFields] of Object.entries(dependencies)) {
+    for (const [triggerField, dependentFields] of Object.entries(
+      dependencies
+    )) {
       // 如果触发字段有值
       if (this.hasValue(formData[triggerField])) {
         // 检查依赖字段
@@ -176,7 +201,7 @@ export class SchemaValidator {
           for (const dependentField of dependentFields) {
             if (!this.hasValue(formData[dependentField])) {
               errors[dependentField] =
-                `${this.getFieldTitle(dependentField)} is required when ${this.getFieldTitle(triggerField)} is provided`;
+                `${this.getFieldTitle(dependentField)} is required when ${this.getFieldTitle(triggerField)} is provided`
             }
           }
         } else if (typeof dependentFields === 'object') {
@@ -185,8 +210,8 @@ export class SchemaValidator {
             formData,
             dependentFields as ExtendedJSONSchema,
             recursive
-          );
-          Object.assign(errors, dependencyErrors);
+          )
+          Object.assign(errors, dependencyErrors)
         }
       }
     }
@@ -204,15 +229,18 @@ export class SchemaValidator {
     errors: Record<string, string>,
     recursive: boolean
   ): void {
-    const { if: ifSchema, then: thenSchema, else: elseSchema } = this.schema;
+    const { if: ifSchema, then: thenSchema, else: elseSchema } = this.schema
 
-    if (!ifSchema) return;
+    if (!ifSchema) return
 
     // 检查 if 条件是否满足
-    const ifMatches = this.matchesSchema(formData, ifSchema as ExtendedJSONSchema);
+    const ifMatches = this.matchesSchema(
+      formData,
+      ifSchema as ExtendedJSONSchema
+    )
 
     // 根据条件选择对应的 schema
-    const targetSchema = ifMatches ? thenSchema : elseSchema;
+    const targetSchema = ifMatches ? thenSchema : elseSchema
 
     if (targetSchema) {
       // 验证表单数据是否满足目标 schema
@@ -220,8 +248,8 @@ export class SchemaValidator {
         formData,
         targetSchema as ExtendedJSONSchema,
         recursive
-      );
-      Object.assign(errors, conditionalErrors);
+      )
+      Object.assign(errors, conditionalErrors)
     }
   }
 
@@ -237,8 +265,8 @@ export class SchemaValidator {
     errors: Record<string, string>,
     recursive: boolean
   ): void {
-    const allOf = this.schema.allOf;
-    if (!allOf || !Array.isArray(allOf)) return;
+    const allOf = this.schema.allOf
+    if (!allOf || !Array.isArray(allOf)) return
 
     // 必须满足所有子 schema
     for (const subSchema of allOf) {
@@ -246,8 +274,8 @@ export class SchemaValidator {
         formData,
         subSchema as ExtendedJSONSchema,
         recursive
-      );
-      Object.assign(errors, subErrors);
+      )
+      Object.assign(errors, subErrors)
     }
   }
 
@@ -264,43 +292,43 @@ export class SchemaValidator {
     errors: Record<string, string>,
     recursive: boolean
   ): void {
-    const anyOf = this.schema.anyOf;
-    if (!anyOf || !Array.isArray(anyOf)) return;
+    const anyOf = this.schema.anyOf
+    if (!anyOf || !Array.isArray(anyOf)) return
 
     // 至少满足一个子 schema
-    const allSubErrors: Record<string, string>[] = [];
-    let hasMatch = false;
+    const allSubErrors: Record<string, string>[] = []
+    let hasMatch = false
 
     for (const subSchema of anyOf) {
       const subErrors = this.validateAgainstSchema(
         formData,
         subSchema as ExtendedJSONSchema,
         recursive
-      );
+      )
       if (Object.keys(subErrors).length === 0) {
-        hasMatch = true;
-        break;
+        hasMatch = true
+        break
       }
-      allSubErrors.push(subErrors);
+      allSubErrors.push(subErrors)
     }
 
     // 如果没有任何一个 schema 匹配，收集所有错误
     if (!hasMatch) {
       // 合并所有子 schema 的错误信息
-      const combinedErrors: Record<string, string[]> = {};
+      const combinedErrors: Record<string, string[]> = {}
       for (const subErrors of allSubErrors) {
         for (const [field, message] of Object.entries(subErrors)) {
           if (!combinedErrors[field]) {
-            combinedErrors[field] = [];
+            combinedErrors[field] = []
           }
-          combinedErrors[field].push(message);
+          combinedErrors[field].push(message)
         }
       }
 
       // 生成友好的错误提示
       for (const [field, messages] of Object.entries(combinedErrors)) {
         errors[field] =
-          `Must satisfy at least one of the following conditions: ${messages.join(' or ')}`;
+          `Must satisfy at least one of the following conditions: ${messages.join(' or ')}`
       }
     }
   }
@@ -319,37 +347,37 @@ export class SchemaValidator {
     errors: Record<string, string>,
     recursive: boolean
   ): void {
-    const oneOf = this.schema.oneOf;
-    if (!oneOf || !Array.isArray(oneOf)) return;
+    const oneOf = this.schema.oneOf
+    if (!oneOf || !Array.isArray(oneOf)) return
 
     // 有且仅有一个子 schema 匹配
-    let matchCount = 0;
-    let bestMatchErrors: Record<string, string> = {};
-    let minErrorCount = Infinity;
+    let matchCount = 0
+    let bestMatchErrors: Record<string, string> = {}
+    let minErrorCount = Infinity
 
     for (const subSchema of oneOf) {
       const subErrors = this.validateAgainstSchema(
         formData,
         subSchema as ExtendedJSONSchema,
         recursive
-      );
-      const errorCount = Object.keys(subErrors).length;
+      )
+      const errorCount = Object.keys(subErrors).length
 
       if (errorCount === 0) {
-        matchCount++;
+        matchCount++
       } else if (errorCount < minErrorCount) {
         // 保存错误最少的 schema 的错误（最接近匹配）
-        minErrorCount = errorCount;
-        bestMatchErrors = subErrors;
+        minErrorCount = errorCount
+        bestMatchErrors = subErrors
       }
     }
 
     if (matchCount === 0) {
       // 没有任何 schema 匹配，返回最接近匹配的 schema 的错误
-      Object.assign(errors, bestMatchErrors);
+      Object.assign(errors, bestMatchErrors)
     } else if (matchCount > 1) {
       // 多个 schema 匹配（互斥条件冲突）
-      errors['_schema'] = 'Data matches multiple mutually exclusive conditions';
+      errors['_schema'] = 'Data matches multiple mutually exclusive conditions'
     }
     // matchCount === 1 时验证通过，不添加错误
   }
@@ -370,58 +398,61 @@ export class SchemaValidator {
     schema: ExtendedJSONSchema,
     recursive: boolean
   ): Record<string, string> {
-    const errors: Record<string, string> = {};
+    const errors: Record<string, string> = {}
 
     // 1. 验证 required 字段
     if (schema.required && Array.isArray(schema.required)) {
       for (const requiredField of schema.required) {
         if (!this.hasValue(formData[requiredField])) {
-          errors[requiredField] = `${this.getFieldTitle(requiredField, schema)} is required`;
+          errors[requiredField] =
+            `${this.getFieldTitle(requiredField, schema)} is required`
         }
       }
     }
 
     // 2. 验证 properties 中的约束
     if (schema.properties) {
-      for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
-        if (typeof fieldSchema === 'boolean') continue;
+      for (const [fieldName, fieldSchema] of Object.entries(
+        schema.properties
+      )) {
+        if (typeof fieldSchema === 'boolean') continue
 
-        const fieldValue = formData[fieldName];
+        const fieldValue = formData[fieldName]
         const fieldErrors = this.validateFieldValue({
           value: fieldValue,
           schema: fieldSchema,
           fieldName,
           parentSchema: schema,
           recursive,
-        });
-        Object.assign(errors, fieldErrors);
+        })
+        Object.assign(errors, fieldErrors)
       }
     }
 
     // 3. 处理 oneOf/anyOf/allOf/if（如果传入的 schema 包含这些字段）
     if (schema.oneOf || schema.anyOf || schema.allOf || schema.if) {
       // 创建临时验证器来处理嵌套的条件验证，传入 rootSchema 以保持对顶层 schema 的引用
-      const nestedValidator = new SchemaValidator(schema, this.rootSchema);
+      const nestedValidator = new SchemaValidator(schema, this.rootSchema)
 
       // 直接调用相应的验证方法，而不是调用 validate（避免重复验证）
       if (schema.dependencies) {
-        nestedValidator.validateDependencies(formData, errors, recursive);
+        nestedValidator.validateDependencies(formData, errors, recursive)
       }
       if (schema.if) {
-        nestedValidator.validateConditional(formData, errors, recursive);
+        nestedValidator.validateConditional(formData, errors, recursive)
       }
       if (schema.allOf) {
-        nestedValidator.validateAllOf(formData, errors, recursive);
+        nestedValidator.validateAllOf(formData, errors, recursive)
       }
       if (schema.anyOf) {
-        nestedValidator.validateAnyOf(formData, errors, recursive);
+        nestedValidator.validateAnyOf(formData, errors, recursive)
       }
       if (schema.oneOf) {
-        nestedValidator.validateOneOf(formData, errors, recursive);
+        nestedValidator.validateOneOf(formData, errors, recursive)
       }
     }
 
-    return errors;
+    return errors
   }
 
   /**
@@ -448,70 +479,95 @@ export class SchemaValidator {
     parentSchema,
     recursive,
   }: {
-    value: any;
-    schema: ExtendedJSONSchema;
-    fieldName: string;
-    parentSchema?: ExtendedJSONSchema;
-    recursive: boolean;
+    value: any
+    schema: ExtendedJSONSchema
+    fieldName: string
+    parentSchema?: ExtendedJSONSchema
+    recursive: boolean
   }): Record<string, string> {
-    const errors: Record<string, string> = {};
+    const errors: Record<string, string> = {}
 
     // 如果值不存在，跳过验证（required 已在上层处理）
-    if (!this.hasValue(value)) return errors;
+    // 但对于数组类型，即使是空数组也需要验证类型约束（如 minItems）
+    const isEmptyArray = Array.isArray(value) && value.length === 0
+    if (!this.hasValue(value) && !isEmptyArray) return errors
 
     // 验证 const（常量值）
     if (schema.const !== undefined && value !== schema.const) {
-      errors[fieldName] = `${this.getFieldTitle(fieldName, parentSchema)} must be ${schema.const}`;
-      return errors;
+      errors[fieldName] =
+        `${this.getFieldTitle(fieldName, parentSchema)} must be ${schema.const}`
+      return errors
     }
 
     // 验证 enum（枚举值）
     if (schema.enum && !schema.enum.includes(value)) {
       errors[fieldName] =
-        `${this.getFieldTitle(fieldName, parentSchema)} must be one of: ${schema.enum.join(', ')}`;
-      return errors;
+        `${this.getFieldTitle(fieldName, parentSchema)} must be one of: ${schema.enum.join(', ')}`
+      return errors
     }
 
     // 根据类型验证
     // 如果没有明确的 type，根据其他字段推断类型
-    let inferredType = schema.type;
+    let inferredType = schema.type
     if (!inferredType) {
-      if (schema.pattern || schema.minLength || schema.maxLength || schema.format) {
-        inferredType = 'string';
+      if (
+        schema.pattern ||
+        schema.minLength ||
+        schema.maxLength ||
+        schema.format
+      ) {
+        inferredType = 'string'
       } else if (
         schema.minimum !== undefined ||
         schema.maximum !== undefined ||
         schema.multipleOf !== undefined
       ) {
-        inferredType = 'number';
+        inferredType = 'number'
       } else if (
         schema.minItems !== undefined ||
         schema.maxItems !== undefined ||
         schema.uniqueItems
       ) {
-        inferredType = 'array';
-      } else if (schema.minProperties !== undefined || schema.maxProperties !== undefined) {
-        inferredType = 'object';
+        inferredType = 'array'
+      } else if (
+        schema.minProperties !== undefined ||
+        schema.maxProperties !== undefined
+      ) {
+        inferredType = 'object'
       }
     }
 
     switch (inferredType) {
       case 'string':
-        this.validateString({ value, schema, fieldName, errors, parentSchema });
-        break;
+        this.validateString({ value, schema, fieldName, errors, parentSchema })
+        break
       case 'number':
       case 'integer':
-        this.validateNumber({ value, schema, fieldName, errors, parentSchema });
-        break;
+        this.validateNumber({ value, schema, fieldName, errors, parentSchema })
+        break
       case 'array':
-        this.validateArray({ value, schema, fieldName, errors, parentSchema, recursive });
-        break;
+        this.validateArray({
+          value,
+          schema,
+          fieldName,
+          errors,
+          parentSchema,
+          recursive,
+        })
+        break
       case 'object':
-        this.validateObject({ value, schema, fieldName, errors, parentSchema, recursive });
-        break;
+        this.validateObject({
+          value,
+          schema,
+          fieldName,
+          errors,
+          parentSchema,
+          recursive,
+        })
+        break
     }
 
-    return errors;
+    return errors
   }
 
   /**
@@ -529,29 +585,30 @@ export class SchemaValidator {
     errors,
     parentSchema,
   }: {
-    value: string;
-    schema: ExtendedJSONSchema;
-    fieldName: string;
-    errors: Record<string, string>;
-    parentSchema?: ExtendedJSONSchema;
+    value: string
+    schema: ExtendedJSONSchema
+    fieldName: string
+    errors: Record<string, string>
+    parentSchema?: ExtendedJSONSchema
   }): void {
     // 验证最小长度
     if (schema.minLength !== undefined && value.length < schema.minLength) {
       errors[fieldName] =
-        `${this.getFieldTitle(fieldName, parentSchema)} minimum length is ${schema.minLength} characters`;
+        `${this.getFieldTitle(fieldName, parentSchema)} minimum length is ${schema.minLength} characters`
     }
 
     // 验证最大长度
     if (schema.maxLength !== undefined && value.length > schema.maxLength) {
       errors[fieldName] =
-        `${this.getFieldTitle(fieldName, parentSchema)} maximum length is ${schema.maxLength} characters`;
+        `${this.getFieldTitle(fieldName, parentSchema)} maximum length is ${schema.maxLength} characters`
     }
 
     // 验证正则表达式
     if (schema.pattern) {
-      const regex = new RegExp(schema.pattern);
+      const regex = new RegExp(schema.pattern)
       if (!regex.test(value)) {
-        errors[fieldName] = `${this.getFieldTitle(fieldName, parentSchema)} invalid format`;
+        errors[fieldName] =
+          `${this.getFieldTitle(fieldName, parentSchema)} invalid format`
       }
     }
 
@@ -562,9 +619,9 @@ export class SchemaValidator {
         format: schema.format,
         fieldName,
         parentSchema,
-      });
+      })
       if (formatError) {
-        errors[fieldName] = formatError;
+        errors[fieldName] = formatError
       }
     }
   }
@@ -584,40 +641,46 @@ export class SchemaValidator {
     errors,
     parentSchema,
   }: {
-    value: number;
-    schema: ExtendedJSONSchema;
-    fieldName: string;
-    errors: Record<string, string>;
-    parentSchema?: ExtendedJSONSchema;
+    value: number
+    schema: ExtendedJSONSchema
+    fieldName: string
+    errors: Record<string, string>
+    parentSchema?: ExtendedJSONSchema
   }): void {
     // 验证最小值
     if (schema.minimum !== undefined && value < schema.minimum) {
       errors[fieldName] =
-        `${this.getFieldTitle(fieldName, parentSchema)} minimum value is ${schema.minimum}`;
+        `${this.getFieldTitle(fieldName, parentSchema)} minimum value is ${schema.minimum}`
     }
 
     // 验证最大值
     if (schema.maximum !== undefined && value > schema.maximum) {
       errors[fieldName] =
-        `${this.getFieldTitle(fieldName, parentSchema)} maximum value is ${schema.maximum}`;
+        `${this.getFieldTitle(fieldName, parentSchema)} maximum value is ${schema.maximum}`
     }
 
     // 验证排他最小值
-    if (schema.exclusiveMinimum !== undefined && value <= schema.exclusiveMinimum) {
+    if (
+      schema.exclusiveMinimum !== undefined &&
+      value <= schema.exclusiveMinimum
+    ) {
       errors[fieldName] =
-        `${this.getFieldTitle(fieldName, parentSchema)} must be greater than ${schema.exclusiveMinimum}`;
+        `${this.getFieldTitle(fieldName, parentSchema)} must be greater than ${schema.exclusiveMinimum}`
     }
 
     // 验证排他最大值
-    if (schema.exclusiveMaximum !== undefined && value >= schema.exclusiveMaximum) {
+    if (
+      schema.exclusiveMaximum !== undefined &&
+      value >= schema.exclusiveMaximum
+    ) {
       errors[fieldName] =
-        `${this.getFieldTitle(fieldName, parentSchema)} must be less than ${schema.exclusiveMaximum}`;
+        `${this.getFieldTitle(fieldName, parentSchema)} must be less than ${schema.exclusiveMaximum}`
     }
 
     // 验证倍数
     if (schema.multipleOf !== undefined && value % schema.multipleOf !== 0) {
       errors[fieldName] =
-        `${this.getFieldTitle(fieldName, parentSchema)} must be a multiple of ${schema.multipleOf}`;
+        `${this.getFieldTitle(fieldName, parentSchema)} must be a multiple of ${schema.multipleOf}`
     }
   }
 
@@ -638,67 +701,80 @@ export class SchemaValidator {
     parentSchema,
     recursive,
   }: {
-    value: any[];
-    schema: ExtendedJSONSchema;
-    fieldName: string;
-    errors: Record<string, string>;
-    parentSchema?: ExtendedJSONSchema;
-    recursive: boolean;
+    value: any[]
+    schema: ExtendedJSONSchema
+    fieldName: string
+    errors: Record<string, string>
+    parentSchema?: ExtendedJSONSchema
+    recursive: boolean
   }): void {
     // 验证最小项数
     if (schema.minItems !== undefined && value.length < schema.minItems) {
       errors[fieldName] =
-        `${this.getFieldTitle(fieldName, parentSchema)} requires at least ${schema.minItems} items`;
+        `${this.getFieldTitle(fieldName, parentSchema)} requires at least ${schema.minItems} items`
     }
 
     // 验证最大项数
     if (schema.maxItems !== undefined && value.length > schema.maxItems) {
       errors[fieldName] =
-        `${this.getFieldTitle(fieldName, parentSchema)} allows at most ${schema.maxItems} items`;
+        `${this.getFieldTitle(fieldName, parentSchema)} allows at most ${schema.maxItems} items`
     }
 
     // 验证唯一性
     if (schema.uniqueItems) {
-      const uniqueValues = new Set(value.map(v => JSON.stringify(v)));
+      const uniqueValues = new Set(value.map((v) => JSON.stringify(v)))
       if (uniqueValues.size !== value.length) {
         errors[fieldName] =
-          `${this.getFieldTitle(fieldName, parentSchema)} must not contain duplicate items`;
+          `${this.getFieldTitle(fieldName, parentSchema)} must not contain duplicate items`
       }
     }
 
     // 如果 recursive 为 true，递归验证数组元素
-    if (recursive && schema.items && typeof schema.items !== 'boolean' && !Array.isArray(schema.items)) {
-      const itemsSchema = schema.items;
+    if (
+      recursive &&
+      schema.items &&
+      typeof schema.items !== 'boolean' &&
+      !Array.isArray(schema.items)
+    ) {
+      const itemsSchema = schema.items
 
       for (let i = 0; i < value.length; i++) {
-        const item = value[i];
+        const item = value[i]
 
         // 如果 items 是对象类型，递归验证其 properties
-        if (itemsSchema.type === 'object' && typeof item === 'object' && item !== null) {
+        if (
+          itemsSchema.type === 'object' &&
+          typeof item === 'object' &&
+          item !== null
+        ) {
           // 检查 required 字段
           if (itemsSchema.required && Array.isArray(itemsSchema.required)) {
             for (const requiredField of itemsSchema.required) {
-              if (!this.hasValue((item as Record<string, any>)[requiredField])) {
+              if (
+                !this.hasValue((item as Record<string, any>)[requiredField])
+              ) {
                 errors[`${fieldName}[${i}].${requiredField}`] =
-                  `${this.getFieldTitle(requiredField, itemsSchema)} is required`;
+                  `${this.getFieldTitle(requiredField, itemsSchema)} is required`
               }
             }
           }
 
           // 递归验证 properties
           if (itemsSchema.properties) {
-            for (const [propName, propSchema] of Object.entries(itemsSchema.properties)) {
-              if (typeof propSchema === 'boolean') continue;
+            for (const [propName, propSchema] of Object.entries(
+              itemsSchema.properties
+            )) {
+              if (typeof propSchema === 'boolean') continue
 
-              const propValue = (item as Record<string, any>)[propName];
+              const propValue = (item as Record<string, any>)[propName]
               const propErrors = this.validateFieldValue({
                 value: propValue,
                 schema: propSchema,
                 fieldName: `${fieldName}[${i}].${propName}`,
                 parentSchema: itemsSchema,
                 recursive: true,
-              });
-              Object.assign(errors, propErrors);
+              })
+              Object.assign(errors, propErrors)
             }
           }
         } else {
@@ -709,8 +785,8 @@ export class SchemaValidator {
             fieldName: `${fieldName}[${i}]`,
             parentSchema: schema,
             recursive: true,
-          });
-          Object.assign(errors, itemErrors);
+          })
+          Object.assign(errors, itemErrors)
         }
       }
     }
@@ -733,28 +809,28 @@ export class SchemaValidator {
     parentSchema,
     recursive,
   }: {
-    value: Record<string, any>;
-    schema: ExtendedJSONSchema;
-    fieldName: string;
-    errors: Record<string, string>;
-    parentSchema?: ExtendedJSONSchema;
-    recursive: boolean;
+    value: Record<string, any>
+    schema: ExtendedJSONSchema
+    fieldName: string
+    errors: Record<string, string>
+    parentSchema?: ExtendedJSONSchema
+    recursive: boolean
   }): void {
     // 验证最小属性数
     if (schema.minProperties !== undefined) {
-      const propCount = Object.keys(value).length;
+      const propCount = Object.keys(value).length
       if (propCount < schema.minProperties) {
         errors[fieldName] =
-          `${this.getFieldTitle(fieldName, parentSchema)} requires at least ${schema.minProperties} properties`;
+          `${this.getFieldTitle(fieldName, parentSchema)} requires at least ${schema.minProperties} properties`
       }
     }
 
     // 验证最大属性数
     if (schema.maxProperties !== undefined) {
-      const propCount = Object.keys(value).length;
+      const propCount = Object.keys(value).length
       if (propCount > schema.maxProperties) {
         errors[fieldName] =
-          `${this.getFieldTitle(fieldName, parentSchema)} allows at most ${schema.maxProperties} properties`;
+          `${this.getFieldTitle(fieldName, parentSchema)} allows at most ${schema.maxProperties} properties`
       }
     }
 
@@ -765,25 +841,27 @@ export class SchemaValidator {
         for (const requiredField of schema.required) {
           if (!this.hasValue(value[requiredField])) {
             errors[`${fieldName}.${requiredField}`] =
-              `${this.getFieldTitle(requiredField, schema)} is required`;
+              `${this.getFieldTitle(requiredField, schema)} is required`
           }
         }
       }
 
       // 递归验证 properties
       if (schema.properties) {
-        for (const [propName, propSchema] of Object.entries(schema.properties)) {
-          if (typeof propSchema === 'boolean') continue;
+        for (const [propName, propSchema] of Object.entries(
+          schema.properties
+        )) {
+          if (typeof propSchema === 'boolean') continue
 
-          const propValue = value[propName];
+          const propValue = value[propName]
           const propErrors = this.validateFieldValue({
             value: propValue,
             schema: propSchema,
             fieldName: `${fieldName}.${propName}`,
             parentSchema: schema,
             recursive: true,
-          });
-          Object.assign(errors, propErrors);
+          })
+          Object.assign(errors, propErrors)
         }
       }
     }
@@ -803,10 +881,10 @@ export class SchemaValidator {
     fieldName,
     parentSchema,
   }: {
-    value: string;
-    format: string;
-    fieldName: string;
-    parentSchema?: ExtendedJSONSchema;
+    value: string
+    format: string
+    fieldName: string
+    parentSchema?: ExtendedJSONSchema
   }): string | null {
     const formatValidators: Record<string, RegExp> = {
       email: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
@@ -815,13 +893,13 @@ export class SchemaValidator {
       date: /^\d{4}-\d{2}-\d{2}$/,
       time: /^\d{2}:\d{2}:\d{2}$/,
       'date-time': /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/,
-    };
-
-    const validator = formatValidators[format];
-    if (validator && !validator.test(value)) {
-      return `${this.getFieldTitle(fieldName, parentSchema)} invalid format (expected: ${format})`;
     }
 
-    return null;
+    const validator = formatValidators[format]
+    if (validator && !validator.test(value)) {
+      return `${this.getFieldTitle(fieldName, parentSchema)} invalid format (expected: ${format})`
+    }
+
+    return null
   }
 }

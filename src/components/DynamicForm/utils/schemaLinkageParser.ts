@@ -124,10 +124,8 @@ function parseSchemaRecursive(
       linkages[currentPath] = linkagesArray;
     }
 
-    // 递归处理嵌套对象
-    if (typedSchema.type === 'object' && typedSchema.properties) {
-      parseSchemaRecursive(typedSchema, currentPath, linkages);
-    }
+    // 不递归处理嵌套对象，避免父级 DynamicForm 重复解析子级字段的联动
+    // 嵌套对象内部的联动由 NestedFormWidget 创建的子 DynamicForm 独立解析
 
     // 数组字段：停止递归，不解析数组元素内部的字段
     // 数组元素内部的联动由 NestedFormWidget 创建的子 DynamicForm 独立解析

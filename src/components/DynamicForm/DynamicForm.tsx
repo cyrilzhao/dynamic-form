@@ -19,6 +19,7 @@ import { LinkageStateProvider, useLinkageStateContext } from './context/LinkageS
 import { WidgetsProvider } from './context/WidgetsContext';
 import { wrapPrimitiveArrays, unwrapPrimitiveArrays } from './utils/arrayTransformer';
 import { extractSchemaDefaults, mergeDefaults } from './utils/extractSchemaDefaults';
+import { createSchemaResolver } from './utils/createSchemaResolver';
 import '@blueprintjs/core/lib/css/blueprint.css';
 
 // 空对象常量，避免每次渲染创建新对象
@@ -276,6 +277,7 @@ const DynamicFormInner = React.memo(
         defaultValues: processedDefaultValues,
         mode: validateMode,
         reValidateMode: reValidateMode,
+        resolver: createSchemaResolver(schema),
       });
 
       // 根据模式选择使用哪个 form methods
@@ -418,8 +420,8 @@ const DynamicFormInner = React.memo(
           // }
           return merged;
         }
-        return ownLinkageStates;
-      }, [linkageStateContext?.parentLinkageStates, ownLinkageStates, pathPrefix]);
+        return { ...ownLinkageStates };
+      }, [linkageStateContext, ownLinkageStates, pathPrefix]);
 
       const {
         handleSubmit,
@@ -544,11 +546,6 @@ const DynamicFormInner = React.memo(
               // 如果联动状态指定不可见，则不渲染该字段
               if (isFieldHiddenByLinkage(field.name, linkageStates)) {
                 return null;
-              }
-
-              // 合并联动状态中的 options 到 field 中
-              if (linkageState?.options) {
-                field.options = linkageState.options;
               }
 
               return (

@@ -190,17 +190,12 @@ export function useLinkageManager({
     }) => {
       taskQueue.setUpdatingForm(true);
 
-      // 更新联动状态
-      if (Object.keys(states).length > 0) {
-        setLinkageStates(prev => ({ ...prev, ...states }));
-      }
-
       // 预先标记字段（processQueue 需要，防止级联触发）
       if (preMarkFields) {
         fields.forEach(fieldName => taskQueue.markFieldUpdating(fieldName));
       }
 
-      // 批量更新表单值
+      // 批量更新表单值（先更新值，再更新状态，避免时序问题）
       fields.forEach(fieldName => {
         const linkageArray = linkages[fieldName];
         const hasValueLinkage = linkageArray?.some(linkage => linkage.type === 'value');
@@ -243,6 +238,11 @@ export function useLinkageManager({
           }
         }
       });
+
+      // 更新联动状态（在更新表单值之后，确保值和状态同步）
+      if (Object.keys(states).length > 0) {
+        setLinkageStates(prev => ({ ...prev, ...states }));
+      }
 
       await new Promise(resolve => setTimeout(resolve, 0));
       taskQueue.clearUpdatingFields();
