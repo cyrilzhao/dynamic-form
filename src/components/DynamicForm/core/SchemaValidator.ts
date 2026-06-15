@@ -729,9 +729,8 @@ export class SchemaValidator {
       }
     }
 
-    // 如果 recursive 为 true，递归验证数组元素
+    // 验证数组元素（items.required 始终检查，属性级别递归验证需要 recursive=true）
     if (
-      recursive &&
       schema.items &&
       typeof schema.items !== 'boolean' &&
       !Array.isArray(schema.items)
@@ -747,7 +746,7 @@ export class SchemaValidator {
           typeof item === 'object' &&
           item !== null
         ) {
-          // 检查 required 字段
+          // 始终检查 required 字段（不依赖 recursive）
           if (itemsSchema.required && Array.isArray(itemsSchema.required)) {
             for (const requiredField of itemsSchema.required) {
               if (
