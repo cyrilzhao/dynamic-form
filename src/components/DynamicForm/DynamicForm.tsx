@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useImperativeHandle, forwardRef } from 'react';
+import React, { useCallback, useMemo, useImperativeHandle, forwardRef, useRef } from 'react';
 import { useForm, FormProvider, useFormContext, type UseFormReturn } from 'react-hook-form';
 import { Button } from '@blueprintjs/core';
 import { SchemaParser } from './core/SchemaParser';
@@ -272,12 +272,15 @@ const DynamicFormInner = React.memo(
         return wrapPrimitiveArrays(merged, schema);
       }, [defaultValues, schema]);
 
+      // 用于向 resolver 传递最新联动状态（ref 避免重新创建 resolver）
+      const linkageStatesRef = useRef<Record<string, { visible?: boolean; disabled?: boolean }>>({});
+
       // 只有非嵌套表单模式才创建新的 useForm 实例
       const ownMethods = useForm({
         defaultValues: processedDefaultValues,
         mode: validateMode,
         reValidateMode: reValidateMode,
-        resolver: createSchemaResolver(schema),
+        resolver: createSchemaResolver(schema, linkageStatesRef),
       });
 
       // 根据模式选择使用哪个 form methods
@@ -422,6 +425,9 @@ const DynamicFormInner = React.memo(
         }
         return { ...ownLinkageStates };
       }, [linkageStateContext, ownLinkageStates, pathPrefix]);
+
+      // 同步更新 ref，确保 resolver 始终使用最新联动状态
+      linkageStatesRef.current = linkageStates;
 
       const {
         handleSubmit,
