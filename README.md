@@ -788,6 +788,41 @@ You can customize error messages for each validation rule using `ui.errorMessage
 }
 ```
 
+#### Linkage-Driven Field Skipping
+
+Fields that are hidden or disabled via **linkage** are automatically excluded from validation. This prevents validation errors from blocking form submission when fields are not visible or interactive to the user.
+
+```typescript
+// Example: creditCardNumber is hidden when paymentMethod !== 'credit_card'
+// → creditCardNumber will NOT be validated when hidden, even if it's in `required`
+const schema = {
+  type: 'object',
+  properties: {
+    paymentMethod: { type: 'string', title: 'Payment Method' },
+    creditCardNumber: {
+      type: 'string',
+      title: 'Card Number',
+      ui: {
+        linkages: [{
+          type: 'visibility',
+          dependencies: ['#/properties/paymentMethod'],
+          when: { field: '#/properties/paymentMethod', operator: '==', value: 'credit_card' },
+          fulfill: { state: { visible: true } },
+          otherwise: { state: { visible: false } }
+        }]
+      }
+    }
+  },
+  required: ['creditCardNumber']
+};
+```
+
+**Rules:**
+- Fields with `visible: false` (linkage-hidden) → validation errors skipped
+- Fields with `disabled: true` (linkage-disabled) → validation errors skipped
+- Fields with `ui.hidden: true` (schema static config) → validation errors skipped
+- Fields with `ui.disabled: true` (schema static config) → validation errors skipped
+
 #### Conditional Validation
 
 Use JSON Schema's conditional validation keywords:

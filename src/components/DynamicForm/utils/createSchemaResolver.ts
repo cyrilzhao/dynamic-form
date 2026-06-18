@@ -25,20 +25,51 @@ function setError(
 }
 
 /**
- * 检查字段是否因联动被隐藏或禁用（需跳过校验）
+ * 从 schema 中查找指定路径的字段 schema（跳过数字索引段）
+ */
+function getFieldSchema(
+  path: string,
+  schema: ExtendedJSONSchema
+): ExtendedJSONSchema | null {
+  const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.').filter(p => !/^\d+$/.test(p));
+  let current: ExtendedJSONSchema = schema;
+  for (const part of parts) {
+    if (typeof current === 'boolean') return null;
+    const next = current.properties?.[part] ?? (current.items as any)?.properties?.[part];
+    if (!next || typeof next === 'boolean') return null;
+    current = next as ExtendedJSONSchema;
+  }
+  return current;
+}
+
+/**
+ * 检查字段是否因联动或 schema 静态配置被隐藏或禁用（需跳过校验）
  */
 function isHiddenOrDisabled(
   fieldPath: string,
-  linkageStates: Record<string, { visible?: boolean; disabled?: boolean }>
+  linkageStates: Record<string, { visible?: boolean; disabled?: boolean }>,
+  schema: ExtendedJSONSchema
 ): boolean {
+  // 检查字段自身：联动状态
   const state = linkageStates[fieldPath];
   if (state?.visible === false || state?.disabled === true) return true;
 
+  // 检查字段自身：schema 静态配置
+  const fieldSchema = getFieldSchema(fieldPath, schema);
+  if (fieldSchema?.ui?.hidden === true || fieldSchema?.ui?.disabled === true) return true;
+
   // 检查父级路径（处理嵌套字段）
-  const parts = fieldPath.split('.');
+  const normalized = fieldPath.replace(/\[(\d+)\]/g, '.$1');
+  const parts = normalized.split('.');
   for (let i = 1; i < parts.length; i++) {
-    const parentState = linkageStates[parts.slice(0, i).join('.')];
-    if (parentState?.visible === false || parentState?.disabled === true) return true;
+    const parentNormalized = parts.slice(0, i).join('.');
+    const parentOriginal = parentNormalized.replace(/\.(\d+)/g, '[$1]');
+
+    const parentLinkageState = linkageStates[parentOriginal] ?? linkageStates[parentNormalized];
+    if (parentLinkageState?.visible === false || parentLinkageState?.disabled === true) return true;
+
+    const parentFieldSchema = getFieldSchema(parentOriginal, schema);
+    if (parentFieldSchema?.ui?.hidden === true || parentFieldSchema?.ui?.disabled === true) return true;
   }
 
   return false;
@@ -63,7 +94,7 @@ export function createSchemaResolver(
     const linkageStates = linkageStatesRef?.current ?? {};
     const fieldErrors: FieldErrors = {};
     for (const [field, message] of Object.entries(errors)) {
-      if (isHiddenOrDisabled(field, linkageStates)) continue;
+      if (isHiddenOrDisabled(field, linkageStates, schema)) continue;
       setError(fieldErrors, field, { type: 'validation', message });
     }
 
