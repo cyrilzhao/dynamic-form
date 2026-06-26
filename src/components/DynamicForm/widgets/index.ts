@@ -4,6 +4,7 @@ export { TextareaWidget } from './TextareaWidget';
 export { NumberWidget } from './NumberWidget';
 export { SelectWidget } from './SelectWidget';
 export { CheckboxWidget } from './CheckboxWidget';
+export { CheckboxGroupWidget } from './CheckboxGroupWidget';
 export { SwitchWidget } from './SwitchWidget';
 export { RadioWidget } from './RadioWidget';
 export { NestedFormWidget } from './NestedFormWidget';

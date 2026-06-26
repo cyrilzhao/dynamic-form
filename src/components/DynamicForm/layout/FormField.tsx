@@ -66,7 +66,9 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
   const widgets = useWidgets();
   const callbacks = useCallbacks();
 
-  const WidgetComponent = widgets[field.widget] || FieldRegistry.getWidget(field.widget);
+  const resolvedWidget =
+    field.widget === 'checkbox' && field.type !== 'boolean' ? 'checkbox-group' : field.widget;
+  const WidgetComponent = widgets[resolvedWidget] || FieldRegistry.getWidget(resolvedWidget);
 
   if (!WidgetComponent) {
     console.warn(`Widget "${field.widget}" not found`);

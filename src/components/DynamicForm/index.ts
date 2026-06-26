@@ -17,6 +17,10 @@ export type {
   LinkageType,
 } from './types/linkage'
 
+// Widgets
+export { CodeEditorWidget } from './widgets/CodeEditorWidget'
+export { ObjectEditorWidget } from './widgets/ObjectEditorWidget'
+
 // Widget 预设系统
 export { blueprintPreset } from './presets'
 export type {
