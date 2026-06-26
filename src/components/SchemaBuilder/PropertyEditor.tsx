@@ -23,6 +23,7 @@ import type { LinkageConfig } from '../DynamicForm/types/linkage';
 import { FieldPathSelector } from './FieldPathSelector';
 import { SchemaValidationEditor } from './SchemaValidationEditor';
 import { FieldValidatorsEditor } from './FieldValidatorsEditor';
+import { LinkagesEditor } from './LinkagesEditor';
 import { ObjectEditor } from '../ObjectEditor';
 
 // Helper to get node from path
@@ -114,10 +115,6 @@ export const PropertyEditor: React.FC = () => {
 
   const handleUIChange = (field: string, value: any) => {
     onUpdate(selectedPath, { ui: { ...currentNode.ui, [field]: value } });
-  };
-
-  const handleLinkageChange = (linkage: LinkageConfig | undefined) => {
-    onUpdate(selectedPath, { ui: { ...currentNode.ui, linkages: linkage ? [linkage] : undefined } });
   };
 
   const handleKeyChange = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -1075,10 +1072,10 @@ export const PropertyEditor: React.FC = () => {
             title="Linkage"
             panel={
               <div className="editor-panel">
-                <LinkageEditor
+                <LinkagesEditor
                   key={selectedPath.join('.')}
-                  value={currentNode.ui?.linkages?.[0]}
-                  onChange={handleLinkageChange}
+                  value={currentNode.ui?.linkages}
+                  onChange={linkages => handleUIChange('linkages', linkages)}
                   currentFieldPath={currentFieldPath}
                   schema={schema}
                   disabled={isArrayItems}
