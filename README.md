@@ -1461,9 +1461,10 @@ const schema = {
   }
 };
 
-<DynamicForm
-  schema={schema}
-  callbacks={{
+function MyForm() {
+  // ✅ 必须用 useMemo 稳定引用，否则每次渲染都创建新对象，
+  //    导致 CallbacksContext 持续触发所有 Widget 重渲染
+  const callbacks = useMemo(() => ({
     handleAvatarUpload: async (file: File) => {
       const url = await uploadAvatarAPI(file);
       return url;
@@ -1472,10 +1473,17 @@ const schema = {
       const url = await uploadResumeAPI(file);
       return url;
     }
-  }}
-  widgets={{ upload: UploadWidget }}
-  onSubmit={handleSubmit}
-/>
+  }), []); // 若函数依赖外部状态，将其加入依赖数组
+
+  return (
+    <DynamicForm
+      schema={schema}
+      callbacks={callbacks}
+      widgets={{ upload: UploadWidget }}
+      onSubmit={handleSubmit}
+    />
+  );
+}
 ```
 
 **Rules:**
