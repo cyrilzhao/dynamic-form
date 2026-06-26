@@ -6,6 +6,7 @@ import { FieldError } from '../components/FieldError';
 import { FieldHelp } from '../components/FieldHelp';
 import { FieldRegistry } from '../core/FieldRegistry';
 import { useWidgets } from '../context/WidgetsContext';
+import { useCallbacks } from '../context/CallbacksContext';
 import type { FieldConfig } from '../types/schema';
 import type { LinkageResult } from '../types/linkage';
 
@@ -20,6 +21,35 @@ export interface FormFieldProps {
   virtualScrollHeight?: number;
 }
 
+/**
+ * 将 callbackProps 中的函数名解析为实际函数
+ * - callbackProps 优先覆盖 widgetProps 中的同名 key
+ * - 找不到的函数名：跳过注入，开发环境警告
+ * - 同名覆盖时：开发环境警告
+ */
+function resolveCallbackProps(
+  callbackProps: Record<string, string> | undefined,
+  callbacks: Record<string, (...args: any[]) => any>,
+  widgetProps?: Record<string, any>
+): Record<string, (...args: any[]) => any> {
+  if (!callbackProps) return {};
+  const result: Record<string, (...args: any[]) => any> = {};
+  for (const [propName, fnName] of Object.entries(callbackProps)) {
+    const fn = callbacks[fnName];
+    if (!fn) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`[DynamicForm] callbacks missing: "${fnName}" (used by callbackProps.${propName})`);
+      }
+      continue;
+    }
+    if (process.env.NODE_ENV !== 'production' && widgetProps && propName in widgetProps) {
+      console.warn(`[DynamicForm] callbackProps key "${propName}" overrides widgetProps`);
+    }
+    result[propName] = fn;
+  }
+  return result;
+}
+
 const FormFieldComponent: React.FC<FormFieldProps> = ({
   field,
   disabled,
@@ -32,8 +62,9 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
 }) => {
   const { control } = useFormContext();
 
-  // 从 Context 获取 widgets
+  // 从 Context 获取 widgets 和 callbacks
   const widgets = useWidgets();
+  const callbacks = useCallbacks();
 
   const WidgetComponent = widgets[field.widget] || FieldRegistry.getWidget(field.widget);
 
@@ -77,6 +108,13 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
     return style;
   }, [effectiveLayout, effectiveLabelWidth]);
 
+  const widgetProps = field.schema?.ui?.widgetProps;
+  const resolvedCallbacks = resolveCallbackProps(
+    field.schema?.ui?.callbackProps,
+    callbacks,
+    widgetProps
+  );
+
   return (
     <FormGroup
       label={
@@ -115,7 +153,8 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
                   labelWidth={effectiveLabelWidth}
                   enableVirtualScroll={enableVirtualScroll}
                   virtualScrollHeight={virtualScrollHeight}
-                  {...(field.schema?.ui?.widgetProps || {})}
+                  {...(widgetProps || {})}
+                  {...resolvedCallbacks}
                 />
               </FormGroup>
               {error && <FieldError message={error} />}

@@ -17,6 +17,7 @@ import {
 import { PathPrefixProvider } from './context/PathPrefixContext';
 import { LinkageStateProvider, useLinkageStateContext } from './context/LinkageStateContext';
 import { WidgetsProvider } from './context/WidgetsContext';
+import { CallbacksProvider } from './context/CallbacksContext';
 import { wrapPrimitiveArrays, unwrapPrimitiveArrays } from './utils/arrayTransformer';
 import { extractSchemaDefaults, mergeDefaults } from './utils/extractSchemaDefaults';
 import { createSchemaResolver } from './utils/createSchemaResolver';
@@ -26,6 +27,7 @@ import '@blueprintjs/core/lib/css/blueprint.css';
 const EMPTY_LINKAGE_FUNCTIONS = {};
 const EMPTY_WIDGETS = {};
 const EMPTY_CUSTOM_FORMATS = {};
+const EMPTY_CALLBACKS = {};
 
 /**
  * 递归展开嵌套对象，对每层路径都调用 setValue
@@ -197,6 +199,7 @@ const DynamicFormInner = React.memo(
         onChange,
         widgets,
         linkageFunctions,
+        callbacks,
         customFormats,
         layout = 'vertical',
         labelWidth,
@@ -226,6 +229,7 @@ const DynamicFormInner = React.memo(
       const stableLinkageFunctions = linkageFunctions || EMPTY_LINKAGE_FUNCTIONS;
       const stableWidgets = widgets || EMPTY_WIDGETS;
       const stableCustomFormats = customFormats || EMPTY_CUSTOM_FORMATS;
+      const stableCallbacks = callbacks || EMPTY_CALLBACKS;
 
       // 设置自定义格式验证器并解析字段
       // 当 asNestedForm 为 true 时，需要为字段名添加 pathPrefix 前缀
@@ -638,7 +642,11 @@ const DynamicFormInner = React.memo(
           return content;
         }
 
-        return <WidgetsProvider widgets={stableWidgets}>{content}</WidgetsProvider>;
+        return (
+          <CallbacksProvider callbacks={stableCallbacks}>
+            <WidgetsProvider widgets={stableWidgets}>{content}</WidgetsProvider>
+          </CallbacksProvider>
+        );
       }, [
         asNestedForm,
         pathPrefix,
@@ -652,6 +660,7 @@ const DynamicFormInner = React.memo(
         renderedFields,
         submitButton,
         stableWidgets,
+        stableCallbacks,
       ]);
 
       // 嵌套表单模式下不需要再包裹 FormProvider，因为已经复用了父表单的 context

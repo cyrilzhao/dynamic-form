@@ -79,6 +79,9 @@ export interface UIConfig {
   // 自定义 widget 额外参数，会被直接展开传递给 widget 组件
   widgetProps?: Record<string, any>;
 
+  // Widget 回调函数引用（key=prop名，value=函数名，运行时从 DynamicForm.callbacks 注册表解析）
+  callbackProps?: Record<string, string>;
+
   [key: string]: any;
 }
 

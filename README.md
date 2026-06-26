@@ -1433,6 +1433,57 @@ import { CustomInputWidget } from './widgets/CustomInputWidget';
 }
 ```
 
+**Widget Callbacks:**
+
+Use `callbacks` + `ui.callbackProps` to pass runtime functions to widgets (e.g., upload handlers, search handlers). Function names in the schema are resolved at render time from the `callbacks` registry.
+
+```typescript
+const schema = {
+  type: 'object',
+  properties: {
+    avatar: {
+      type: 'string',
+      title: 'Avatar',
+      ui: {
+        widget: 'upload',
+        callbackProps: { onUpload: 'handleAvatarUpload' }, // function name reference
+        widgetProps: { accept: 'image/*' }                 // plain data props
+      }
+    },
+    resume: {
+      type: 'string',
+      title: 'Resume',
+      ui: {
+        widget: 'upload',
+        callbackProps: { onUpload: 'handleResumeUpload' }
+      }
+    }
+  }
+};
+
+<DynamicForm
+  schema={schema}
+  callbacks={{
+    handleAvatarUpload: async (file: File) => {
+      const url = await uploadAvatarAPI(file);
+      return url;
+    },
+    handleResumeUpload: async (file: File) => {
+      const url = await uploadResumeAPI(file);
+      return url;
+    }
+  }}
+  widgets={{ upload: UploadWidget }}
+  onSubmit={handleSubmit}
+/>
+```
+
+**Rules:**
+- `callbackProps` keys override same-named keys in `widgetProps`
+- If a function name in `callbackProps` is not found in `callbacks`, it is silently skipped (with a dev warning)
+- The `callbacks` registry is shared across all fields; each field selects its own functions via `callbackProps`
+```
+
 #### Layout Configuration
 
 Control form layout at global or field level:
@@ -1537,6 +1588,7 @@ Additional UI customization options:
 | `flattenPrefix` | `boolean` | Add parent title as prefix       |
 | `errorMessages` | `object` | Custom error messages            |
 | `widgetProps` | `object`  | Props passed to widget component   |
+| `callbackProps` | `object` | Callback function references (key=prop name, value=function name from `callbacks`) |
 
 ---
 
@@ -1874,6 +1926,7 @@ const schema = {
 | `onChange`         | `(data: any) => void`                           | No       | -            | Change handler                  |
 | `widgets`          | `Record<string, ComponentType>`                 | No       | `{}`         | Custom widgets                  |
 | `linkageFunctions` | `Record<string, Function>`                      | No       | `{}`         | Linkage functions               |
+| `callbacks`        | `Record<string, Function>`                      | No       | `{}`         | Widget callback function registry (used with `ui.callbackProps`) |
 | `customFormats`    | `Record<string, Function>`                      | No       | `{}`         | Custom format validators        |
 | `layout`           | `'vertical' \| 'horizontal' \| 'inline'`        | No       | `'vertical'` | Form layout                     |
 | `labelWidth`       | `number \| string`                              | No       | -            | Label width (horizontal layout) |

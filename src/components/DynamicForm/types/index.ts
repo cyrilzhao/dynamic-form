@@ -136,6 +136,7 @@ export interface DynamicFormProps {
   // 自定义配置
   widgets?: Record<string, React.ComponentType<any>>;
   linkageFunctions?: Record<string, LinkageFunction>; // 联动函数（详见 UI_LINKAGE_DESIGN.md）
+  callbacks?: Record<string, (...args: any[]) => any>; // Widget 回调函数注册表（配合 schema ui.callbackProps 使用）
   customFormats?: Record<string, (value: string) => boolean>; // 自定义格式验证器
 
   // UI 配置
