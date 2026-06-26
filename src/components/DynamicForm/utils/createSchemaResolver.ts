@@ -1,6 +1,7 @@
 import type { Resolver, FieldErrors } from 'react-hook-form';
 import type { RefObject } from 'react';
 import { SchemaValidator } from '../core/SchemaValidator';
+import { runAllFieldValidators } from './runFieldValidators';
 import type { ExtendedJSONSchema } from '../types/schema';
 
 /**
@@ -85,7 +86,9 @@ export function createSchemaResolver(
 ): Resolver {
   return async (values) => {
     const validator = new SchemaValidator(schema);
-    const errors = validator.validate(values);
+    const schemaErrors = validator.validate(values);
+    const fieldValidatorErrors = await runAllFieldValidators(values, schema);
+    const errors = { ...schemaErrors, ...fieldValidatorErrors };
 
     if (Object.keys(errors).length === 0) {
       return { values, errors: {} };

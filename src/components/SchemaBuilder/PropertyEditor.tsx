@@ -22,6 +22,7 @@ import { LinkageEditor } from './LinkageEditor';
 import type { LinkageConfig } from '../DynamicForm/types/linkage';
 import { FieldPathSelector } from './FieldPathSelector';
 import { SchemaValidationEditor } from './SchemaValidationEditor';
+import { FieldValidatorsEditor } from './FieldValidatorsEditor';
 import { ObjectEditor } from '../ObjectEditor';
 
 // Helper to get node from path
@@ -71,7 +72,6 @@ export const PropertyEditor: React.FC = () => {
       ...currentNode,
       ui: {
         ...currentNode?.ui,
-        validation: currentNode?.ui?.validation || {},
         errorMessages: currentNode?.ui?.errorMessages || {},
       },
     },
@@ -117,7 +117,7 @@ export const PropertyEditor: React.FC = () => {
   };
 
   const handleLinkageChange = (linkage: LinkageConfig | undefined) => {
-    onUpdate(selectedPath, { ui: { ...currentNode.ui, linkage } });
+    onUpdate(selectedPath, { ui: { ...currentNode.ui, linkages: linkage ? [linkage] : undefined } });
   };
 
   const handleKeyChange = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -678,102 +678,6 @@ export const PropertyEditor: React.FC = () => {
                         )}
                       />
                     </FormGroup>
-
-                    <Divider />
-
-                    <FormGroup
-                      label="Custom Validation Function"
-                      helperText="Name of custom validation function (e.g., matchPassword)"
-                    >
-                      <Controller
-                        name="ui.validation.function"
-                        control={control}
-                        render={({ field }) => (
-                          <InputGroup
-                            {...field}
-                            value={field.value ?? ''}
-                            placeholder="Function name"
-                            disabled={isArrayItems}
-                            onChange={e => {
-                              field.onChange(e);
-                              handleUIChange('validation', {
-                                ...currentNode.ui?.validation,
-                                function: e.target.value,
-                              });
-                            }}
-                          />
-                        )}
-                      />
-                    </FormGroup>
-
-                    <FormGroup
-                      label="Custom Validation Dependencies"
-                      helperText="Select field paths that this validation depends on"
-                    >
-                      <Controller
-                        name="ui.validation.dependencies"
-                        control={control}
-                        render={({ field }) => {
-                          const dependencies = Array.isArray(field.value) ? field.value : [];
-
-                          const handleAddDependency = (path: string) => {
-                            if (path && !dependencies.includes(path)) {
-                              const newDeps = [...dependencies, path];
-                              field.onChange(newDeps);
-                              handleUIChange('validation', {
-                                ...currentNode.ui?.validation,
-                                dependencies: newDeps,
-                              });
-                            }
-                          };
-
-                          const handleRemoveDependency = (index: number) => {
-                            const newDeps = dependencies.filter((_, i) => i !== index);
-                            field.onChange(newDeps);
-                            handleUIChange('validation', {
-                              ...currentNode.ui?.validation,
-                              dependencies: newDeps,
-                            });
-                          };
-
-                          return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              {/* 已选择的依赖字段列表 */}
-                              {dependencies.length > 0 && (
-                                <div
-                                  style={{
-                                    display: 'flex',
-                                    flexWrap: 'wrap',
-                                    gap: 4,
-                                    marginBottom: 4,
-                                  }}
-                                >
-                                  {dependencies.map((dep, index) => (
-                                    <Tag
-                                      key={index}
-                                      onRemove={() => handleRemoveDependency(index)}
-                                      intent="primary"
-                                    >
-                                      {dep}
-                                    </Tag>
-                                  ))}
-                                </div>
-                              )}
-
-                              {/* 字段路径选择器 */}
-                              <FieldPathSelector
-                                schema={schema}
-                                currentFieldPath={currentFieldPath}
-                                value=""
-                                onChange={handleAddDependency}
-                                disabled={isArrayItems}
-                                placeholder="Click to add dependency field"
-                              />
-                            </div>
-                          );
-                        }}
-                      />
-                    </FormGroup>
                   </>
                 )}
               </div>
@@ -1173,10 +1077,24 @@ export const PropertyEditor: React.FC = () => {
               <div className="editor-panel">
                 <LinkageEditor
                   key={selectedPath.join('.')}
-                  value={currentNode.ui?.linkage}
+                  value={currentNode.ui?.linkages?.[0]}
                   onChange={handleLinkageChange}
                   currentFieldPath={currentFieldPath}
                   schema={schema}
+                  disabled={isArrayItems}
+                />
+              </div>
+            }
+          />
+
+          <Tab
+            id="validators"
+            title="Validators"
+            panel={
+              <div className="editor-panel">
+                <FieldValidatorsEditor
+                  value={currentNode.ui?.validators}
+                  onChange={validators => handleUIChange('validators', validators)}
                   disabled={isArrayItems}
                 />
               </div>
