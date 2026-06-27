@@ -4,6 +4,7 @@ import type { ExtendedJSONSchema } from '@/components/DynamicForm'
 import { Card } from '@blueprintjs/core'
 import { CodeEditorWidget } from '@/components/DynamicForm'
 import { ObjectEditorWidget } from '@/components/DynamicForm'
+import { SchemaBuilderWidget } from '@/components/DynamicForm/widgets/SchemaBuilderWidget'
 
 export const BasicFormPanel: React.FC = () => {
   const schema: ExtendedJSONSchema = {
@@ -167,6 +168,13 @@ export const BasicFormPanel: React.FC = () => {
         type: 'boolean',
         title: '同意用户协议',
       },
+      dynamicFormSchema: {
+        type: 'object',
+        title: '动态表单 Schema',
+        ui: {
+          widget: 'schema-builder',
+        },
+      },
     },
     required: ['username', 'email', 'password', 'agreeTerms', 'aaa'],
   }
@@ -194,8 +202,15 @@ export const BasicFormPanel: React.FC = () => {
         widgets={{
           'code-editor': CodeEditorWidget,
           'object-editor': ObjectEditorWidget,
+          'schema-builder': SchemaBuilderWidget,
         }}
       />
+      <details style={{ marginTop: 16 }}>
+        <summary style={{ cursor: 'pointer', color: '#5c7080', fontSize: 13 }}>查看 Schema</summary>
+        <pre style={{ marginTop: 8, padding: 12, background: '#f6f8fa', borderRadius: 4, fontSize: 12, overflow: 'auto' }}>
+          {JSON.stringify(schema, null, 2)}
+        </pre>
+      </details>
     </Card>
   )
 }

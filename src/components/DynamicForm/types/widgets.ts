@@ -16,6 +16,7 @@ export interface WidgetPreset {
   radio: ComponentType<FieldWidgetProps>;
   checkbox: ComponentType<FieldWidgetProps>;
   'checkbox-group': ComponentType<FieldWidgetProps>;
+  'schema-builder': ComponentType<FieldWidgetProps>;
   switch: ComponentType<FieldWidgetProps>;
   'nested-form': ComponentType<FieldWidgetProps>;
   array: ComponentType<FieldWidgetProps>;

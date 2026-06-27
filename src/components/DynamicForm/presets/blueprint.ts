@@ -13,6 +13,7 @@ import {
   ArrayFieldWidget,
   KeyValueArrayWidget,
   TableArrayWidget,
+  SchemaBuilderWidget,
 } from '../widgets';
 import type { WidgetPreset } from '../types/widgets';
 
@@ -31,6 +32,7 @@ export const blueprintPreset: WidgetPreset = {
   radio: RadioWidget,
   checkbox: CheckboxWidget,
   'checkbox-group': CheckboxGroupWidget,
+  'schema-builder': SchemaBuilderWidget,
   switch: SwitchWidget,
   'nested-form': NestedFormWidget,
   array: ArrayFieldWidget,
