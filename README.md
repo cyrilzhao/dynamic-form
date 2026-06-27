@@ -1352,7 +1352,7 @@ Declare which fields the linkage depends on using JSON Pointer format:
       dependencies: [
         '#/properties/price',           // Top-level field
         '#/properties/address/city',    // Nested object field
-        '#/properties/items/0/name'     // Array element field
+        '#/properties/items'            // Entire array (to react to any item change)
       ],
       fulfill: { function: 'calculate' }
     }]
@@ -1365,6 +1365,7 @@ Declare which fields the linkage depends on using JSON Pointer format:
 - Use `/` for nested paths
 - Dependencies determine when linkage recalculates
 - Empty dependencies array means linkage runs only on initial load
+- **When depending on array data, always reference the array field itself** (`#/properties/items`), not individual items. Any change to array contents (e.g. `items.0.price`) will automatically trigger dependencies on the parent array path. Use a linkage function to access specific item values from `formData`.
 
 ---
 

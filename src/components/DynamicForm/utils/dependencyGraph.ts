@@ -86,7 +86,6 @@ export class DependencyGraph {
       const dependents = this.graph.get(field);
       if (dependents) {
         dependents.forEach(dependent => {
-          // 只有在未访问过的情况下才添加到结果数组
           if (!visited.has(dependent)) {
             affected.push(dependent);
           }
@@ -96,6 +95,14 @@ export class DependencyGraph {
     };
 
     dfs(changedField);
+
+    // 前缀匹配：当 'permissions.0.isAdmin' 变化时，也触发依赖 'permissions' 的字段
+    for (const source of this.graph.keys()) {
+      if (changedField.startsWith(source + '.')) {
+        dfs(source);
+      }
+    }
+
     return affected;
   }
 

@@ -254,7 +254,7 @@ export function resolveDependencyPath({
   }
 
   // 2. JSON Pointer：绝对路径
-  if (depPath.startsWith('#/') && schema) {
+  if (depPath.startsWith('#/')) {
     return resolveJsonPointerDependency(depPath, currentPath, schema);
   }
 
@@ -307,11 +307,7 @@ function resolveConditionPaths(
 
   // 解析 field 字段
   if (resolved.field) {
-    if (schema) {
-      resolved.field = resolveDependencyPath({ depPath: resolved.field, currentPath, schema });
-    } else if (resolved.field.startsWith('./')) {
-      resolved.field = resolveRelativePath(resolved.field, currentPath);
-    }
+    resolved.field = resolveDependencyPath({ depPath: resolved.field, currentPath, schema });
   }
 
   // 递归处理 and/or

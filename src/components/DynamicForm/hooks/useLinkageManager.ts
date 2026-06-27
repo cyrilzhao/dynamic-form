@@ -150,17 +150,14 @@ export function useLinkageManager({
     const graph = new DependencyGraph();
 
     Object.entries(linkages).forEach(([fieldName, linkageArray]) => {
-      // 遍历数组中的每个联动配置
       linkageArray.forEach(linkage => {
         linkage.dependencies.forEach(dep => {
-          // 标准化路径并添加依赖关系
           const normalizedDep = PathResolver.toFieldPath(dep);
           graph.addDependency(fieldName, normalizedDep);
         });
       });
     });
 
-    // 检测循环依赖
     const cycle = graph.detectCycle();
     if (cycle) {
       console.error('检测到循环依赖:', cycle.join(' -> '));

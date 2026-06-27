@@ -91,10 +91,9 @@ export function useArrayLinkageManager({
       // 为每个数组元素生成联动配置
       arrayValue.forEach((_, index) => {
         const elementFieldPath = `${arrayPath}.${index}.${fieldPathInArray}`;
-        const resolvedLinkages = linkageArray.map(linkage =>
+        newDynamicLinkages[elementFieldPath] = linkageArray.map(linkage =>
           resolveArrayElementLinkage(linkage, elementFieldPath, schema)
         );
-        newDynamicLinkages[elementFieldPath] = resolvedLinkages;
       });
     });
 

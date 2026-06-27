@@ -1,5 +1,5 @@
 import type { ExtendedJSONSchema, LinkageConfig } from '../types/schema';
-import { resolveRelativePath } from './pathTransformer';
+import { resolveArrayElementLinkage } from './arrayLinkageHelper';
 
 /**
  * 解析结果
@@ -170,108 +170,11 @@ export function transformToAbsolutePaths(
   const result: Record<string, LinkageConfig[]> = {};
 
   Object.entries(linkages).forEach(([fieldPath, linkageArray]) => {
-    // 使用标准的 . 分隔符构建绝对路径
     const absolutePath = fieldPath ? `${pathPrefix}.${fieldPath}` : pathPrefix;
-
-    // 转换数组中每个联动配置内部的路径引用
-    const transformedLinkages = linkageArray.map(linkage =>
-      transformLinkageConfigPaths(linkage, pathPrefix, absolutePath)
+    result[absolutePath] = linkageArray.map(linkage =>
+      resolveArrayElementLinkage(linkage, absolutePath)
     );
-
-    result[absolutePath] = transformedLinkages;
   });
-
-  return result;
-}
-
-/**
- * 转换联动配置内部的路径引用
- * @param linkage - 原始联动配置
- * @param pathPrefix - 路径前缀
- * @param fieldPath - 当前字段的完整路径（用于相对路径解析）
- * @returns 转换后的联动配置
- */
-function transformLinkageConfigPaths(
-  linkage: LinkageConfig,
-  pathPrefix: string,
-  fieldPath: string
-): LinkageConfig {
-  const result = { ...linkage };
-
-  // 转换 dependencies 中的相对路径
-  if (result.dependencies) {
-    result.dependencies = result.dependencies.map(dep => {
-      if (dep.startsWith('./')) {
-        // 相对路径：使用统一的 resolveRelativePath 函数
-        console.log(
-          '[transformLinkageConfigPaths] 处理相对路径:',
-          JSON.stringify({
-            dep,
-            fieldPath,
-          })
-        );
-
-        const resolvedPath = resolveRelativePath(dep, fieldPath);
-
-        console.log(
-          '[transformLinkageConfigPaths] 相对路径解析结果:',
-          JSON.stringify({
-            resolvedPath,
-          })
-        );
-
-        return resolvedPath;
-      }
-      // 绝对路径（JSON Pointer）保持不变
-      return dep;
-    });
-  }
-
-  // 转换 when 条件中的路径
-  if (result.when && typeof result.when === 'object') {
-    result.when = transformConditionPaths(result.when, pathPrefix, fieldPath);
-  }
-
-  return result;
-}
-
-/**
- * 递归转换条件表达式中的路径
- */
-function transformConditionPaths(condition: any, pathPrefix: string, fieldPath: string): any {
-  const result = { ...condition };
-
-  // 转换 field 字段
-  if (result.field && typeof result.field === 'string') {
-    if (result.field.startsWith('./')) {
-      // 相对路径：使用统一的 resolveRelativePath 函数
-      console.log(
-        '[transformConditionPaths] 处理相对路径:',
-        JSON.stringify({
-          originalField: result.field,
-          fieldPath,
-        })
-      );
-
-      result.field = resolveRelativePath(result.field, fieldPath);
-
-      console.log(
-        '[transformConditionPaths] 相对路径解析结果:',
-        JSON.stringify({
-          resolvedField: result.field,
-        })
-      );
-    }
-    // 绝对路径（JSON Pointer）保持不变
-  }
-
-  // 递归处理 and/or
-  if (result.and && Array.isArray(result.and)) {
-    result.and = result.and.map((c: any) => transformConditionPaths(c, pathPrefix, fieldPath));
-  }
-  if (result.or && Array.isArray(result.or)) {
-    result.or = result.or.map((c: any) => transformConditionPaths(c, pathPrefix, fieldPath));
-  }
 
   return result;
 }

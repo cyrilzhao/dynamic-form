@@ -2406,6 +2406,35 @@ console.log('解析结果:', resolveDependencyPath({ depPath, currentPath, schem
 console.log('动态联动配置:', dynamicLinkages);
 ```
 
+#### 问题 5：跨数组依赖或外部字段依赖数组内部字段时联动不触发
+
+**症状**：依赖路径写到了数组 items 内部字段（如 `#/properties/permissions/items/properties/isAdmin`），但修改数组内容时联动不生效
+
+**原因**：依赖路径只能写到**数组字段本身**，不能引用 items 内部的具体字段。系统通过前缀匹配机制，当 `permissions.0.isAdmin` 变化时，会触发依赖 `permissions` 的所有联动。但如果路径写到 `permissions.isAdmin`（items 内部），前缀匹配无法命中 `permissions.0.isAdmin`，导致联动失效。
+
+**解决方案**：
+
+```typescript
+// ❌ 错误：引用到 items 内部字段
+{
+  dependencies: ['#/properties/permissions/items/properties/isAdmin'],
+  when: { field: '#/properties/permissions/items/properties/isAdmin', operator: '==', value: true }
+}
+
+// ✅ 正确：依赖整个数组，通过联动函数访问内部数据
+{
+  dependencies: ['#/properties/permissions'],
+  fulfill: { function: 'checkAdminPermission' }
+}
+
+// 联动函数内部访问具体字段
+checkAdminPermission: (formData) => {
+  return formData.permissions?.some(p => p.isAdmin === true) ?? false
+}
+```
+
+**规律**：当依赖的是"数组中某些元素的某个字段的聚合结果"时，必须依赖数组本身，并使用联动函数处理逻辑。简单的 `when` 条件只适合依赖单个具体字段。
+
 #### 问题 4：性能问题
 
 **症状**：数组元素较多时表单卡顿
