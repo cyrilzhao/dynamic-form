@@ -53,8 +53,11 @@ function setValuesRecursive(
     const path = prefix ? `${prefix}.${key}` : key;
     // 设置当前路径的值
     methods.setValue(path, value, options);
-    // 普通对象递归展开（数组和 null 除外）
-    // 数组由 useFieldArray 管理，直接设置整体即可
+    // 普通对象递归展开（数组和 null 除外）：
+    // NestedFormWidget 内部的子字段通过独立的 Controller 注册（如 address.street）。
+    // 仅调用 setValue('address', {...}) 只更新父 Controller，子 Controller 不会收到新值。
+    // 必须对每一层路径都调用 setValue，才能确保所有嵌套表单的子字段同步更新。
+    // 数组由 useFieldArray 管理，直接设置整体即可，无需递归展开。
     if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
       setValuesRecursive(methods, value, options, path);
     }
@@ -277,6 +280,9 @@ const DynamicFormInner = React.memo(
       }, [defaultValues, schema]);
 
       // 用于向 resolver 传递最新联动状态（ref 避免重新创建 resolver）
+      // resolver 需要读取最新的联动状态（用于跳过隐藏字段的校验），但不能将 linkageStates 作为
+      // useForm 的依赖：每次联动状态变化都重新创建 resolver 会导致表单重新初始化、清空用户输入。
+      // 用 ref 保存最新状态，resolver 通过 ref 读取而不触发 useForm 重建。
       const linkageStatesRef = useRef<Record<string, { visible?: boolean; disabled?: boolean }>>({});
 
       // 只有非嵌套表单模式才创建新的 useForm 实例
@@ -325,7 +331,10 @@ const DynamicFormInner = React.memo(
         if (asNestedForm && pathPrefix) {
           const transformed = transformToAbsolutePaths(rawLinkages, pathPrefix);
 
-          // 如果有父级联动状态，过滤掉已经在父级计算过的联动
+          // 过滤掉已经在父级 DynamicForm 计算过的联动。
+          // 原因：嵌套表单架构中，每层 DynamicForm 只负责本层字段的联动，通过 LinkageStateContext
+          // 将自己的联动状态传递给子层。若子层重复计算父层已处理的联动，会导致同一字段被两个
+          // useLinkageManager 实例同时管理，引发竞态条件和状态不一致。
           if (linkageStateContext?.parentLinkageStates) {
             const filtered: Record<string, LinkageConfig[]> = {};
             Object.entries(transformed).forEach(([key, value]) => {

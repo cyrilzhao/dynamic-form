@@ -171,6 +171,12 @@ export function transformToAbsolutePaths(
 
   Object.entries(linkages).forEach(([fieldPath, linkageArray]) => {
     const absolutePath = fieldPath ? `${pathPrefix}.${fieldPath}` : pathPrefix;
+    // 在此处（而非运行时）解析所有依赖路径：
+    // absolutePath 已包含 pathPrefix 中的真实数组索引（如 'departments.0.employees.0.techStack'），
+    // 可以直接将 JSON Pointer（如 '#/properties/departments/items/properties/type'）
+    // 解析为具体路径（如 'departments.0.type'）。
+    // 若推迟到运行时再解析，dep graph 初始化时拿到的是未解析的 JSON Pointer，
+    // 导致 watch 无法正确识别依赖关系，联动不触发。
     result[absolutePath] = linkageArray.map(linkage =>
       resolveArrayElementLinkage(linkage, absolutePath)
     );

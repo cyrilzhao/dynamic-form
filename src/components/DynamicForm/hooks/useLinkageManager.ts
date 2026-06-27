@@ -150,14 +150,17 @@ export function useLinkageManager({
     const graph = new DependencyGraph();
 
     Object.entries(linkages).forEach(([fieldName, linkageArray]) => {
+      // 遍历数组中的每个联动配置
       linkageArray.forEach(linkage => {
         linkage.dependencies.forEach(dep => {
+          // 标准化路径并添加依赖关系
           const normalizedDep = PathResolver.toFieldPath(dep);
           graph.addDependency(fieldName, normalizedDep);
         });
       });
     });
 
+    // 检测循环依赖
     const cycle = graph.detectCycle();
     if (cycle) {
       console.error('检测到循环依赖:', cycle.join(' -> '));
@@ -187,7 +190,9 @@ export function useLinkageManager({
     }) => {
       taskQueue.setUpdatingForm(true);
 
-      // 预先标记字段（processQueue 需要，防止级联触发）
+      // 预先标记字段：processQueue 场景中，setValue 会触发 watch，
+      // watch 会再次检查这些字段是否需要联动。预先标记可防止自己触发自己，避免无限级联。
+      // refreshLinkage 场景无需预标记，因为它是主动刷新，不存在触发自身的问题。
       if (preMarkFields) {
         fields.forEach(fieldName => taskQueue.markFieldUpdating(fieldName));
       }
@@ -209,7 +214,9 @@ export function useLinkageManager({
           }
         }
 
-        // 处理 options 联动：检查当前值是否在新 options 中，如果不在则清空
+        // 处理 options 联动：当 options 更新后，原有值可能已不在新选项列表中。
+        // 若不清空，表单会包含非法值（UI 显示为空但 getValues() 返回旧值），导致提交数据错误。
+        // 对多选（数组）要求每个元素都合法；对单选直接检查。
         const hasOptionsLinkage = linkageArray?.some(linkage => linkage.type === 'options');
         if (hasOptionsLinkage && states[fieldName]?.options) {
           const newOptions = states[fieldName].options;

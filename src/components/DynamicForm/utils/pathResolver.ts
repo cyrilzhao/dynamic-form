@@ -106,7 +106,10 @@ export class PathResolver {
     // obj 可能有 key = "group~~category.contacts"
     const keys = path.split('.');
 
-    // 从最长前缀开始尝试匹配，直到单个 key（i = 1 时 prefix = keys[0]）
+    // 从最长前缀开始尝试匹配，直到单个 key（i = 1 时 prefix = keys[0]）。
+    // 从长到短的原因：优先匹配最具体的 key，避免将 "a.b" 错误地匹配到 "a" 后再
+    // 尝试在 obj["a"] 上查找 "b"，当 obj 中同时存在 "a" 和 "a.b" 两个 key 时，
+    // 应优先匹配更精确的 "a.b"。
     for (let i = keys.length - 1; i >= 1; i--) {
       const prefix = keys.slice(0, i).join('.');
       if (prefix in obj) {

@@ -270,9 +270,8 @@ export function resolveDependencyPath({
 /**
  * 为数组元素的联动配置解析路径
  * @param linkage - 原始联动配置
- * @param currentPath - 当前字段的完整路径
- * @param schema - Schema 对象（可选，当 depPath 为绝对路径时必填）
- * @returns 解析后的联动配置
+ * @param currentPath - 当前字段的完整路径（包含真实数组索引，如 'contacts.0.companyName'）
+ * @returns 解析后的联动配置（dependencies 和 when.field 均已转为运行时绝对路径）
  */
 export function resolveArrayElementLinkage(
   linkage: LinkageConfig,
@@ -306,6 +305,7 @@ function resolveConditionPaths(
 ): any {
   const resolved = { ...condition }
 
+  // 解析 field 字段
   if (resolved.field) {
     resolved.field = resolveDependencyPath({
       depPath: resolved.field,
@@ -313,6 +313,7 @@ function resolveConditionPaths(
     })
   }
 
+  // 递归处理 and/or
   if (resolved.and) {
     resolved.and = resolved.and.map((c: any) =>
       resolveConditionPaths(c, currentPath)

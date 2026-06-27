@@ -96,7 +96,11 @@ export class DependencyGraph {
 
     dfs(changedField);
 
-    // 前缀匹配：当 'permissions.0.isAdmin' 变化时，也触发依赖 'permissions' 的字段
+    // 跨数组依赖的前缀匹配：
+    // 当依赖整个数组（如 'permissions'）时，dep graph 中注册的 source 是 'permissions'，
+    // 但 react-hook-form 的 watch 触发的是具体字段路径（如 'permissions.0.isAdmin'），
+    // 精确匹配永远找不到。加 source + '.' 前缀检查，确保数组内任何字段变化都能触发
+    // 依赖该数组的联动。source + '.' 中的 '.' 防止误匹配 'permissions2' 等无关路径。
     for (const source of this.graph.keys()) {
       if (changedField.startsWith(source + '.')) {
         dfs(source);
@@ -363,9 +367,11 @@ export class DependencyGraph {
     const inDegree = new Map<string, number>();
     const remaining = new Set(fields);
 
-    // 计算入度（只考虑 fields 中的字段）
+    // 计算入度（只考虑 fields 中的字段）：
+    // 仅统计 fields 内部的依赖关系，忽略来自 fields 外部字段的依赖。
+    // 原因：外部字段在此次联动批次中不参与计算，其变化不影响本批次内字段的执行顺序；
+    // 若计入外部依赖，某些字段的入度永远不会降为 0，会被误判为循环依赖。
     fields.forEach(field => {
-      // 获取该字段依赖的所有字段
       const deps = this.reverseGraph.get(field) || new Set();
       // 只统计在 fields 中的依赖
       const relevantDeps = Array.from(deps).filter(dep => remaining.has(dep));
