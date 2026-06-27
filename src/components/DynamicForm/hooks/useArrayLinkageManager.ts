@@ -63,7 +63,7 @@ export function useArrayLinkageManager({
       // 如果路径已经包含数字索引（已实例化的联动），需要解析内部的 JSON Pointer 路径
       if (isArrayElementPath(fieldPath)) {
         const resolvedLinkages = linkageArray.map(linkage =>
-          resolveArrayElementLinkage(linkage, fieldPath, schema)
+          resolveArrayElementLinkage(linkage, fieldPath)
         );
         newDynamicLinkages[fieldPath] = resolvedLinkages;
         return;
@@ -92,7 +92,7 @@ export function useArrayLinkageManager({
       arrayValue.forEach((_, index) => {
         const elementFieldPath = `${arrayPath}.${index}.${fieldPathInArray}`;
         newDynamicLinkages[elementFieldPath] = linkageArray.map(linkage =>
-          resolveArrayElementLinkage(linkage, elementFieldPath, schema)
+          resolveArrayElementLinkage(linkage, elementFieldPath)
         );
       });
     });
