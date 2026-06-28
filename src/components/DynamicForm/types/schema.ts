@@ -105,6 +105,12 @@ export interface UIConfig {
 
   // 字段级自定义校验规则（由 SchemaBuilder 用户配置，运行时执行）
   validators?: ValidatorRule[]
+
+  // 字段值转换配置：输入框显示原始值，表单存储转换后的值
+  transform?: {
+    callback: string          // 函数名，从 callbacks 注册表解析，签名: (inputValue: any) => formValue
+    reverseCallback?: string  // 可选，反向转换函数名，签名: (formValue: any) => inputValue（用于初始显示）
+  }
 }
 
 /**

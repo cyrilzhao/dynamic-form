@@ -1,5 +1,5 @@
-import React from 'react'
-import { DynamicForm } from '@/components/DynamicForm'
+import React, { useEffect, useRef } from 'react'
+import { DynamicForm, type DynamicFormRef } from '@/components/DynamicForm'
 import type { ExtendedJSONSchema } from '@/components/DynamicForm'
 import { Card } from '@blueprintjs/core'
 import { CodeEditorWidget } from '@/components/DynamicForm'
@@ -7,6 +7,8 @@ import { ObjectEditorWidget } from '@/components/DynamicForm'
 import { SchemaBuilderWidget } from '@/components/DynamicForm/widgets/SchemaBuilderWidget'
 
 export const BasicFormPanel: React.FC = () => {
+  const formRef = useRef<DynamicFormRef>(null)
+
   const schema: ExtendedJSONSchema = {
     type: 'object',
     title: '用户注册表单',
@@ -175,8 +177,22 @@ export const BasicFormPanel: React.FC = () => {
           widget: 'schema-builder',
         },
       },
+      rate: {
+        type: 'number',
+        title: '利率（百分比输入，小数存储）',
+        default: 50,
+        maximum: 100,
+        ui: {
+          widget: 'number',
+          placeholder: '请输入百分比，如 96',
+          transform: {
+            callback: 'percentToDecimal',
+            reverseCallback: 'decimalToPercent',
+          },
+        },
+      },
     },
-    required: ['username', 'email', 'password', 'agreeTerms', 'aaa'],
+    required: ['username', 'email', 'password', 'agreeTerms', 'rate'],
   }
 
   const handleSubmit = (data: any) => {
@@ -184,10 +200,23 @@ export const BasicFormPanel: React.FC = () => {
     alert('提交成功！请查看控制台输出')
   }
 
+  const handleChange = (data: any) => {
+    console.log('handleChange:', data)
+  }
+
   // 自定义格式验证器
   const customFormats = {
     phone: (value: string) => /^1[3-9]\d{9}$/.test(value),
   }
+
+  useEffect(() => {
+    setTimeout(() => {
+      // formRef.current?.setValue('rate', 0.6)
+      formRef.current?.setValues({
+        rate: 0.7,
+      })
+    }, 3000)
+  }, [])
 
   return (
     <Card style={{ marginTop: '20px', maxWidth: '600px' }}>
@@ -196,9 +225,15 @@ export const BasicFormPanel: React.FC = () => {
         包含常见的表单字段类型：文本、邮箱、手机号、密码、数字、下拉选择、单选、多行文本、开关、复选框等。
       </p>
       <DynamicForm
+        ref={formRef}
         schema={schema}
         onSubmit={handleSubmit}
+        onChange={handleChange}
         customFormats={customFormats}
+        callbacks={{
+          percentToDecimal: (val: number) => (val != null ? val / 100 : val),
+          decimalToPercent: (val: number) => (val != null ? val * 100 : val),
+        }}
         widgets={{
           'code-editor': CodeEditorWidget,
           'object-editor': ObjectEditorWidget,
@@ -206,8 +241,19 @@ export const BasicFormPanel: React.FC = () => {
         }}
       />
       <details style={{ marginTop: 16 }}>
-        <summary style={{ cursor: 'pointer', color: '#5c7080', fontSize: 13 }}>查看 Schema</summary>
-        <pre style={{ marginTop: 8, padding: 12, background: '#f6f8fa', borderRadius: 4, fontSize: 12, overflow: 'auto' }}>
+        <summary style={{ cursor: 'pointer', color: '#5c7080', fontSize: 13 }}>
+          查看 Schema
+        </summary>
+        <pre
+          style={{
+            marginTop: 8,
+            padding: 12,
+            background: '#f6f8fa',
+            borderRadius: 4,
+            fontSize: 12,
+            overflow: 'auto',
+          }}
+        >
           {JSON.stringify(schema, null, 2)}
         </pre>
       </details>
