@@ -340,6 +340,7 @@ UI 配置通过 `ui` 字段扩展，支持以下属性：
 | `labelWidth`    | `number \| string`                       | 标签宽度（仅在 horizontal layout 下生效）                                                     |
 | `flattenPath`   | `boolean`                                | 路径透明化：是否跳过该对象层级（详见 [FIELD_PATH_FLATTENING.md](./FIELD_PATH_FLATTENING.md)） |
 | `flattenPrefix` | `boolean`                                | 路径透明化：是否添加当前字段 title 作为前缀                                                   |
+| `transform`     | `{ callback: string; reverseCallback?: string }` | 字段值转换配置（详见 [5.3.10](#5310-字段值转换-uitransform)）              |
 
 > **完整类型定义**：详见 [PART3 - 组件架构设计](./DYNAMIC_FORM_PART3.md#核心类型定义)
 >
@@ -711,6 +712,75 @@ FormField 组件会将 `widgetProps` 中的所有属性展开传递给 widget：
 **效果**：表单显示 `认证配置 - 密钥`，提交数据 `{ auth: { content: { key: 'xxx' } } }`
 
 更多使用场景、实现原理和最佳实践，请查看 [完整文档](./FIELD_PATH_FLATTENING.md)。
+
+#### 5.3.10 字段值转换 (`ui.transform`)
+
+`ui.transform` 用于需要用户以一种单位输入、但以另一种格式存储的字段（如百分比输入、货币规范化）。转换逻辑完全在 DynamicForm 内部完成，外部调用方始终与存储域值交互。
+
+**值域约定：**
+
+| 边界 | 值域 |
+|------|------|
+| `setValues` / `setValue` 传入 | 存储域 |
+| `getValues` / `getValue` 返回 | 存储域 |
+| `onChange` / `onSubmit` 回调参数 | 存储域 |
+| `schema.default` / `schema.maximum` 等 | 输入域（用户输入的值） |
+| 表单内部状态 | 输入域 |
+
+**配置项：**
+
+```typescript
+ui: {
+  transform: {
+    callback: string           // 必填，callbacks 注册表中的函数名：输入域 → 存储域
+    reverseCallback?: string   // 可选，callbacks 注册表中的函数名：存储域 → 输入域
+  }
+}
+```
+
+**`reverseCallback` 使用场景：**
+
+- **可逆转换**（如百分比 ↔ 小数）：**强烈推荐**提供，否则 `setValues` 无法将存储域值转回输入域
+- **不可逆转换**（如货币文字规范化：`"HK$"` / `"HK dollar"` → `"HKD"`）：无法提供，此时 `setValues` 直接写入存储域值（因存储域值本身是合法输入）
+
+**示例：**
+
+```json
+{
+  "type": "number",
+  "title": "利率",
+  "default": 50,
+  "maximum": 100,
+  "ui": {
+    "widget": "number",
+    "placeholder": "请输入百分比，如 96",
+    "transform": {
+      "callback": "percentToDecimal",
+      "reverseCallback": "decimalToPercent"
+    }
+  }
+}
+```
+
+```typescript
+<DynamicForm
+  schema={schema}
+  callbacks={{
+    percentToDecimal: (val: number) => val / 100,   // 96 → 0.96
+    decimalToPercent: (val: number) => val * 100,   // 0.96 → 96
+  }}
+  onSubmit={(data) => {
+    console.log(data.rate); // 0.96（存储域）
+  }}
+/>
+```
+
+**运行时行为：**
+
+- 输入框始终显示用户输入的值（如 96）
+- 输入框下方实时显示 "Converted value: 0.96"
+- 所有校验规则（`minimum`/`maximum`/`pattern`/自定义 `validate`）针对输入域值生效
+- `setValues({ rate: 0.96 })` 通过 `reverseCallback` 转换为 96 后写入输入框
 
 ### 5.4 条件验证（Conditional Validation）
 

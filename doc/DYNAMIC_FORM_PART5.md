@@ -296,6 +296,43 @@ const linkageFunctions = {
 - [UI 联动设计](./UI_LINKAGE_DESIGN.md) - 完整的联动配置和高级场景
 - [数组字段联动](./ARRAY_FIELD_LINKAGE.md) - 数组元素内部的联动处理
 
+#### 8.2.5 字段值转换（ui.transform）
+
+当字段需要以一种单位输入（如百分比）、以另一种格式存储（如小数）时，使用 `ui.transform`。
+
+```typescript
+const schema: ExtendedJSONSchema = {
+  type: 'object',
+  properties: {
+    rate: {
+      type: 'number',
+      title: '利率',
+      default: 50,     // 输入域：初始显示 50
+      maximum: 100,    // 输入域：校验 ≤ 100
+      ui: {
+        widget: 'number',
+        transform: {
+          callback: 'percentToDecimal',      // 输入域 → 存储域
+          reverseCallback: 'decimalToPercent', // 存储域 → 输入域
+        },
+      },
+    },
+  },
+};
+
+<DynamicForm
+  schema={schema}
+  callbacks={{
+    percentToDecimal: (val: number) => val / 100,
+    decimalToPercent: (val: number) => val * 100,
+  }}
+  onSubmit={(data) => {
+    // data.rate === 0.96（存储域）
+    // setValues({ rate: 0.96 }) 会通过 reverseCallback 将输入框显示为 96
+  }}
+/>
+```
+
 ### 8.3 集成到项目
 
 #### 8.3.1 安装依赖

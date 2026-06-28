@@ -62,6 +62,12 @@ export interface UIConfig {
   itemStyle?: React.CSSProperties; // 数组项自定义样式
 
   [key: string]: any; // 支持其他自定义属性
+
+  // 字段值转换配置：输入域（用户输入）→ 存储域（表单数据出口），转换在 DynamicForm 内部透明完成
+  transform?: {
+    callback: string;          // 函数名（从 DynamicForm.callbacks 注册表解析），签名：(inputValue) => storedValue
+    reverseCallback?: string;  // 可选，反向函数名，签名：(storedValue) => inputValue；不可逆转换时省略
+  };
 }
 
 /**
