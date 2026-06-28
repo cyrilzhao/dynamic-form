@@ -31,53 +31,7 @@ export class SchemaValidator {
     formData: Record<string, any>,
     recursive: boolean = false
   ): Record<string, string> {
-    const errors: Record<string, string> = {}
-
-    // 1. 验证 required 字段
-    if (this.schema.required && Array.isArray(this.schema.required)) {
-      for (const requiredField of this.schema.required) {
-        if (!this.hasValue(formData[requiredField])) {
-          errors[requiredField] =
-            `${this.getFieldTitle(requiredField)} is required`
-        }
-      }
-    }
-
-    // 2. 验证 properties 中的约束
-    if (this.schema.properties) {
-      for (const [fieldName, fieldSchema] of Object.entries(
-        this.schema.properties
-      )) {
-        if (typeof fieldSchema === 'boolean') continue
-
-        const fieldValue = formData[fieldName]
-        const fieldErrors = this.validateFieldValue({
-          value: fieldValue,
-          schema: fieldSchema,
-          fieldName,
-          parentSchema: this.schema,
-          recursive,
-        })
-        Object.assign(errors, fieldErrors)
-      }
-    }
-
-    // 3. 处理 dependencies
-    this.validateDependencies(formData, errors, recursive)
-
-    // 4. 处理 if/then/else
-    this.validateConditional(formData, errors, recursive)
-
-    // 5. 处理 allOf
-    this.validateAllOf(formData, errors, recursive)
-
-    // 6. 处理 anyOf
-    this.validateAnyOf(formData, errors, recursive)
-
-    // 7. 处理 oneOf
-    this.validateOneOf(formData, errors, recursive)
-
-    return errors
+    return this.validateAgainstSchema(formData, this.schema, recursive)
   }
 
   /**
@@ -403,6 +357,7 @@ export class SchemaValidator {
     // 1. 验证 required 字段
     if (schema.required && Array.isArray(schema.required)) {
       for (const requiredField of schema.required) {
+        if (schema.properties && !(requiredField in schema.properties)) continue
         if (!this.hasValue(formData[requiredField])) {
           errors[requiredField] =
             `${this.getFieldTitle(requiredField, schema)} is required`
@@ -412,14 +367,10 @@ export class SchemaValidator {
 
     // 2. 验证 properties 中的约束
     if (schema.properties) {
-      for (const [fieldName, fieldSchema] of Object.entries(
-        schema.properties
-      )) {
+      for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
         if (typeof fieldSchema === 'boolean') continue
-
-        const fieldValue = formData[fieldName]
         const fieldErrors = this.validateFieldValue({
-          value: fieldValue,
+          value: formData[fieldName],
           schema: fieldSchema,
           fieldName,
           parentSchema: schema,
@@ -429,28 +380,13 @@ export class SchemaValidator {
       }
     }
 
-    // 3. 处理 oneOf/anyOf/allOf/if（如果传入的 schema 包含这些字段）
-    if (schema.oneOf || schema.anyOf || schema.allOf || schema.if) {
-      // 创建临时验证器来处理嵌套的条件验证，传入 rootSchema 以保持对顶层 schema 的引用
-      const nestedValidator = new SchemaValidator(schema, this.rootSchema)
-
-      // 直接调用相应的验证方法，而不是调用 validate（避免重复验证）
-      if (schema.dependencies) {
-        nestedValidator.validateDependencies(formData, errors, recursive)
-      }
-      if (schema.if) {
-        nestedValidator.validateConditional(formData, errors, recursive)
-      }
-      if (schema.allOf) {
-        nestedValidator.validateAllOf(formData, errors, recursive)
-      }
-      if (schema.anyOf) {
-        nestedValidator.validateAnyOf(formData, errors, recursive)
-      }
-      if (schema.oneOf) {
-        nestedValidator.validateOneOf(formData, errors, recursive)
-      }
-    }
+    // 3-7. 条件验证（各自独立判断，修复 dependencies 仅在其他条件存在时才触发的 bug）
+    const nestedValidator = new SchemaValidator(schema, this.rootSchema)
+    if (schema.dependencies) nestedValidator.validateDependencies(formData, errors, recursive)
+    if (schema.if) nestedValidator.validateConditional(formData, errors, recursive)
+    if (schema.allOf) nestedValidator.validateAllOf(formData, errors, recursive)
+    if (schema.anyOf) nestedValidator.validateAnyOf(formData, errors, recursive)
+    if (schema.oneOf) nestedValidator.validateOneOf(formData, errors, recursive)
 
     return errors
   }
@@ -749,9 +685,8 @@ export class SchemaValidator {
           // 始终检查 required 字段（不依赖 recursive）
           if (itemsSchema.required && Array.isArray(itemsSchema.required)) {
             for (const requiredField of itemsSchema.required) {
-              if (
-                !this.hasValue((item as Record<string, any>)[requiredField])
-              ) {
+              if (itemsSchema.properties && !(requiredField in itemsSchema.properties)) continue
+              if (!this.hasValue((item as Record<string, any>)[requiredField])) {
                 errors[`${fieldName}[${i}].${requiredField}`] =
                   `${this.getFieldTitle(requiredField, itemsSchema)} is required`
               }
@@ -838,6 +773,7 @@ export class SchemaValidator {
       // 检查 required 字段
       if (schema.required && Array.isArray(schema.required)) {
         for (const requiredField of schema.required) {
+          if (schema.properties && !(requiredField in schema.properties)) continue
           if (!this.hasValue(value[requiredField])) {
             errors[`${fieldName}.${requiredField}`] =
               `${this.getFieldTitle(requiredField, schema)} is required`

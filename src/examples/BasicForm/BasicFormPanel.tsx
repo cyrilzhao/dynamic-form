@@ -192,7 +192,7 @@ export const BasicFormPanel: React.FC = () => {
         },
       },
     },
-    required: ['username', 'email', 'password', 'agreeTerms', 'rate'],
+    required: ['username', 'email', 'password', 'agreeTerms', 'rate', 'aaa'],
   }
 
   const handleSubmit = (data: any) => {
