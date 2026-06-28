@@ -1598,6 +1598,100 @@ Additional UI customization options:
 | `errorMessages` | `object` | Custom error messages            |
 | `widgetProps` | `object`  | Props passed to widget component   |
 | `callbackProps` | `object` | Callback function references (key=prop name, value=function name from `callbacks`) |
+| `transform` | `object` | Value transform config (see below) |
+
+#### Value Transform (`ui.transform`)
+
+Use `ui.transform` when a field needs to accept input in one domain (e.g. percentage) but store a different value (e.g. decimal). The conversion is transparent to external callers.
+
+**Value domain contract:**
+
+| Boundary | Domain |
+|----------|--------|
+| `setValues` / `setValue` input | Stored domain |
+| `getValues` / `getValue` output | Stored domain |
+| `onChange` / `onSubmit` callback | Stored domain |
+| `schema.default` / `schema.maximum` etc. | Input domain (the value the user types) |
+| Form internal state | Input domain |
+
+**Configuration:**
+
+```typescript
+ui: {
+  transform: {
+    callback: string          // required — function name from the `callbacks` registry
+                              // signature: (inputValue: any) => storedValue
+    reverseCallback?: string  // optional — reverse function name
+                              // signature: (storedValue: any) => inputValue
+  }
+}
+```
+
+**When to provide `reverseCallback`:**
+
+There are two types of transforms, each with different `reverseCallback` requirements:
+
+**Type 1 — Reversible transform** (e.g. percentage ↔ decimal): `reverseCallback` is **strongly recommended**. Without it, `setValues({ rate: 0.96 })` cannot convert the stored value back to `96` for display — the raw stored value will appear in the input instead.
+
+```typescript
+// ✅ Reversible: provide reverseCallback
+transform: {
+  callback: 'percentToDecimal',       // 96 → 0.96
+  reverseCallback: 'decimalToPercent', // 0.96 → 96
+}
+```
+
+**Type 2 — Irreversible transform** (e.g. normalise currency text to a canonical code): `reverseCallback` **cannot** be provided because the conversion is one-way. This is fine because the stored value itself is a valid input value (idempotent: `callback("HKD") === "HKD"`), so `setValues({ currency: 'HKD' })` writes `"HKD"` directly to the input, which is correct.
+
+```typescript
+// ✅ Irreversible: omit reverseCallback by design
+transform: {
+  callback: 'normalizeCurrency', // "HK$" | "HK dollar" | "HKD" → "HKD"
+}
+```
+
+**Example — percentage input stored as decimal:**
+
+```typescript
+const schema: ExtendedJSONSchema = {
+  type: 'object',
+  properties: {
+    rate: {
+      type: 'number',
+      title: 'Interest Rate',
+      default: 50,     // input domain: user sees 50 initially
+      maximum: 100,    // input domain: validation checks against 50–100
+      ui: {
+        widget: 'number',
+        placeholder: 'Enter percentage, e.g. 96',
+        transform: {
+          callback: 'percentToDecimal',
+          reverseCallback: 'decimalToPercent',
+        },
+      },
+    },
+  },
+};
+
+<DynamicForm
+  schema={schema}
+  callbacks={{
+    percentToDecimal: (val: number) => val / 100,
+    decimalToPercent: (val: number) => val * 100,
+  }}
+  onSubmit={(data) => {
+    console.log(data.rate); // 0.96 — stored domain
+  }}
+/>
+```
+
+**Behavior at runtime:**
+
+- The input always shows the input-domain value the user typed (e.g. `96`).
+- A "Converted value: 0.96" hint is shown below the input in real time.
+- All validation rules (`minimum`, `maximum`, `pattern`, custom `validate`) run against the input value.
+- `setValues({ rate: 0.96 })` calls `reverseCallback(0.96)` = `96` before writing to the input.
+- `getValues()` and `onSubmit` always return the stored-domain value (`0.96`).
 
 ---
 
