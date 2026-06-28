@@ -124,6 +124,13 @@ function parseSchemaRecursive(
       linkages[currentPath] = linkagesArray;
     }
 
+    // 递归解析嵌套的普通对象（非数组）中的联动配置。
+    // 与数组字段不同，普通嵌套对象的字段直接属于当前 DynamicForm 的字段树，
+    // 需要在父级统一收集其联动配置，而不是交由子组件独立处理。
+    if (typedSchema.type === 'object' && typedSchema.properties) {
+      parseSchemaRecursive(typedSchema, currentPath, linkages);
+    }
+
     // 不递归处理嵌套对象，避免父级 DynamicForm 重复解析子级字段的联动
     // 嵌套对象内部的联动由 NestedFormWidget 创建的子 DynamicForm 独立解析
 

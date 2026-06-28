@@ -185,6 +185,13 @@ function transformFormData(
   return processedData
 }
 
+/**
+ * 将表单数据中所有配置了 ui.transform.callback 的字段值从展示域转为存储域
+ *
+ * 调用时机：getValues、onChange 回调、onSubmit 回调。
+ * 原因：表单内部存储展示域值（用户输入），对外暴露的所有数据出口统一返回存储域值，
+ * 使外部调用方无需感知转换逻辑。
+ */
 function applyFieldTransforms(
   data: any,
   schema: ExtendedJSONSchema,
@@ -224,6 +231,12 @@ function applyFieldTransforms(
   return result
 }
 
+/**
+ * 根据路径字符串（如 "a.b.c" 或 "items.0.name"）从 schema 树中查找对应的子 schema
+ *
+ * 用于 setValue/getValue 时找到单个字段的 transform 配置，以便对值进行单字段级别转换。
+ * 数字段（如 "0"）表示数组索引，此时跳入 items schema 继续查找。
+ */
 function getSchemaAtPath(
   schema: ExtendedJSONSchema,
   path: string
@@ -242,6 +255,13 @@ function getSchemaAtPath(
   return current
 }
 
+/**
+ * 将外部传入的存储域值反向转换为展示域值，写入表单内部
+ *
+ * 调用时机：setValues、setValue、reset 等外部赋值 API。
+ * 原因：表单内部存储展示域值，外部 API 统一接收存储域值，
+ * 因此写入前需要先通过 reverseCallback 转换。
+ */
 function reverseFieldTransforms(
   data: any,
   schema: ExtendedJSONSchema,

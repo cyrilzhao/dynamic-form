@@ -1295,7 +1295,8 @@ describe('SchemaParser', () => {
 
       const rules = SchemaParser.getValidationRules(schema, true);
 
-      expect(rules.required).toBe('This field is required');
+      expect(rules.validate?.required).toBeDefined();
+      expect((rules.validate?.required as Function)(null)).toBe('This field is required');
     });
   });
 

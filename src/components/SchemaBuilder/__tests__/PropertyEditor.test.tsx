@@ -627,7 +627,7 @@ describe('PropertyEditor', () => {
       });
 
       fireEvent.click(screen.getByText('Linkage'));
-      expect(screen.getByText('Enable Linkage')).toBeInTheDocument();
+      expect(screen.getByText('Add Linkage Rule')).toBeInTheDocument();
     });
   });
 
@@ -768,10 +768,10 @@ describe('PropertyEditor', () => {
       });
 
       fireEvent.click(screen.getByText('Linkage'));
-      // 点击 Enable Linkage 开关
-      const enableSwitch = screen.getByText('Enable Linkage').closest('label')?.querySelector('input');
-      if (enableSwitch) {
-        fireEvent.click(enableSwitch);
+      // LinkagesEditor 使用 "Add Linkage Rule" 而非 "Enable Linkage"
+      const addButton = screen.queryByText('Add Linkage Rule');
+      if (addButton) {
+        fireEvent.click(addButton);
         expect(onUpdate).toHaveBeenCalled();
       }
     });

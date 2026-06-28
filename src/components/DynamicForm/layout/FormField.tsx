@@ -58,6 +58,19 @@ function resolveCallbackProps(
   return result
 }
 
+/**
+ * 字段值转换包装组件
+ *
+ * 用途：当字段配置了 ui.transform 时，包装原始 Widget，实现以下行为：
+ * - 表单内部始终存储「展示域」值（用户输入的原始值，如百分比 96）
+ * - handleChange 同时更新展示值和实时预览（调用 transformFn 计算存储域值）
+ * - getValues/onChange/onSubmit 由 DynamicForm 统一应用 transform 转换为存储域
+ * - 输入框下方实时显示转换后的值，方便用户确认
+ *
+ * 为什么用 useRef 而不是直接用 useCallback deps：
+ * - controllerField 每次渲染可能引用变化，用 ref 避免 handleChange/handleBlur 的闭包过期
+ * - displayValueRef 供 useEffect 内读取最新值，避免 useEffect deps 中加入 displayValue 导致不必要重跑
+ */
 interface WidgetWithTransformProps {
   controllerField: any
   WidgetComponent: React.ComponentType<any>
@@ -88,6 +101,7 @@ const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
     }
   )
 
+  // 每次渲染更新 ref，确保 handleChange/handleBlur 的闭包始终访问最新引用
   const controllerFieldRef = useRef(controllerField)
   controllerFieldRef.current = controllerField
   const transformRef = useRef(transformFn)
@@ -95,6 +109,8 @@ const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
   const displayValueRef = useRef(displayValue)
   displayValueRef.current = displayValue
 
+  // 当外部通过 setValue/setValues 更新表单值时，同步更新本地展示值
+  // 仅在值真正变化时执行，避免用户正在输入时被外部赋值打断
   useEffect(() => {
     const val = controllerField.value ?? ''
     if (val === displayValueRef.current) return
@@ -112,6 +128,9 @@ const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
     )
   }, [controllerField.value])
 
+  // 用户输入时：存储展示域值（不做转换），同时实时计算并展示转换后的预览
+  // 存储展示域而非存储域的原因：使所有校验规则（min/max/pattern/custom validate）
+  // 都在展示域下工作，错误提示天然符合用户输入的单位语义
   const handleChange = useCallback((val: any) => {
     setDisplayValue(val)
     let preview: any

@@ -248,9 +248,11 @@ function resolveJsonPointerDependency(
 export function resolveDependencyPath({
   depPath,
   currentPath,
+  schema: _schema,
 }: {
   depPath: string
   currentPath: string
+  schema?: any
 }): string {
   // 1. 相对路径：同级字段
   if (depPath.startsWith('./')) {
@@ -275,18 +277,22 @@ export function resolveDependencyPath({
  */
 export function resolveArrayElementLinkage(
   linkage: LinkageConfig,
-  currentPath: string
+  currentPath: string,
+  _schema?: any
 ): LinkageConfig {
   const resolved = { ...linkage }
 
   // 解析 dependencies 中的路径
-  // 注意：LinkageConfig 类型保证 dependencies 是必填字段，无需检查
-  resolved.dependencies = resolved.dependencies.map((depPath) => {
-    return resolveDependencyPath({
-      depPath,
-      currentPath,
+  // dependencies 在 LinkageConfig 类型中为必填，但实际使用时可能省略（如纯 schema 联动），
+  // 此处做防御性检查避免 .map() 抛 TypeError
+  if (resolved.dependencies) {
+    resolved.dependencies = resolved.dependencies.map((depPath) => {
+      // 指向顶层字段的 JSON Pointer（无 /items/ 层级）保持原样，不转为运行时路径。
+      // 原因：顶层字段在所有数组元素中是共享的，其路径不含索引，无需实例化
+      if (depPath.startsWith('#/') && !depPath.includes('/items/')) return depPath
+      return resolveDependencyPath({ depPath, currentPath })
     })
-  })
+  }
 
   // 解析 when 条件中的路径
   if (resolved.when && typeof resolved.when === 'object') {
@@ -307,10 +313,15 @@ function resolveConditionPaths(
 
   // 解析 field 字段
   if (resolved.field) {
-    resolved.field = resolveDependencyPath({
-      depPath: resolved.field,
-      currentPath,
-    })
+    // 同 dependencies 的处理逻辑：指向顶层字段的绝对 JSON Pointer 保持不变
+    if (resolved.field.startsWith('#/') && !resolved.field.includes('/items/')) {
+      // 保留顶层字段的绝对路径，运行时按原值匹配
+    } else {
+      resolved.field = resolveDependencyPath({
+        depPath: resolved.field,
+        currentPath,
+      })
+    }
   }
 
   // 递归处理 and/or

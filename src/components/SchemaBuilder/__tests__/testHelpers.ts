@@ -96,7 +96,7 @@ export const schemaWithLinkage: ExtendedJSONSchema = {
       type: 'string',
       title: 'Details',
       ui: {
-        linkage: {
+        linkages: [{
           type: 'visibility',
           dependencies: ['#/properties/showDetails'],
           when: {
@@ -110,7 +110,7 @@ export const schemaWithLinkage: ExtendedJSONSchema = {
           otherwise: {
             state: { visible: false },
           },
-        },
+        }],
       },
     },
   },

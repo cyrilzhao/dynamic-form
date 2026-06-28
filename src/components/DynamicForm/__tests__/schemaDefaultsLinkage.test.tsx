@@ -2,8 +2,13 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { DynamicForm } from '../DynamicForm';
+import { FieldRegistry, blueprintPreset } from '..';
 import type { ExtendedJSONSchema } from '../types/schema';
 import type { DynamicFormRef } from '../types';
+
+beforeAll(() => {
+  FieldRegistry.setDefaultPreset(blueprintPreset);
+});
 
 /**
  * 测试 schema 默认值与联动计算的集成
@@ -466,9 +471,10 @@ describe('动态 schema 联动的默认值测试', () => {
       { timeout: 3000 }
     );
 
-    // 选择 httpRequest 触发 schema 联动
-    const select = screen.getByRole('combobox');
-    fireEvent.change(select, { target: { value: 'httpRequest' } });
+    // 选择 httpRequest 触发 schema 联动（SelectWidget 渲染自定义 button，用 setValue 代替 UI 操作）
+    await act(async () => {
+      formRef.current?.setValue('actionType', 'httpRequest');
+    });
 
     // 等待动态 schema 加载完成
     await waitFor(
@@ -557,10 +563,9 @@ describe('动态 schema 联动的默认值测试', () => {
       />
     );
 
-    // 选择 httpRequest 触发 schema 联动
-    const select = screen.getByRole('combobox');
+    // 选择 httpRequest 触发 schema 联动（SelectWidget 渲染自定义 button，用 setValue 代替 UI 操作）
     await act(async () => {
-      fireEvent.change(select, { target: { value: 'httpRequest' } });
+      formRef.current?.setValue('actionType', 'httpRequest');
     });
 
     // 手动触发联动以加载动态 schema

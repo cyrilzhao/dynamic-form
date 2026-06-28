@@ -38,6 +38,9 @@ export class FieldRegistry {
    * 批量注册 widgets
    */
   static registerBatch(widgets: WidgetRegistry) {
+    // 兼容性保护：某些预设的某个子模块可能为 null/undefined，
+    // 直接调用 Object.entries 会抛 TypeError，提前返回避免整个预设加载失败
+    if (!widgets) return;
     Object.entries(widgets).forEach(([type, component]) => {
       this.register(type, component);
     });

@@ -50,6 +50,7 @@ const config: Config = {
     '!src/**/*.stories.tsx',
     '!src/**/*.test.{ts,tsx}',
     '!src/**/__tests__/**',
+    '!src/examples/**',
     '!src/main.tsx',
     '!src/vite-env.d.ts',
     '!src/services/api.ts',

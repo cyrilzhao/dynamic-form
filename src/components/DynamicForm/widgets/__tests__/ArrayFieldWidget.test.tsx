@@ -4,6 +4,11 @@ import '@testing-library/jest-dom';
 import { ArrayFieldWidget } from '../ArrayFieldWidget';
 import { FormWrapper, TestWrapper } from './testHelpers';
 import type { ExtendedJSONSchema } from '../../types/schema';
+import { FieldRegistry, blueprintPreset } from '../..';
+
+beforeAll(() => {
+  FieldRegistry.setDefaultPreset(blueprintPreset);
+});
 
 // Mock react-virtuoso
 jest.mock('react-virtuoso', () => ({

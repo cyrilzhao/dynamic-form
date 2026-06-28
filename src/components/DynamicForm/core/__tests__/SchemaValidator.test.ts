@@ -92,6 +92,179 @@ describe('SchemaValidator', () => {
     });
   });
 
+  describe('required 幻象字段过滤测试', () => {
+    it('顶层 required 包含 properties 中不存在的字段时应跳过', () => {
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          username: { type: 'string', title: 'Username' },
+        },
+        required: ['username', 'nonExistentField'],
+      };
+
+      const validator = new SchemaValidator(schema);
+      const errors = validator.validate({ username: '' });
+
+      expect(errors.username).toBe('Username is required');
+      expect(errors.nonExistentField).toBeUndefined(); // 幻象字段被跳过
+    });
+
+    it('顶层 required 同时包含存在和不存在的字段时只对存在字段报错', () => {
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          name: { type: 'string', title: 'Name' },
+        },
+        required: ['name', 'phantom1', 'phantom2'],
+      };
+
+      const validator = new SchemaValidator(schema);
+      const errors = validator.validate({ name: '' });
+
+      expect(errors.name).toBe('Name is required');
+      expect(Object.keys(errors)).toEqual(['name']); // 仅 name 报错
+    });
+
+    it('oneOf 子 schema 的 required 引用父 schema 同级字段（不在子 schema properties 中）应正常验证', () => {
+      // 场景：accountType 和 idCard 定义在父 schema，oneOf 子 schema 只有 accountType 的 const 约束
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          accountType: { type: 'string', title: 'Account Type' },
+          idCard: { type: 'string', title: 'ID Card' },
+        },
+        oneOf: [
+          {
+            properties: { accountType: { const: 'personal' } },
+            required: ['idCard'], // idCard 在父 schema 中，不在子 schema properties 中
+          },
+          {
+            properties: { accountType: { const: 'business' } },
+          },
+        ],
+      };
+
+      const validator = new SchemaValidator(schema);
+      const errors = validator.validate({ accountType: 'personal', idCard: '' });
+
+      expect(errors.idCard).toBe('ID Card is required'); // 父 schema 同级字段应被验证
+    });
+
+    it('oneOf 子 schema 的 required 引用子 schema 自身 properties 的字段（不在父 schema 中）应正常验证', () => {
+      // 场景：email 仅定义在 oneOf 子 schema 的 properties 中，父 schema 中没有
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          name: { type: 'string', title: 'Name' },
+        },
+        oneOf: [
+          {
+            properties: {
+              email: { type: 'string', title: 'Email' },
+            },
+            required: ['email'], // email 在子 schema properties 中，不在父 schema 中
+          },
+        ],
+      };
+
+      const validator = new SchemaValidator(schema);
+      const errors = validator.validate({ name: 'John', email: '' });
+
+      expect(errors.email).toBe('Email is required'); // 子 schema 自身字段应被验证
+    });
+
+    it('anyOf 子 schema 的 required 引用父 schema 同级字段应正常验证', () => {
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          type: { type: 'string', title: 'Type' },
+          cardNumber: { type: 'string', title: 'Card Number' },
+          bankAccount: { type: 'string', title: 'Bank Account' },
+        },
+        anyOf: [
+          {
+            properties: { type: { const: 'card' } },
+            required: ['cardNumber'],
+          },
+          {
+            properties: { type: { const: 'bank' } },
+            required: ['bankAccount'],
+          },
+        ],
+      };
+
+      const validator = new SchemaValidator(schema);
+      // 两个子 schema 均不匹配时，anyOf 会聚合错误
+      const errors = validator.validate({ type: 'other', cardNumber: '', bankAccount: '' });
+
+      // 至少有一个 required 错误被触发（anyOf 无匹配时返回合并错误）
+      expect(errors.cardNumber ?? errors.bankAccount).toBeDefined();
+    });
+
+    it('allOf 子 schema 的 required 字段应正常验证', () => {
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          age: { type: 'number', title: 'Age' },
+          license: { type: 'string', title: 'License' },
+        },
+        allOf: [
+          { required: ['age'] },
+          { required: ['license'] },
+        ],
+      };
+
+      const validator = new SchemaValidator(schema);
+      const errors = validator.validate({ age: undefined, license: '' });
+
+      expect(errors.age).toBe('Age is required');
+      expect(errors.license).toBe('License is required');
+    });
+
+    it('嵌套对象 recursive=true 时 required 包含不存在字段应跳过', () => {
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          user: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', title: 'Name' },
+            },
+            required: ['name', 'phantomField'], // phantomField 不在 user.properties 中
+          },
+        },
+      };
+
+      const validator = new SchemaValidator(schema);
+      const errors = validator.validate({ user: { name: '' } }, true);
+
+      expect(errors['user.name']).toBe('Name is required');
+      expect(errors['user.phantomField']).toBeUndefined(); // 幻象字段被跳过
+    });
+
+    it('嵌套对象 recursive=true 时 required 包含存在字段应正常报错', () => {
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          address: {
+            type: 'object',
+            properties: {
+              city: { type: 'string', title: 'City' },
+              street: { type: 'string', title: 'Street' },
+            },
+            required: ['city', 'street'],
+          },
+        },
+      };
+
+      const validator = new SchemaValidator(schema);
+      const errors = validator.validate({ address: { city: '', street: '' } }, true);
+
+      expect(errors['address.city']).toBe('City is required');
+      expect(errors['address.street']).toBe('Street is required');
+    });
+  });
+
   describe('dependencies 验证', () => {
     describe('简单依赖（数组形式）', () => {
       it('当触发字段有值时，依赖字段必填', () => {

@@ -27,6 +27,13 @@ export class SchemaValidator {
    * @param recursive - 是否递归验证嵌套字段（默认 false，只验证当前层）
    * @returns 验证错误对象，键为字段名，值为错误信息
    */
+  /**
+   * 验证整个表单数据
+   *
+   * 重构说明：原来 validate 与 validateAgainstSchema 存在大量重复逻辑（required 检查、
+   * properties 约束检查）。现在 validate 作为公开入口，直接委托给
+   * validateAgainstSchema（私有核心方法），消除重复，逻辑集中在一处维护。
+   */
   validate(
     formData: Record<string, any>,
     recursive: boolean = false
@@ -357,7 +364,11 @@ export class SchemaValidator {
     // 1. 验证 required 字段
     if (schema.required && Array.isArray(schema.required)) {
       for (const requiredField of schema.required) {
-        if (schema.properties && !(requiredField in schema.properties)) continue
+        // 只对 "schema 与当前 validator 实例的 schema 完全相同" 的调用应用此 guard：
+        // - validate() 直接调用时 schema === this.schema，过滤真正不存在的幻象字段
+        // - validateOneOf/validateAnyOf 传入 sub-schema 时 schema !== this.schema，
+        //   不应用 guard，保留 sub-schema 的 required（可合法引用父 schema 的字段）
+        if (schema === this.schema && this.schema.properties && !(requiredField in this.schema.properties)) continue
         if (!this.hasValue(formData[requiredField])) {
           errors[requiredField] =
             `${this.getFieldTitle(requiredField, schema)} is required`
@@ -380,7 +391,10 @@ export class SchemaValidator {
       }
     }
 
-    // 3-7. 条件验证（各自独立判断，修复 dependencies 仅在其他条件存在时才触发的 bug）
+    // 3-7. 条件验证（各自独立判断）
+    // 修复前：dependencies 被包裹在 if (schema.oneOf || ...) 大块中，
+    // 导致只有 schema 同时包含条件关键字时 dependencies 才会被验证。
+    // 修复后：每个条件独立检查，dependencies 始终生效。
     const nestedValidator = new SchemaValidator(schema, this.rootSchema)
     if (schema.dependencies) nestedValidator.validateDependencies(formData, errors, recursive)
     if (schema.if) nestedValidator.validateConditional(formData, errors, recursive)

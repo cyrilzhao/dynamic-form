@@ -106,10 +106,19 @@ export interface UIConfig {
   // 字段级自定义校验规则（由 SchemaBuilder 用户配置，运行时执行）
   validators?: ValidatorRule[]
 
-  // 字段值转换配置：输入框显示原始值，表单存储转换后的值
+  /**
+   * 字段值转换配置
+   *
+   * 设计背景：某些字段需要用户以"展示域"输入（如百分比 96），但实际存储"存储域"的值（如 0.96）。
+   * 这类转换完全在 DynamicForm 内部完成，外部（setValues/getValues/onChange/onSubmit）
+   * 始终以存储域值交互，schema.default/maximum 等配置则使用展示域值（更直观）。
+   *
+   * - callback：展示域 → 存储域，在 getValues/onChange/onSubmit 时自动应用
+   * - reverseCallback：存储域 → 展示域，在 setValues/setValue 时自动应用（将外部存储值转为用户可见的展示值）
+   */
   transform?: {
     callback: string          // 函数名，从 callbacks 注册表解析，签名: (inputValue: any) => formValue
-    reverseCallback?: string  // 可选，反向转换函数名，签名: (formValue: any) => inputValue（用于初始显示）
+    reverseCallback?: string  // 可选，反向转换函数名，签名: (formValue: any) => inputValue
   }
 }
 
