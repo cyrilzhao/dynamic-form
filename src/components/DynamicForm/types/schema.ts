@@ -117,8 +117,9 @@ export interface UIConfig {
    * - reverseCallback：存储域 → 展示域，在 setValues/setValue 时自动应用（将外部存储值转为用户可见的展示值）
    */
   transform?: {
-    callback: string          // 函数名，从 callbacks 注册表解析，签名: (inputValue: any) => formValue
-    reverseCallback?: string  // 可选，反向转换函数名，签名: (formValue: any) => inputValue
+    // 可以是 callbacks 注册表中的函数名（string），也可以是内联 JS 函数体（ScriptTransform）
+    callback: string | { type: 'script'; code: string }
+    reverseCallback?: string | { type: 'script'; code: string }
   }
 }
 

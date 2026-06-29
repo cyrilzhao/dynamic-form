@@ -24,6 +24,7 @@ import { FieldPathSelector } from './FieldPathSelector'
 import { SchemaValidationEditor } from './SchemaValidationEditor'
 import { FieldValidatorsEditor } from './FieldValidatorsEditor'
 import { LinkagesEditor } from './LinkagesEditor'
+import { TransformEditor } from './TransformEditor'
 import { ObjectEditor } from '../ObjectEditor'
 
 // Helper to get node from path
@@ -918,6 +919,12 @@ export const PropertyEditor: React.FC = () => {
                     </FormGroup>
                   </>
                 )}
+                <Divider style={{ margin: '16px 0' }} />
+                <FieldValidatorsEditor
+                  value={currentNode.ui?.validators}
+                  onChange={(validators) => handleUIChange('validators', validators)}
+                  disabled={isArrayItems}
+                />
               </div>
             }
           />
@@ -1426,15 +1433,13 @@ export const PropertyEditor: React.FC = () => {
           />
 
           <Tab
-            id="validators"
-            title="Validators"
+            id="transform"
+            title="Transform"
             panel={
               <div className="editor-panel">
-                <FieldValidatorsEditor
-                  value={currentNode.ui?.validators}
-                  onChange={(validators) =>
-                    handleUIChange('validators', validators)
-                  }
+                <TransformEditor
+                  value={currentNode.ui?.transform}
+                  onChange={(transform) => handleUIChange('transform', transform)}
                   disabled={isArrayItems}
                 />
               </div>

@@ -44,6 +44,7 @@ import {
   mergeDefaults,
 } from './utils/extractSchemaDefaults'
 import { createSchemaResolver } from './utils/createSchemaResolver'
+import { resolveTransformFn } from './utils/resolveTransformFn'
 import '@blueprintjs/core/lib/css/blueprint.css'
 
 // 空对象常量，避免每次渲染创建新对象
@@ -203,9 +204,10 @@ function applyFieldTransforms(
     if (!(key in result)) continue
     const fieldSchema = rawSchema as ExtendedJSONSchema
     const cb = fieldSchema.ui?.transform?.callback
-    if (cb && callbacks[cb]) {
+    const fn = resolveTransformFn(cb, callbacks)
+    if (fn) {
       try {
-        result[key] = callbacks[cb](result[key])
+        result[key] = fn(result[key])
       } catch {
         /* keep */
       }
@@ -273,9 +275,10 @@ function reverseFieldTransforms(
     if (!(key in result)) continue
     const fieldSchema = rawSchema as ExtendedJSONSchema
     const cb = fieldSchema.ui?.transform?.reverseCallback
-    if (cb && callbacks[cb]) {
+    const fn = resolveTransformFn(cb, callbacks)
+    if (fn) {
       try {
-        result[key] = callbacks[cb](result[key])
+        result[key] = fn(result[key])
       } catch {
         /* keep */
       }
@@ -620,22 +623,14 @@ const DynamicFormInner = React.memo(
         () => ({
           setValue: (name, value, options) => {
             const fieldSchema = getSchemaAtPath(schema, name)
-            const reverseCb = fieldSchema?.ui?.transform?.reverseCallback
-            const reverseFn = reverseCb
-              ? callbacksRef.current[reverseCb]
-              : undefined
-            methods.setValue(
-              name,
-              reverseFn ? reverseFn(value) : value,
-              options
-            )
+            const reverseFn = resolveTransformFn(fieldSchema?.ui?.transform?.reverseCallback, callbacksRef.current)
+            methods.setValue(name, reverseFn ? reverseFn(value) : value, options)
           },
           getValue: (name: string) => {
             const displayValue = methods.getValues(name as any)
             const fieldSchema = getSchemaAtPath(schema, name)
-            const cb = fieldSchema?.ui?.transform?.callback
-            const transformFn = cb ? callbacksRef.current[cb] : undefined
-            return transformFn ? transformFn(displayValue) : displayValue
+            const fn = resolveTransformFn(fieldSchema?.ui?.transform?.callback, callbacksRef.current)
+            return fn ? fn(displayValue) : displayValue
           },
           getValues: () => {
             const displayValues = methods.getValues()

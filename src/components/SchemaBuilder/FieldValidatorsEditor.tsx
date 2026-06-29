@@ -4,12 +4,12 @@ import {
   FormGroup,
   HTMLSelect,
   InputGroup,
-  TextArea,
   Card,
   Tag,
   Callout,
   Divider,
 } from '@blueprintjs/core';
+import { CodeEditor } from '../CodeEditor';
 import type { ValidatorRule } from '../DynamicForm/types/schema';
 
 interface FieldValidatorsEditorProps {
@@ -121,14 +121,12 @@ export const FieldValidatorsEditor: React.FC<FieldValidatorsEditorProps> = ({
             label="Validation Code"
             helperText="Function body receiving (value, formValues). Return true or a string error message."
           >
-            <TextArea
-              fill
-              rows={6}
+            <CodeEditor
               value={scriptCode}
-              onChange={e => setScriptCode(e.target.value)}
-              placeholder={"if (!value || value.length < 3) return 'Must be at least 3 characters';\nreturn true;"}
+              language="javascript"
+              config={{ initialMode: 'edit', previewLines: 6 }}
+              onChange={code => setScriptCode(code)}
               disabled={disabled}
-              style={{ fontFamily: 'monospace', fontSize: 12 }}
             />
           </FormGroup>
         </>

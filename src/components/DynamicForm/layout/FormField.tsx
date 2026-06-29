@@ -7,6 +7,7 @@ import { FieldHelp } from '../components/FieldHelp'
 import { FieldRegistry } from '../core/FieldRegistry'
 import { useWidgets } from '../context/WidgetsContext'
 import { useCallbacks } from '../context/CallbacksContext'
+import { resolveTransformFn } from '../utils/resolveTransformFn'
 import type { FieldConfig } from '../types/schema'
 import type { LinkageResult } from '../types/linkage'
 
@@ -247,7 +248,7 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
 
   const transformConfig = field.schema?.ui?.transform
   const transformFn = transformConfig
-    ? callbacks[transformConfig.callback]
+    ? resolveTransformFn(transformConfig.callback, callbacks)
     : undefined
 
   return (
