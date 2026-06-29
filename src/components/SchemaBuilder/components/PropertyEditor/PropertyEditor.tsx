@@ -18,9 +18,6 @@ import {
 import { get } from 'lodash'
 import { useSchemaBuilder } from '../../SchemaBuilder'
 import type { SchemaNodeType } from '../../types'
-import { LinkageEditor } from './components/LinkageEditor'
-import type { LinkageConfig } from '../../../DynamicForm/types/linkage'
-import { FieldPathSelector } from './components/FieldPathSelector'
 import { SchemaValidationEditor } from './components/SchemaValidationEditor'
 import { FieldValidatorsEditor } from './components/FieldValidatorsEditor'
 import { LinkagesEditor } from './components/LinkagesEditor'
@@ -174,12 +171,23 @@ export const PropertyEditor: React.FC = () => {
           defaultValue={field.value ?? ''}
           disabled={isArrayItems}
           onKeyDown={(e) => {
-            if (!['-', 'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key) && !/^\d$/.test(e.key)) {
+            if (
+              ![
+                '-',
+                'Backspace',
+                'Delete',
+                'ArrowLeft',
+                'ArrowRight',
+                'Tab',
+              ].includes(e.key) &&
+              !/^\d$/.test(e.key)
+            ) {
               e.preventDefault()
             }
           }}
           onBlur={(e) => {
-            const v = e.target.value === '' ? undefined : parseInt(e.target.value, 10)
+            const v =
+              e.target.value === '' ? undefined : parseInt(e.target.value, 10)
             field.onChange(v)
             handleFieldChange('default', v)
           }}
@@ -200,12 +208,24 @@ export const PropertyEditor: React.FC = () => {
               e.preventDefault()
               return
             }
-            if (!['-', '.', 'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key) && !/^\d$/.test(e.key)) {
+            if (
+              ![
+                '-',
+                '.',
+                'Backspace',
+                'Delete',
+                'ArrowLeft',
+                'ArrowRight',
+                'Tab',
+              ].includes(e.key) &&
+              !/^\d$/.test(e.key)
+            ) {
               e.preventDefault()
             }
           }}
           onBlur={(e) => {
-            const v = e.target.value === '' ? undefined : parseFloat(e.target.value)
+            const v =
+              e.target.value === '' ? undefined : parseFloat(e.target.value)
             field.onChange(v)
             handleFieldChange('default', v)
           }}
@@ -235,7 +255,15 @@ export const PropertyEditor: React.FC = () => {
   ]
 
   const widgetOptions = {
-    string: ['textarea', 'password', 'email', 'url', 'select', 'radio', 'checkbox'],
+    string: [
+      'textarea',
+      'password',
+      'email',
+      'url',
+      'select',
+      'radio',
+      'checkbox',
+    ],
     number: [],
     integer: [],
     boolean: ['checkbox', 'radio'],
@@ -932,7 +960,9 @@ export const PropertyEditor: React.FC = () => {
                 <Divider style={{ margin: '16px 0' }} />
                 <FieldValidatorsEditor
                   value={currentNode.ui?.validators}
-                  onChange={(validators) => handleUIChange('validators', validators)}
+                  onChange={(validators) =>
+                    handleUIChange('validators', validators)
+                  }
                   disabled={isArrayItems}
                 />
               </div>
@@ -1181,37 +1211,41 @@ export const PropertyEditor: React.FC = () => {
                   />
                 </FormGroup>
 
-                <Divider />
+                {currentType === 'object' && (
+                  <>
+                    <Divider />
 
-                <Controller
-                  name="ui.flattenPath"
-                  control={control}
-                  render={({ field }) => (
-                    <Switch
-                      label="Flatten Path (Transparent)"
-                      checked={!!field.value}
-                      onChange={(e) =>
-                        handleUIChange('flattenPath', e.currentTarget.checked)
-                      }
-                      disabled={isArrayItems}
+                    <Controller
+                      name="ui.flattenPath"
+                      control={control}
+                      render={({ field }) => (
+                        <Switch
+                          label="Flatten Path (Transparent)"
+                          checked={!!field.value}
+                          onChange={(e) =>
+                            handleUIChange('flattenPath', e.currentTarget.checked)
+                          }
+                          disabled={isArrayItems}
+                        />
+                      )}
                     />
-                  )}
-                />
 
-                <Controller
-                  name="ui.flattenPrefix"
-                  control={control}
-                  render={({ field }) => (
-                    <Switch
-                      label="Flatten Prefix"
-                      checked={!!field.value}
-                      onChange={(e) =>
-                        handleUIChange('flattenPrefix', e.currentTarget.checked)
-                      }
-                      disabled={isArrayItems}
+                    <Controller
+                      name="ui.flattenPrefix"
+                      control={control}
+                      render={({ field }) => (
+                        <Switch
+                          label="Flatten Prefix"
+                          checked={!!field.value}
+                          onChange={(e) =>
+                            handleUIChange('flattenPrefix', e.currentTarget.checked)
+                          }
+                          disabled={isArrayItems}
+                        />
+                      )}
                     />
-                  )}
-                />
+                  </>
+                )}
 
                 {currentType === 'array' && (
                   <>
@@ -1421,6 +1455,19 @@ export const PropertyEditor: React.FC = () => {
                     </FormGroup>
                   </>
                 )}
+
+                <Divider />
+
+                <FormGroup
+                  label="Field Transform"
+                  helperText="Configure data transformation functions for this field"
+                >
+                  <TransformEditor
+                    value={currentNode.ui?.transform}
+                    onChange={(transform) => handleUIChange('transform', transform)}
+                    disabled={isArrayItems}
+                  />
+                </FormGroup>
               </div>
             }
           />
@@ -1436,20 +1483,6 @@ export const PropertyEditor: React.FC = () => {
                   onChange={(linkages) => handleUIChange('linkages', linkages)}
                   currentFieldPath={currentFieldPath}
                   schema={schema}
-                  disabled={isArrayItems}
-                />
-              </div>
-            }
-          />
-
-          <Tab
-            id="transform"
-            title="Transform"
-            panel={
-              <div className="editor-panel">
-                <TransformEditor
-                  value={currentNode.ui?.transform}
-                  onChange={(transform) => handleUIChange('transform', transform)}
                   disabled={isArrayItems}
                 />
               </div>
