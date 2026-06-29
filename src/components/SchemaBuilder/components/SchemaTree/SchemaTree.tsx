@@ -8,10 +8,10 @@ import {
   MenuDivider,
   Tooltip,
 } from '@blueprintjs/core';
-import { Tree } from '../Tree';
-import type { TreeNodeInfo } from '../Tree';
-import { useSchemaBuilder } from './SchemaBuilder';
-import type { ExtendedJSONSchema } from '../DynamicForm/types/schema';
+import { Tree } from '../../../Tree';
+import type { TreeNodeInfo } from '../../../Tree';
+import { useSchemaBuilder } from '../../SchemaBuilder';
+import type { ExtendedJSONSchema } from '../../../DynamicForm/types/schema';
 
 export const SchemaTree: React.FC = () => {
   const {

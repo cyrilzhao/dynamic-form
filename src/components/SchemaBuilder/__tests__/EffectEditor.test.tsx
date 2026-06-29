@@ -4,7 +4,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { EffectEditor } from '../EffectEditor';
+import { EffectEditor } from '../components/PropertyEditor/components/EffectEditor';
 
 // Mock ObjectEditor 组件
 jest.mock('../../ObjectEditor', () => ({

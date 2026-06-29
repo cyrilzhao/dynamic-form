@@ -11,7 +11,7 @@ import {
   Classes,
   Tooltip,
 } from '@blueprintjs/core';
-import type { ExtendedJSONSchema } from '../DynamicForm/types/schema';
+import type { ExtendedJSONSchema } from '../../../../DynamicForm/types/schema';
 
 interface FieldPathSelectorProps {
   schema: ExtendedJSONSchema;

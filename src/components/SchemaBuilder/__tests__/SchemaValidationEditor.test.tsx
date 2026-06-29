@@ -4,12 +4,12 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { SchemaValidationEditor } from '../SchemaValidationEditor';
+import { SchemaValidationEditor } from '../components/PropertyEditor/components/SchemaValidationEditor';
 import { basicSchema } from './testHelpers';
 
 // Mock FieldPathSelector 组件
 let mockFieldPathSelectorOnChange: ((value: string) => void) | null = null;
-jest.mock('../FieldPathSelector', () => ({
+jest.mock('../components/PropertyEditor/components/FieldPathSelector', () => ({
   FieldPathSelector: ({ value, onChange, placeholder }: any) => {
     mockFieldPathSelectorOnChange = onChange;
     return (
@@ -25,7 +25,7 @@ jest.mock('../FieldPathSelector', () => ({
 
 // Mock ValidationEffectEditor 组件
 let mockValidationEffectEditorOnChange: ((value: any) => void) | null = null;
-jest.mock('../ValidationEffectEditor', () => ({
+jest.mock('../components/PropertyEditor/components/ValidationEffectEditor', () => ({
   ValidationEffectEditor: ({ value, onChange, label }: any) => {
     mockValidationEffectEditorOnChange = onChange;
     return (

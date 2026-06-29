@@ -12,8 +12,8 @@ import {
   MenuItem,
   Popover,
 } from '@blueprintjs/core';
-import type { ConditionExpression, ConditionOperator } from '../DynamicForm/types/linkage';
-import type { ExtendedJSONSchema } from '../DynamicForm/types/schema';
+import type { ConditionExpression, ConditionOperator } from '../../../../DynamicForm/types/linkage';
+import type { ExtendedJSONSchema } from '../../../../DynamicForm/types/schema';
 import { FieldPathSelector } from './FieldPathSelector';
 
 // 单条件表达式类型

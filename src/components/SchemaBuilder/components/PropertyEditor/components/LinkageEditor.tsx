@@ -15,8 +15,8 @@ import type {
   LinkageType,
   ConditionExpression,
   LinkageEffect,
-} from '../DynamicForm/types/linkage';
-import type { ExtendedJSONSchema } from '../DynamicForm/types/schema';
+} from '../../../../DynamicForm/types/linkage';
+import type { ExtendedJSONSchema } from '../../../../DynamicForm/types/schema';
 import { ConditionEditor } from './ConditionEditor';
 import { EffectEditor } from './EffectEditor';
 import { FieldPathSelector } from './FieldPathSelector';

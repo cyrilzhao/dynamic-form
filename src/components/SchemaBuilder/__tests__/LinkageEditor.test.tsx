@@ -4,7 +4,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { LinkageEditor } from '../LinkageEditor';
+import { LinkageEditor } from '../components/PropertyEditor/components/LinkageEditor';
 import { basicSchema } from './testHelpers';
 
 describe('LinkageEditor', () => {

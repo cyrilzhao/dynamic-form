@@ -4,7 +4,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { FieldPathSelector } from '../FieldPathSelector';
+import { FieldPathSelector } from '../components/PropertyEditor/components/FieldPathSelector';
 import { basicSchema, nestedSchema, arraySchema } from './testHelpers';
 
 describe('FieldPathSelector', () => {

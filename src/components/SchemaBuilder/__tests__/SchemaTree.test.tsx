@@ -4,7 +4,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { SchemaTree } from '../SchemaTree';
+import { SchemaTree } from '../components/SchemaTree/SchemaTree';
 import { SchemaBuilderContext } from '../SchemaBuilder';
 import { basicSchema, nestedSchema, arraySchema } from './testHelpers';
 

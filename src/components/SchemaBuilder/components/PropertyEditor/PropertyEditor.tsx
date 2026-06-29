@@ -16,13 +16,13 @@ import {
   Tag,
 } from '@blueprintjs/core';
 import { get } from 'lodash';
-import { useSchemaBuilder } from './SchemaBuilder';
-import type { SchemaNodeType } from './types';
-import { LinkageEditor } from './LinkageEditor';
-import type { LinkageConfig } from '../DynamicForm/types/linkage';
-import { FieldPathSelector } from './FieldPathSelector';
-import { SchemaValidationEditor } from './SchemaValidationEditor';
-import { ObjectEditor } from '../ObjectEditor';
+import { useSchemaBuilder } from '../../SchemaBuilder';
+import type { SchemaNodeType } from '../../types';
+import { LinkageEditor } from './components/LinkageEditor';
+import type { LinkageConfig } from '../../../DynamicForm/types/linkage';
+import { FieldPathSelector } from './components/FieldPathSelector';
+import { SchemaValidationEditor } from './components/SchemaValidationEditor';
+import { ObjectEditor } from '../../../ObjectEditor';
 
 // Helper to get node from path
 const getNode = (schema: any, path: string[]) => {
@@ -164,6 +164,37 @@ export const PropertyEditor: React.FC = () => {
   };
 
   const currentType = watch('type') as SchemaNodeType;
+
+  const renderDefaultValue = () => (
+    <Controller
+      name="default"
+      control={control}
+      render={({ field }) => (
+        <FormGroup label="Default Value">
+          {currentType === 'boolean' ? (
+            <Switch
+              checked={!!field.value}
+              disabled={isArrayItems}
+              onChange={e => {
+                field.onChange(e.currentTarget.checked);
+                handleFieldChange('default', e.currentTarget.checked);
+              }}
+            />
+          ) : (
+            <InputGroup
+              {...field}
+              value={field.value || ''}
+              disabled={isArrayItems}
+              onChange={e => {
+                field.onChange(e);
+                handleFieldChange('default', e.target.value);
+              }}
+            />
+          )}
+        </FormGroup>
+      )}
+    />
+  );
 
   return (
     <div className="property-editor">
@@ -311,34 +342,7 @@ export const PropertyEditor: React.FC = () => {
                   />
                 </FormGroup>
 
-                <Controller
-                  name="default"
-                  control={control}
-                  render={({ field }) => (
-                    <FormGroup label="Default Value">
-                      {currentType === 'boolean' ? (
-                        <Switch
-                          checked={!!field.value}
-                          disabled={isArrayItems}
-                          onChange={e => {
-                            field.onChange(e.currentTarget.checked);
-                            handleFieldChange('default', e.currentTarget.checked);
-                          }}
-                        />
-                      ) : (
-                        <InputGroup
-                          {...field}
-                          value={field.value || ''}
-                          disabled={isArrayItems}
-                          onChange={e => {
-                            field.onChange(e);
-                            handleFieldChange('default', e.target.value);
-                          }}
-                        />
-                      )}
-                    </FormGroup>
-                  )}
-                />
+                {renderDefaultValue()}
 
                 {isObjectProperty && (
                   <Switch

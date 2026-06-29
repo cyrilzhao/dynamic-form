@@ -9,8 +9,8 @@ import type {
   SchemaBuilderRef,
 } from './types';
 import type { ExtendedJSONSchema } from '../DynamicForm/types/schema';
-import { SchemaTree } from './SchemaTree';
-import { PropertyEditor } from './PropertyEditor';
+import { SchemaTree } from './components/SchemaTree/SchemaTree';
+import { PropertyEditor } from './components/PropertyEditor/PropertyEditor';
 import { Card, Divider, Tabs, Tab } from '@blueprintjs/core';
 import { DynamicForm } from '../DynamicForm';
 import './SchemaBuilder.scss';

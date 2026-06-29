@@ -8,8 +8,8 @@ import {
   Button,
   Tag,
 } from '@blueprintjs/core';
-import type { LinkageEffect, LinkageType } from '../DynamicForm/types/linkage';
-import { ObjectEditor } from '../ObjectEditor';
+import type { LinkageEffect, LinkageType } from '../../../../DynamicForm/types/linkage';
+import { ObjectEditor } from '../../../../ObjectEditor';
 
 interface EffectEditorProps {
   value?: LinkageEffect;

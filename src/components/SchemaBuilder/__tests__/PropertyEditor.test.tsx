@@ -4,13 +4,13 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { PropertyEditor } from '../PropertyEditor';
+import { PropertyEditor } from '../components/PropertyEditor/PropertyEditor';
 import { SchemaBuilderContext } from '../SchemaBuilder';
 import { basicSchema } from './testHelpers';
 
 // Mock SchemaValidationEditor 组件
 let mockSchemaValidationEditorOnChange: ((config: any) => void) | null = null;
-jest.mock('../SchemaValidationEditor', () => ({
+jest.mock('../components/PropertyEditor/components/SchemaValidationEditor', () => ({
   SchemaValidationEditor: ({ onChange }: any) => {
     mockSchemaValidationEditorOnChange = onChange;
     return <div data-testid="schema-validation-editor">SchemaValidationEditor Mock</div>;
