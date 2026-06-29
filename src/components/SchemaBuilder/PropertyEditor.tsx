@@ -151,6 +151,80 @@ export const PropertyEditor: React.FC = () => {
     }
   }
 
+  const renderDefaultValueInput = (field: any) => {
+    if (currentType === 'boolean') {
+      return (
+        <Switch
+          checked={!!field.value}
+          disabled={isArrayItems}
+          onChange={(e) => {
+            field.onChange(e.currentTarget.checked)
+            handleFieldChange('default', e.currentTarget.checked)
+          }}
+        />
+      )
+    }
+    if (currentType === 'integer') {
+      return (
+        <input
+          key="default-integer"
+          type="text"
+          className="bp6-input"
+          style={{ width: '100%' }}
+          defaultValue={field.value ?? ''}
+          disabled={isArrayItems}
+          onKeyDown={(e) => {
+            if (!['-', 'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key) && !/^\d$/.test(e.key)) {
+              e.preventDefault()
+            }
+          }}
+          onBlur={(e) => {
+            const v = e.target.value === '' ? undefined : parseInt(e.target.value, 10)
+            field.onChange(v)
+            handleFieldChange('default', v)
+          }}
+        />
+      )
+    }
+    if (currentType === 'number') {
+      return (
+        <input
+          key="default-number"
+          type="text"
+          className="bp6-input"
+          style={{ width: '100%' }}
+          defaultValue={field.value ?? ''}
+          disabled={isArrayItems}
+          onKeyDown={(e) => {
+            if (e.key === '.' && e.currentTarget.value.includes('.')) {
+              e.preventDefault()
+              return
+            }
+            if (!['-', '.', 'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key) && !/^\d$/.test(e.key)) {
+              e.preventDefault()
+            }
+          }}
+          onBlur={(e) => {
+            const v = e.target.value === '' ? undefined : parseFloat(e.target.value)
+            field.onChange(v)
+            handleFieldChange('default', v)
+          }}
+        />
+      )
+    }
+    return (
+      <InputGroup
+        {...field}
+        value={field.value || ''}
+        disabled={isArrayItems}
+        onChange={(e) => {
+          field.onChange(e)
+          handleFieldChange('default', e.target.value)
+        }}
+      />
+    )
+  }
+
   const typeOptions = [
     { label: 'String', value: 'string' },
     { label: 'Number', value: 'number' },
@@ -327,71 +401,7 @@ export const PropertyEditor: React.FC = () => {
                   control={control}
                   render={({ field }) => (
                     <FormGroup label="Default Value">
-                      {currentType === 'boolean' ? (
-                        <Switch
-                          checked={!!field.value}
-                          disabled={isArrayItems}
-                          onChange={(e) => {
-                            field.onChange(e.currentTarget.checked)
-                            handleFieldChange(
-                              'default',
-                              e.currentTarget.checked
-                            )
-                          }}
-                        />
-                      ) : currentType === 'integer' ? (
-                        <input
-                          key="default-integer"
-                          type="text"
-                          className="bp6-input"
-                          style={{ width: '100%' }}
-                          defaultValue={field.value ?? ''}
-                          disabled={isArrayItems}
-                          onKeyDown={(e) => {
-                            if (!['-', 'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key) && !/^\d$/.test(e.key)) {
-                              e.preventDefault()
-                            }
-                          }}
-                          onBlur={(e) => {
-                            const v = e.target.value === '' ? undefined : parseInt(e.target.value, 10)
-                            field.onChange(v)
-                            handleFieldChange('default', v)
-                          }}
-                        />
-                      ) : currentType === 'number' ? (
-                        <input
-                          key="default-number"
-                          type="text"
-                          className="bp6-input"
-                          style={{ width: '100%' }}
-                          defaultValue={field.value ?? ''}
-                          disabled={isArrayItems}
-                          onKeyDown={(e) => {
-                            if (e.key === '.' && (e.currentTarget.value.includes('.'))) {
-                              e.preventDefault()
-                              return
-                            }
-                            if (!['-', '.', 'Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key) && !/^\d$/.test(e.key)) {
-                              e.preventDefault()
-                            }
-                          }}
-                          onBlur={(e) => {
-                            const v = e.target.value === '' ? undefined : parseFloat(e.target.value)
-                            field.onChange(v)
-                            handleFieldChange('default', v)
-                          }}
-                        />
-                      ) : (
-                        <InputGroup
-                          {...field}
-                          value={field.value || ''}
-                          disabled={isArrayItems}
-                          onChange={(e) => {
-                            field.onChange(e)
-                            handleFieldChange('default', e.target.value)
-                          }}
-                        />
-                      )}
+                      {renderDefaultValueInput(field)}
                     </FormGroup>
                   )}
                 />
