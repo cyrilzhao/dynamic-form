@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback } from 'react'
 import {
   Button,
   Menu,
@@ -7,11 +7,11 @@ import {
   Position,
   MenuDivider,
   Tooltip,
-} from '@blueprintjs/core';
-import { Tree } from '../Tree';
-import type { TreeNodeInfo } from '../Tree';
-import { useSchemaBuilder } from './SchemaBuilder';
-import type { ExtendedJSONSchema } from '../DynamicForm/types/schema';
+} from '@blueprintjs/core'
+import { Tree } from '../../../Tree'
+import type { TreeNodeInfo } from '../../../Tree'
+import { useSchemaBuilder } from '../../SchemaBuilder'
+import type { ExtendedJSONSchema } from '../../../DynamicForm/types/schema'
 
 export const SchemaTree: React.FC = () => {
   const {
@@ -25,56 +25,61 @@ export const SchemaTree: React.FC = () => {
     onToggleExpand,
     onMoveUp,
     onMoveDown,
-  } = useSchemaBuilder();
+  } = useSchemaBuilder()
 
   const handleNodeClick = (node: TreeNodeInfo<string[]>) => {
-    const path = node.nodeData as string[];
-    onSelect(path);
-  };
+    const path = node.nodeData as string[]
+    onSelect(path)
+  }
 
   const handleNodeCollapse = (node: TreeNodeInfo<string[]>) => {
-    const path = node.nodeData as string[];
-    onToggleExpand(path, false);
-  };
+    const path = node.nodeData as string[]
+    onToggleExpand(path, false)
+  }
 
   const handleNodeExpand = (node: TreeNodeInfo<string[]>) => {
-    const path = node.nodeData as string[];
-    onToggleExpand(path, true);
-  };
+    const path = node.nodeData as string[]
+    onToggleExpand(path, true)
+  }
 
   const renderNodeMenu = useCallback(
     (path: string[], currentSchema: ExtendedJSONSchema) => {
       // Logic for allowed actions
-      const isRoot = path.length === 0;
-      const key = path.length > 0 ? path[path.length - 1] : '';
-      const parentKey = path.length > 1 ? path[path.length - 2] : '';
+      const isRoot = path.length === 0
+      const key = path.length > 0 ? path[path.length - 1] : ''
+      const parentKey = path.length > 1 ? path[path.length - 2] : ''
 
-      const canAddChild = currentSchema.type === 'object' || currentSchema.type === 'array';
+      const canAddChild =
+        currentSchema.type === 'object' || currentSchema.type === 'array'
 
       // Can add sibling if parent is 'properties' (standard object field)
-      const canAddSibling = !isRoot && parentKey === 'properties';
+      const canAddSibling = !isRoot && parentKey === 'properties'
 
       // Can move if parent is 'properties'
-      const canMove = !isRoot && parentKey === 'properties';
+      const canMove = !isRoot && parentKey === 'properties'
 
       // 检查是否是一级节点（path 为 ['properties', 'fieldName']）
-      const isFirstLevelNode = path.length === 2 && path[0] === 'properties';
+      const isFirstLevelNode = path.length === 2 && path[0] === 'properties'
 
       // 如果是一级节点，检查是否是最后一个节点
-      let isLastFirstLevelNode = false;
+      let isLastFirstLevelNode = false
       if (isFirstLevelNode && schema.properties) {
-        const firstLevelNodeCount = Object.keys(schema.properties).length;
-        isLastFirstLevelNode = firstLevelNodeCount === 1;
+        const firstLevelNodeCount = Object.keys(schema.properties).length
+        isLastFirstLevelNode = firstLevelNodeCount === 1
       }
 
       // Can delete if not root and not 'items' of an array (enforcing read-only structure for items)
       // 如果是最后一个一级节点，则不能删除
-      const canDelete = !isRoot && key !== 'items' && !isLastFirstLevelNode;
+      const canDelete = !isRoot && key !== 'items' && !isLastFirstLevelNode
 
       return (
         <Menu>
           {canAddChild && (
-            <MenuItem text="Add Child Node" icon="plus" onClick={() => onAddChild(path, 'string')} />
+            <MenuItem
+              text="Add Child Node"
+              icon="plus"
+              onClick={() => onAddChild(path, 'string')}
+            />
           )}
           {canAddSibling && (
             <MenuItem
@@ -88,8 +93,16 @@ export const SchemaTree: React.FC = () => {
 
           {canMove && (
             <>
-              <MenuItem text="Move Up" icon="arrow-up" onClick={() => onMoveUp(path)} />
-              <MenuItem text="Move Down" icon="arrow-down" onClick={() => onMoveDown(path)} />
+              <MenuItem
+                text="Move Up"
+                icon="arrow-up"
+                onClick={() => onMoveUp(path)}
+              />
+              <MenuItem
+                text="Move Down"
+                icon="arrow-down"
+                onClick={() => onMoveDown(path)}
+              />
             </>
           )}
 
@@ -104,39 +117,51 @@ export const SchemaTree: React.FC = () => {
             />
           )}
         </Menu>
-      );
+      )
     },
     [schema, onAddChild, onAddSibling, onMoveUp, onMoveDown, onDelete]
-  );
+  )
 
   const buildTreeNodes = useCallback(
-    (currentSchema: ExtendedJSONSchema, path: string[] = []): TreeNodeInfo<string[]>[] => {
-      const pathStr = path.join('.');
-      const isSelected = path.join('.') === selectedPath.join('.');
-      const isExpanded = !!expandedPaths[pathStr];
+    (
+      currentSchema: ExtendedJSONSchema,
+      path: string[] = []
+    ): TreeNodeInfo<string[]>[] => {
+      const pathStr = path.join('.')
+      const isSelected = path.join('.') === selectedPath.join('.')
+      const isExpanded = !!expandedPaths[pathStr]
 
       // Determine label
-      let label = currentSchema.title || (path.length > 0 ? path[path.length - 1] : 'Root');
+      let label =
+        currentSchema.title ||
+        (path.length > 0 ? path[path.length - 1] : 'Root')
 
       // Formatting label
       if (path.length > 0) {
-        const key = path[path.length - 1];
+        const key = path[path.length - 1]
         if (path[path.length - 2] === 'properties') {
-          label = currentSchema.title ? `${currentSchema.title} (${key})` : key;
+          label = currentSchema.title ? `${currentSchema.title} (${key})` : key
         } else if (key === 'items') {
-          label = currentSchema.title ? `${currentSchema.title} (items)` : 'items';
+          label = currentSchema.title
+            ? `${currentSchema.title} (items)`
+            : 'items'
         }
       }
 
-      const canAddChild = currentSchema.type === 'object';
-      const canAddSibling = path.length > 0 && path[path.length - 2] === 'properties';
-      const showActions = canAddChild || canAddSibling || path.length > 0;
+      const canAddChild = currentSchema.type === 'object'
+      const canAddSibling =
+        path.length > 0 && path[path.length - 2] === 'properties'
+      const showActions = canAddChild || canAddSibling || path.length > 0
 
       const node: TreeNodeInfo<string[]> = {
         id: pathStr || 'root',
         label: (
           <div className="schema-tree-node-label">
-            <Tooltip content={label} hoverOpenDelay={500} position={Position.TOP_LEFT}>
+            <Tooltip
+              content={label}
+              hoverOpenDelay={500}
+              position={Position.TOP_LEFT}
+            >
               <span className="node-text">{label}</span>
             </Tooltip>
             <div className="node-actions">
@@ -155,41 +180,53 @@ export const SchemaTree: React.FC = () => {
         isSelected: isSelected,
         isExpanded: isExpanded,
         nodeData: path,
-        hasCaret: currentSchema.type === 'object' || currentSchema.type === 'array',
-      };
+        hasCaret:
+          currentSchema.type === 'object' || currentSchema.type === 'array',
+      }
 
-      const children: TreeNodeInfo<string[]>[] = [];
+      const children: TreeNodeInfo<string[]>[] = []
 
       // Handle Object Properties
       if (currentSchema.type === 'object' && currentSchema.properties) {
-        Object.entries(currentSchema.properties).forEach(([key, propSchema]) => {
-          children.push(
-            ...buildTreeNodes(propSchema as ExtendedJSONSchema, [...path, 'properties', key])
-          );
-        });
+        Object.entries(currentSchema.properties).forEach(
+          ([key, propSchema]) => {
+            children.push(
+              ...buildTreeNodes(propSchema as ExtendedJSONSchema, [
+                ...path,
+                'properties',
+                key,
+              ])
+            )
+          }
+        )
       }
 
       // Handle Array Items
       if (currentSchema.type === 'array' && currentSchema.items) {
-        const itemsSchema = currentSchema.items;
+        const itemsSchema = currentSchema.items
         if (!Array.isArray(itemsSchema)) {
-          children.push(...buildTreeNodes(itemsSchema as ExtendedJSONSchema, [...path, 'items']));
+          children.push(
+            ...buildTreeNodes(itemsSchema as ExtendedJSONSchema, [
+              ...path,
+              'items',
+            ])
+          )
         }
       }
 
       if (children.length > 0) {
-        node.childNodes = children;
+        node.childNodes = children
       }
 
-      return [node];
+      return [node]
     },
     [selectedPath, expandedPaths, renderNodeMenu]
-  );
+  )
 
-  const nodes = useMemo(() => buildTreeNodes(schema), [schema, buildTreeNodes]);
+  const nodes = useMemo(() => buildTreeNodes(schema), [schema, buildTreeNodes])
 
   // 显示根节点
-  const displayNodes = nodes;
+  const displayNodes = nodes
 
   return (
     <Tree<string[]>
@@ -199,5 +236,5 @@ export const SchemaTree: React.FC = () => {
       onNodeExpand={handleNodeExpand}
       className="schema-tree"
     />
-  );
-};
+  )
+}
