@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Button, FormGroup, InputGroup, Callout, HTMLSelect } from '@blueprintjs/core'
-import { CodeEditor } from '../CodeEditor'
-import type { UIConfig } from '../DynamicForm/types/schema'
+import { CodeEditor } from '../../../../CodeEditor'
+import type { UIConfig } from '../../../../DynamicForm/types/schema'
 
 type TransformRef = string | { type: 'script'; code: string }
 

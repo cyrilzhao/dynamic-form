@@ -9,8 +9,8 @@ import {
   Callout,
   Divider,
 } from '@blueprintjs/core';
-import { CodeEditor } from '../CodeEditor';
-import type { ValidatorRule } from '../DynamicForm/types/schema';
+import { CodeEditor } from '../../../../CodeEditor';
+import type { ValidatorRule } from '../../../../DynamicForm/types/schema';
 
 interface FieldValidatorsEditorProps {
   value?: ValidatorRule[];

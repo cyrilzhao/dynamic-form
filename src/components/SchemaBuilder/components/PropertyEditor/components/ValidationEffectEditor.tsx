@@ -11,7 +11,7 @@ import {
   NumericInput,
 } from '@blueprintjs/core';
 import { FieldPathSelector } from './FieldPathSelector';
-import type { ExtendedJSONSchema } from '../DynamicForm/types/schema';
+import type { ExtendedJSONSchema } from '../../../../DynamicForm/types/schema';
 
 interface ValidationEffectEditorProps {
   value?: {

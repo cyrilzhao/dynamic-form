@@ -14,7 +14,7 @@ import {
 } from '@blueprintjs/core';
 import { FieldPathSelector } from './FieldPathSelector';
 import { ValidationEffectEditor } from './ValidationEffectEditor';
-import type { ExtendedJSONSchema } from '../DynamicForm/types/schema';
+import type { ExtendedJSONSchema } from '../../../../DynamicForm/types/schema';
 
 interface SchemaValidationEditorProps {
   schema: ExtendedJSONSchema;

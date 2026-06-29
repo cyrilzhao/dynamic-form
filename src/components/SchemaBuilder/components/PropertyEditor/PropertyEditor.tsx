@@ -16,16 +16,16 @@ import {
   Tag,
 } from '@blueprintjs/core'
 import { get } from 'lodash'
-import { useSchemaBuilder } from './SchemaBuilder'
-import type { SchemaNodeType } from './types'
-import { LinkageEditor } from './LinkageEditor'
-import type { LinkageConfig } from '../DynamicForm/types/linkage'
-import { FieldPathSelector } from './FieldPathSelector'
-import { SchemaValidationEditor } from './SchemaValidationEditor'
-import { FieldValidatorsEditor } from './FieldValidatorsEditor'
-import { LinkagesEditor } from './LinkagesEditor'
-import { TransformEditor } from './TransformEditor'
-import { ObjectEditor } from '../ObjectEditor'
+import { useSchemaBuilder } from '../../SchemaBuilder'
+import type { SchemaNodeType } from '../../types'
+import { LinkageEditor } from './components/LinkageEditor'
+import type { LinkageConfig } from '../../../DynamicForm/types/linkage'
+import { FieldPathSelector } from './components/FieldPathSelector'
+import { SchemaValidationEditor } from './components/SchemaValidationEditor'
+import { FieldValidatorsEditor } from './components/FieldValidatorsEditor'
+import { LinkagesEditor } from './components/LinkagesEditor'
+import { TransformEditor } from './components/TransformEditor'
+import { ObjectEditor } from '../../../ObjectEditor'
 
 // Helper to get node from path
 const getNode = (schema: any, path: string[]) => {

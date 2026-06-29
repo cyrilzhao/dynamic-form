@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Button, Card, Tag, Divider } from '@blueprintjs/core';
 import { LinkageEditor } from './LinkageEditor';
-import type { LinkageConfig } from '../DynamicForm/types/linkage';
-import type { ExtendedJSONSchema } from '../DynamicForm/types/schema';
+import type { LinkageConfig } from '../../../../DynamicForm/types/linkage';
+import type { ExtendedJSONSchema } from '../../../../DynamicForm/types/schema';
 
 interface LinkagesEditorProps {
   value?: LinkageConfig[];
