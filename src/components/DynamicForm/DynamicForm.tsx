@@ -354,6 +354,7 @@ const DynamicFormInner = React.memo(
         customFormats,
         layout = 'vertical',
         labelWidth,
+        columnsCount = 1,
         showErrorList = false,
         showSubmitButton = true,
         renderAsForm = true,
@@ -750,7 +751,18 @@ const DynamicFormInner = React.memo(
       // 使用 useMemo 缓存字段内容，避免每次渲染都创建新的 children
       const fieldsContent = useMemo(
         () => (
-          <div className="dynamic-form__fields">
+          <div
+            className="dynamic-form__fields"
+            style={
+              columnsCount > 1
+                ? {
+                    display: 'grid',
+                    gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
+                    gap: '0 16px',
+                  }
+                : undefined
+            }
+          >
             {fields.map((field) => {
               const linkageState = linkageStates[field.name]
 
@@ -777,6 +789,7 @@ const DynamicFormInner = React.memo(
                   labelWidth={labelWidth}
                   enableVirtualScroll={enableVirtualScroll}
                   virtualScrollHeight={virtualScrollHeight}
+                  columnsCount={columnsCount}
                 />
               )
             })}
@@ -792,6 +805,7 @@ const DynamicFormInner = React.memo(
           labelWidth,
           enableVirtualScroll,
           virtualScrollHeight,
+          columnsCount,
         ]
       )
 

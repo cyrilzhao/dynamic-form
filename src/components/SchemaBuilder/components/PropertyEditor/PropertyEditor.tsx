@@ -290,6 +290,31 @@ export const PropertyEditor: React.FC = () => {
             </p>
           </Callout>
 
+          <FormGroup
+            label="Columns Count"
+            helperText="Number of columns for the form layout (default: 1)"
+            style={{ marginBottom: 16 }}
+          >
+            <Controller
+              name="ui.columnsCount"
+              control={control}
+              render={({ field }) => (
+                <NumericInput
+                  {...field}
+                  value={field.value ?? 1}
+                  onValueChange={(value) =>
+                    handleUIChange('columnsCount', value)
+                  }
+                  min={1}
+                  max={12}
+                  fill
+                />
+              )}
+            />
+          </FormGroup>
+
+          <Divider style={{ marginBottom: 16 }} />
+
           <SchemaValidationEditor
             schema={schema}
             currentFieldPath={currentFieldPath}
@@ -1206,6 +1231,29 @@ export const PropertyEditor: React.FC = () => {
                           handleUIChange('labelWidth', e.target.value)
                         }
                         disabled={isArrayItems}
+                      />
+                    )}
+                  />
+                </FormGroup>
+
+                <FormGroup
+                  label="Column Span"
+                  helperText="Number of columns this field spans in multi-column layout"
+                >
+                  <Controller
+                    name="ui.colSpan"
+                    control={control}
+                    render={({ field }) => (
+                      <NumericInput
+                        {...field}
+                        value={field.value ?? 1}
+                        onValueChange={(value) =>
+                          handleUIChange('colSpan', value)
+                        }
+                        min={1}
+                        max={12}
+                        disabled={isArrayItems}
+                        fill
                       />
                     )}
                   />

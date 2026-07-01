@@ -79,6 +79,9 @@ export interface UIConfig {
   layout?: 'vertical' | 'horizontal' | 'inline' // 布局方式（优先级高于全局配置）
   prefixLabel?: string // 字段标签前缀（由 flattenPrefix 场景写入）
 
+  // 多列布局
+  colSpan?: number // 在多列布局下，该字段占用的列数（默认 1）
+
   // 字段透明化渲染配置
   flattenPath?: boolean // 是否将嵌套对象的子字段提升到当前层级渲染
   flattenPrefix?: boolean // 是否在字段标签前添加父级标题作为前缀

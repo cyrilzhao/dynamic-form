@@ -142,6 +142,7 @@ export interface DynamicFormProps {
   // UI 配置
   layout?: 'vertical' | 'horizontal' | 'inline';
   labelWidth?: number | string; // 全局标签宽度（仅 horizontal layout 下生效）
+  columnsCount?: number; // 多列布局列数（默认 1，使用 CSS Grid 实现）
   showErrorList?: boolean; // 是否显示错误列表
   showSubmitButton?: boolean; // 是否显示提交按钮
   renderAsForm?: boolean; // 是否渲染为 <form> 标签（默认 true）

@@ -645,7 +645,11 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(({
                     title="Live Preview"
                     panel={
                       <div className="preview-content">
-                        <DynamicForm schema={schema} onChange={setPreviewData} />
+                        <DynamicForm
+                          schema={schema}
+                          onChange={setPreviewData}
+                          columnsCount={schema.ui?.columnsCount}
+                        />
                         <Divider />
                         <div className="preview-data">
                           <h5>Data</h5>
@@ -666,7 +670,11 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(({
                 </Tabs>
               ) : previewMode === 'form' ? (
                 <div className="preview-content">
-                  <DynamicForm schema={schema} onChange={setPreviewData} />
+                  <DynamicForm
+                    schema={schema}
+                    onChange={setPreviewData}
+                    columnsCount={schema.ui?.columnsCount}
+                  />
                   <Divider />
                   <div className="preview-data">
                     <h5>Data</h5>

@@ -20,6 +20,7 @@ export interface FormFieldProps {
   labelWidth?: number | string
   enableVirtualScroll?: boolean
   virtualScrollHeight?: number
+  columnsCount?: number
 }
 
 /**
@@ -183,6 +184,7 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
   labelWidth,
   enableVirtualScroll,
   virtualScrollHeight,
+  columnsCount = 1,
 }) => {
   const { control } = useFormContext()
 
@@ -212,6 +214,8 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
   // 计算 labelWidth 的优先级：字段级 > 全局级
   const effectiveLabelWidth = field.schema?.ui?.labelWidth ?? labelWidth
 
+  const colSpan = field.schema?.ui?.colSpan ?? 1
+
   // 使用 useMemo 缓存 formGroupStyle，避免每次渲染都创建新对象
   const formGroupStyle = useMemo(() => {
     const style: React.CSSProperties = {}
@@ -222,8 +226,11 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
       style.display = 'inline-flex'
       style.marginRight = '15px'
     }
+    if (columnsCount > 1 && colSpan > 1) {
+      style.gridColumn = `span ${Math.min(colSpan, columnsCount)}`
+    }
     return style
-  }, [effectiveLayout])
+  }, [effectiveLayout, columnsCount, colSpan])
 
   // 使用 useMemo 缓存 labelStyle，避免每次渲染都创建新对象
   const labelStyle = useMemo(() => {

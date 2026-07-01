@@ -54,6 +54,7 @@ const groups = [
       { id: 'horizontal-layout', label: '水平布局', component: namedLazy(() => import('./examples/LayoutExamples/HorizontalLayoutExample'), 'HorizontalLayoutExample') },
       { id: 'vertical-layout', label: '垂直布局', component: namedLazy(() => import('./examples/LayoutExamples/VerticalLayoutExample'), 'VerticalLayoutExample') },
       { id: 'inline-layout', label: '行内布局', component: namedLazy(() => import('./examples/LayoutExamples/InlineLayoutExample'), 'InlineLayoutExample') },
+      { id: 'multi-column-layout', label: '多列布局', component: namedLazy(() => import('./examples/LayoutExamples/MultiColumnLayoutExample'), 'MultiColumnLayoutExample') },
       { id: 'layout-priority', label: '布局优先级', component: namedLazy(() => import('./examples/LayoutExamples/LayoutPriorityExample'), 'LayoutPriorityExample') },
       { id: 'label-width-priority', label: '标签宽度优先级', component: namedLazy(() => import('./examples/LayoutExamples/LabelWidthPriorityExample'), 'LabelWidthPriorityExample') },
       { id: 'comprehensive-layout', label: '综合布局', component: namedLazy(() => import('./examples/LayoutExamples/ComprehensiveExample'), 'ComprehensiveExample') },
