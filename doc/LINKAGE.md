@@ -132,6 +132,22 @@ type ConditionOperator =
 
 **推荐使用 JSON Pointer 格式**，它提供了明确的路径语义，避免歧义。
 
+**JSON Pointer 路径规范**：
+
+路径段含义由上下文状态决定，系统使用状态机解析：
+
+- `properties` 总是关键字，下一段是字段名（无论叫什么）
+- `items` 在字段名之后出现时是数组关键字，下一段仍是关键字
+- `items` 在 `properties` 之后出现时是字段名（如 `#/properties/items`）
+
+| 路径 | 解析结果 | 说明 |
+|------|---------|------|
+| `#/properties/items` | `items` | `items` 紧跟 `properties`，是字段名 |
+| `#/properties/arr/items/properties/name` | `arr.name` | `items` 紧跟 `arr`，是数组关键字 |
+| `#/properties/properties/properties` | `properties` | 中间的 `properties` 紧跟关键字，是字段名 |
+
+**注意**：只支持严格格式，不支持省略中间 `properties` 的简化格式（如 `#/properties/user/age` 是非法的，应写为 `#/properties/user/properties/age`）。
+
 详细的路径系统说明请参考：[字段路径完全指南](./FIELD_PATH_GUIDE.md)
 
 ## 3. 使用示例
@@ -901,7 +917,9 @@ export function useLinkageManager({
     └─ 每层结果写入 formData，供下层使用
 
 watch 触发阶段：
-  getAffectedFields(name)
+  字段变化（如 items.0.price）
+    ↓ getAffectedFields(name)
+    ↓ 若无受影响字段，逐级检查父路径（items.0 → items）
     ↓ 级联传播检查（isFieldUpdating + hasCascadeTargets）
     ↓ taskQueue.enqueue(name, affectedFields)
     ↓ processQueue()
@@ -933,13 +951,22 @@ watch 触发阶段：
 
 ```typescript
 interface LinkageStateContextValue {
+  /** 父级联动状态（运行时，用于子级读取父级计算结果） */
   parentLinkageStates: Record<string, LinkageResult>;
+  /** 父级联动配置（静态，用于子级过滤，避免时序依赖） */
+  parentLinkages: Record<string, LinkageConfig[]>;
   form: UseFormReturn<any>;
   rootSchema: ExtendedJSONSchema;
   pathPrefix?: string;
   linkageFunctions?: Record<string, LinkageFunction>;
 }
 ```
+
+**为什么需要 `parentLinkages`**：
+
+子级 DynamicForm 初始化时需要过滤掉父级已经负责的联动配置，避免同一字段被两个管理器重复计算。过滤依据**不能**使用 `parentLinkageStates`（运行时状态），因为子级初始化时父级的 `refreshLinkage` 可能尚未执行，导致 `parentLinkageStates` 为空，过滤失败，子级会错误地接管本该由父级管理的联动，最终产生空对象覆盖父级有效状态的问题。
+
+`parentLinkages` 是静态的联动配置，在父级 `useMemo` 计算时就已确定，子级初始化时可以立即读取，彻底消除时序依赖。
 
 ### 6.5 DynamicForm 集成
 
@@ -979,11 +1006,14 @@ const { processedLinkages, formToUse, effectiveLinkageFunctions } = useMemo(() =
     const transformed = transformToAbsolutePaths(rawLinkages, pathPrefix);
 
     // 步骤3.2: 过滤父级已计算的联动
-    if (linkageStateContext?.parentLinkageStates) {
+    // 使用 parentLinkages（静态配置）而非 parentLinkageStates（运行时状态）
+    // 原因：子级初始化时父级 refreshLinkage 可能尚未执行，parentLinkageStates 为空，
+    //       导致过滤失败。parentLinkages 是静态配置，在 useMemo 时即可读取，无时序问题。
+    if (linkageStateContext?.parentLinkages) {
       const filtered: Record<string, LinkageConfig> = {};
       Object.entries(transformed).forEach(([key, value]) => {
-        // 如果父级没有计算过这个字段，才保留
-        if (!(key in linkageStateContext.parentLinkageStates)) {
+        // 如果父级没有配置过这个字段的联动，才保留
+        if (!(key in linkageStateContext.parentLinkages)) {
           filtered[key] = value;
         }
       });
