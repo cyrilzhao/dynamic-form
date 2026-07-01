@@ -497,24 +497,17 @@ const DynamicFormInner = React.memo(
             // 原因：嵌套表单架构中，每层 DynamicForm 只负责本层字段的联动，通过 LinkageStateContext
             // 将自己的联动状态传递给子层。若子层重复计算父层已处理的联动，会导致同一字段被两个
             // useLinkageManager 实例同时管理，引发竞态条件和状态不一致。
-            if (linkageStateContext?.parentLinkageStates) {
+            //
+            // 修复方案：使用父级的静态配置（parentLinkages）而不是运行时状态（parentLinkageStates）
+            // 来判断哪些联动应该过滤。这样避免了时序问题：子级在初始化时就能立即知道哪些联动
+            // 已经由父级负责，无需等待父级的 refreshLinkage 执行。
+            if (linkageStateContext?.parentLinkages) {
               const filtered: Record<string, LinkageConfig[]> = {}
               Object.entries(transformed).forEach(([key, value]) => {
-                if (!(key in linkageStateContext.parentLinkageStates)) {
+                if (!(key in linkageStateContext.parentLinkages)) {
                   filtered[key] = value
                 }
               })
-              // if (process.env.NODE_ENV !== 'production') {
-              //   console.log(
-              //     '[DynamicForm] 嵌套表单路径转换（已过滤父级联动）:',
-              //     JSON.stringify({
-              //       pathPrefix,
-              //       rawLinkages,
-              //       transformed,
-              //       filtered,
-              //     })
-              //   );
-              // }
               linkages = filtered
             } else {
               // if (process.env.NODE_ENV !== 'production') {
@@ -745,12 +738,13 @@ const DynamicFormInner = React.memo(
       const linkageContextValue = useMemo(
         () => ({
           parentLinkageStates: linkageStates,
+          parentLinkages: processedLinkages, // 传递静态配置，用于子级过滤
           form: methodsRef.current, // ✅ 使用 ref 避免 methods 变化触发重新计算
           rootSchema: schema,
           pathPrefix: pathPrefix,
           linkageFunctions: effectiveLinkageFunctions,
         }),
-        [linkageStates, schema, pathPrefix, effectiveLinkageFunctions] // ✅ 移除 methods 依赖
+        [linkageStates, processedLinkages, schema, pathPrefix, effectiveLinkageFunctions] // ✅ 移除 methods 依赖
       )
 
       // 使用 useMemo 缓存字段内容，避免每次渲染都创建新的 children

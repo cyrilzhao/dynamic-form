@@ -96,31 +96,10 @@ function parseSchemaRecursive(
     // 使用标准的 . 分隔符构建字段路径
     const currentPath = parentPath ? `${parentPath}.${fieldName}` : fieldName;
 
-    // if (process.env.NODE_ENV !== 'production') {
-    //   console.log(
-    //     '[parseSchemaRecursive] 处理字段:',
-    //     JSON.stringify({
-    //       fieldName,
-    //       type: typedSchema.type,
-    //       currentPath,
-    //       hasLinkages: !!typedSchema.ui?.linkages,
-    //     })
-    //   );
-    // }
-
     // 收集当前字段的联动配置（只支持 linkages 数组）
     const linkagesArray = typedSchema.ui?.linkages;
 
     if (linkagesArray && Array.isArray(linkagesArray) && linkagesArray.length > 0) {
-      // if (process.env.NODE_ENV !== 'production') {
-      //   console.log(
-      //     '[parseSchemaRecursive] 找到联动配置:',
-      //     JSON.stringify({
-      //       currentPath,
-      //       linkagesCount: linkagesArray.length,
-      //     })
-      //   );
-      // }
       linkages[currentPath] = linkagesArray;
     }
 

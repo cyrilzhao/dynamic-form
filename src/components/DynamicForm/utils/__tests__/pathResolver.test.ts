@@ -153,7 +153,7 @@ describe('PathResolver', () => {
     });
 
     it('应该从 JSON Pointer 提取嵌套字段路径', () => {
-      const result = PathResolver.toFieldPath('#/properties/user/age');
+      const result = PathResolver.toFieldPath('#/properties/user/properties/age');
       expect(result).toBe('user.age');
     });
 
@@ -175,6 +175,21 @@ describe('PathResolver', () => {
     it('应该处理只有 properties 的路径', () => {
       const result = PathResolver.toFieldPath('#/properties');
       expect(result).toBe('');
+    });
+
+    it('字段名为 items 时应正确提取', () => {
+      const result = PathResolver.toFieldPath('#/properties/items');
+      expect(result).toBe('items');
+    });
+
+    it('数组字段内嵌套字段时应跳过 items 关键字', () => {
+      const result = PathResolver.toFieldPath('#/properties/arr/items/properties/name');
+      expect(result).toBe('arr.name');
+    });
+
+    it('字段名为 properties 时应正确提取', () => {
+      const result = PathResolver.toFieldPath('#/properties/properties/properties');
+      expect(result).toBe('properties');
     });
   });
 

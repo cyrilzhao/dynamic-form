@@ -380,8 +380,22 @@ export function useLinkageManager({
       // 保存最新的 formData（解决 setValues 批量更新时的时序问题）
       latestFormDataRef.current = formData as Record<string, any>
 
-      // ✅ 精确监听优化：检查该字段是否被任何联动依赖
-      const affectedFields = dependencyGraph.getAffectedFields(name)
+      // ✅ 精确监听优化：检查该字段及其所有父级路径是否被任何联动依赖
+      // 支持数组内部字段变化触发上层依赖：当 items.0.price 变化时，也会检查 items 是否被依赖
+      let affectedFields = dependencyGraph.getAffectedFields(name)
+
+      if (affectedFields.length === 0) {
+        const parts = name.split('.')
+        for (let i = parts.length - 1; i > 0; i--) {
+          const parentPath = parts.slice(0, i).join('.')
+          const parentAffectedFields = dependencyGraph.getAffectedFields(parentPath)
+          if (parentAffectedFields.length > 0) {
+            affectedFields = parentAffectedFields
+            break
+          }
+        }
+      }
+
       if (affectedFields.length === 0) {
         return
       }

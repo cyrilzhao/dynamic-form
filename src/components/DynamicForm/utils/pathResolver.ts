@@ -75,16 +75,32 @@ export class PathResolver {
    *
    * @example
    * PathResolver.toFieldPath('#/properties/user/age') // 'user.age'
-   * PathResolver.toFieldPath('age') // 'age'
+   * PathResolver.toFieldPath('#/properties/items') // 'items'（字段名）
+   * PathResolver.toFieldPath('#/properties/arr/items/properties/name') // 'arr.name'
+   * PathResolver.toFieldPath('#/properties/properties/properties') // 'properties'（字段名）
    */
   static toFieldPath(path: string): string {
     if (!path.startsWith('#/')) {
       return path;
     }
 
-    const cleanPath = path.replace(/^#\//, '');
-    const segments = cleanPath.split('/').filter(s => s !== 'properties' && s !== 'items');
-    return segments.join('.');
+    const segments = path.replace(/^#\//, '').split('/');
+    const result: string[] = [];
+    let expectField = false;
+
+    for (const segment of segments) {
+      if (!expectField) {
+        if (segment === 'properties') {
+          expectField = true;
+        }
+        // items 后仍是关键字（如 /items/properties/name），保持状态不变
+      } else {
+        result.push(segment);
+        expectField = false;
+      }
+    }
+
+    return result.join('.');
   }
 
   /**

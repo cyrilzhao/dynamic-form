@@ -1,6 +1,6 @@
 import React, { createContext, useContext } from 'react';
 import type { UseFormReturn } from 'react-hook-form';
-import type { LinkageResult, LinkageFunction } from '../types/linkage';
+import type { LinkageResult, LinkageFunction, LinkageConfig } from '../types/linkage';
 import type { ExtendedJSONSchema } from '../types/schema';
 
 /**
@@ -9,6 +9,8 @@ import type { ExtendedJSONSchema } from '../types/schema';
 export interface LinkageStateContextValue {
   /** 父级联动状态（只包含父级范围内的字段） */
   parentLinkageStates: Record<string, LinkageResult>;
+  /** 父级联动配置（静态配置，用于子级过滤） */
+  parentLinkages: Record<string, LinkageConfig[]>;
   /** 共享的表单实例 */
   form: UseFormReturn<any>;
   /** 完整的 schema（用于路径解析） */

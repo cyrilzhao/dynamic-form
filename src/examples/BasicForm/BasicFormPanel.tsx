@@ -191,6 +191,69 @@ export const BasicFormPanel: React.FC = () => {
           },
         },
       },
+      ocr: {
+        type: 'object',
+        title: 'OCR',
+        properties: {
+          model: {
+            title: 'Model',
+            type: 'string',
+            enum: ['azure-layout', 'azure-read', 'mistral'],
+            enumNames: ['Azure-Layout', 'Azure-Read', 'Mistral'],
+            ui: {
+              widget: 'select',
+            },
+          },
+          format: {
+            title: 'Format',
+            type: 'string',
+            ui: {
+              widget: 'select',
+              linkages: [
+                {
+                  type: 'options',
+                  dependencies: ['#/properties/ocr/properties/model'],
+                  when: {
+                    field: '#/properties/ocr/properties/model',
+                    operator: '==',
+                    value: 'azure-layout',
+                  },
+                  fulfill: {
+                    options: [
+                      { label: 'Markdown', value: 'markdown' },
+                      { label: 'Text', value: 'text' },
+                    ],
+                  },
+                },
+                {
+                  type: 'options',
+                  dependencies: ['#/properties/ocr/properties/model'],
+                  when: {
+                    field: '#/properties/ocr/properties/model',
+                    operator: '==',
+                    value: 'azure-read',
+                  },
+                  fulfill: {
+                    options: [{ label: 'Text', value: 'text' }],
+                  },
+                },
+                {
+                  type: 'options',
+                  dependencies: ['#/properties/ocr/properties/model'],
+                  when: {
+                    field: '#/properties/ocr/properties/model',
+                    operator: '==',
+                    value: 'mistral',
+                  },
+                  fulfill: {
+                    options: [{ label: 'Markdown', value: 'markdown' }],
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
     },
     required: ['username', 'email', 'password', 'agreeTerms', 'rate', 'aaa'],
   }
