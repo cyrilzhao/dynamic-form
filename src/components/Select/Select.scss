@@ -35,6 +35,66 @@
     white-space: nowrap;
   }
 
+  &__placeholder {
+    color: #aaa;
+  }
+
+  &__tags-input {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    min-height: 20px;
+    overflow: hidden;
+  }
+
+  &__tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 4px 1px 7px;
+    background: #e8f5e9;
+    border: 1px solid #a5d6a7;
+    border-radius: 3px;
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: nowrap;
+
+    &-label {
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    &-remove {
+      cursor: pointer;
+      color: #888;
+      font-size: 15px;
+      line-height: 1;
+      padding: 0 1px;
+
+      &:hover {
+        color: #333;
+      }
+    }
+  }
+
+  &__search-input--inline {
+    flex: 1;
+    min-width: 60px;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: inherit;
+    color: inherit;
+    padding: 0;
+
+    &::placeholder {
+      color: #aaa;
+    }
+  }
+
   &__icons {
     display: flex;
     align-items: center;
@@ -69,6 +129,21 @@
   &__arrow {
     color: #666;
   }
+
+  &__search-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: inherit;
+    color: inherit;
+    padding: 0;
+    min-width: 0;
+
+    &::placeholder {
+      color: #aaa;
+    }
+  }
 }
 
 @keyframes spin {
@@ -86,6 +161,12 @@
   border-radius: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   overflow-y: auto;
+
+  &__loading {
+    padding: 10px 12px;
+    color: #999;
+    font-size: 14px;
+  }
 }
 
 .select-search {

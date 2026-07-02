@@ -2,7 +2,6 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Option } from './Option';
 import { OptionGroup } from './OptionGroup';
-import { SearchBox } from './SearchBox';
 import type { SelectOption } from '../types';
 
 interface DropdownProps {
@@ -14,10 +13,7 @@ interface DropdownProps {
   triggerRef: React.RefObject<HTMLElement>;
   className?: string;
   maxHeight?: number;
-  searchable?: boolean;
-  searchTerm?: string;
-  onSearchChange?: (value: string) => void;
-  searchPlaceholder?: string;
+  loading?: boolean;
 }
 
 export const Dropdown: React.FC<DropdownProps> = ({
@@ -29,10 +25,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
   triggerRef,
   className = '',
   maxHeight = 300,
-  searchable = false,
-  searchTerm = '',
-  onSearchChange,
-  searchPlaceholder,
+  loading = false,
 }) => {
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
 
@@ -80,40 +73,39 @@ export const Dropdown: React.FC<DropdownProps> = ({
         zIndex: 9999,
       }}
     >
-      {searchable && (
-        <SearchBox
-          value={searchTerm}
-          onChange={onSearchChange || (() => {})}
-          placeholder={searchPlaceholder}
-        />
+      {loading ? (
+        <div className="select-dropdown__loading">Loading...</div>
+      ) : (
+        <>
+          {/* 渲染未分组的选项 */}
+          {groupedOptions.ungrouped.map((option, index) => (
+            <Option
+              key={option.value}
+              option={option}
+              isSelected={selectedValues.some(v => v == option.value)}
+              isFocused={index === focusedIndex}
+              onClick={() => onSelect(option)}
+            />
+          ))}
+          {/* 渲染分组的选项 */}
+          {Object.entries(groupedOptions.groups).map(([groupName, groupOptions]) => {
+            const groupStartIndex = groupedOptions.ungrouped.length;
+            return (
+              <OptionGroup key={groupName} label={groupName}>
+                {groupOptions.map((option, index) => (
+                  <Option
+                    key={option.value}
+                    option={option}
+                    isSelected={selectedValues.some(v => v == option.value)}
+                    isFocused={groupStartIndex + index === focusedIndex}
+                    onClick={() => onSelect(option)}
+                  />
+                ))}
+              </OptionGroup>
+            );
+          })}
+        </>
       )}
-      {/* 渲染未分组的选项 */}
-      {groupedOptions.ungrouped.map((option, index) => (
-        <Option
-          key={option.value}
-          option={option}
-          isSelected={selectedValues.some(v => v == option.value)}
-          isFocused={index === focusedIndex}
-          onClick={() => onSelect(option)}
-        />
-      ))}
-      {/* 渲染分组的选项 */}
-      {Object.entries(groupedOptions.groups).map(([groupName, groupOptions]) => {
-        const groupStartIndex = groupedOptions.ungrouped.length;
-        return (
-          <OptionGroup key={groupName} label={groupName}>
-            {groupOptions.map((option, index) => (
-              <Option
-                key={option.value}
-                option={option}
-                isSelected={selectedValues.some(v => v == option.value)}
-                isFocused={groupStartIndex + index === focusedIndex}
-                onClick={() => onSelect(option)}
-              />
-            ))}
-          </OptionGroup>
-        );
-      })}
     </div>,
     document.body
   );

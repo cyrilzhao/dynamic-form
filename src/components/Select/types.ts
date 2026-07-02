@@ -86,4 +86,6 @@ export interface SelectProps {
   searchPlaceholder?: string;
   /** 无数据时的提示文本 */
   noOptionsMessage?: string;
+  /** 自定义搜索函数，返回异步搜索结果 */
+  onSearch?: (term: string) => Promise<SelectOption[]>;
 }

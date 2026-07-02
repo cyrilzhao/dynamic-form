@@ -100,6 +100,78 @@ export const BasicFormPanel: React.FC = () => {
           placeholder: '请选择国家',
         },
       },
+      countrySearchable: {
+        type: 'string',
+        title: '国家（本地搜索）',
+        enum: ['china', 'usa', 'japan', 'uk', 'other'],
+        enumNames: ['中国', '美国', '日本', '英国', '其他'],
+        ui: {
+          widget: 'select',
+          placeholder: '输入关键词搜索国家',
+          widgetProps: {
+            searchable: true,
+            clearable: true,
+          },
+        },
+      },
+      asyncLanguage: {
+        type: 'string',
+        title: '编程语言（异步搜索）',
+        ui: {
+          widget: 'select',
+          placeholder: '输入关键词异步搜索',
+          widgetProps: {
+            searchable: true,
+            clearable: true,
+            onSearch: async (term: string) => {
+              const all = [
+                { label: 'TypeScript', value: 'ts' },
+                { label: 'JavaScript', value: 'js' },
+                { label: 'Python', value: 'py' },
+                { label: 'Rust', value: 'rs' },
+                { label: 'Go', value: 'go' },
+                { label: 'Java', value: 'java' },
+                { label: 'C++', value: 'cpp' },
+                { label: 'Swift', value: 'swift' },
+              ]
+              await new Promise(r => setTimeout(r, 400))
+              if (!term) return all
+              return all.filter(o => o.label.toLowerCase().includes(term.toLowerCase()))
+            },
+          },
+        },
+      },
+      techStack: {
+        type: 'array',
+        title: '技术栈（多选 + 搜索）',
+        items: { type: 'string' },
+        ui: {
+          widget: 'select',
+          placeholder: '选择或搜索技术栈',
+          widgetProps: {
+            multiple: true,
+            searchable: true,
+            clearable: true,
+            onSearch: async (term: string) => {
+              const all = [
+                { label: 'TypeScript', value: 'ts' },
+                { label: 'JavaScript', value: 'js' },
+                { label: 'React', value: 'react' },
+                { label: 'Vue', value: 'vue' },
+                { label: 'Node.js', value: 'node' },
+                { label: 'Python', value: 'py' },
+                { label: 'Go', value: 'go' },
+                { label: 'Rust', value: 'rs' },
+                { label: 'Docker', value: 'docker' },
+                { label: 'Kubernetes', value: 'k8s' },
+              ]
+              await new Promise(r => setTimeout(r, 300))
+              if (!term) return all
+              return all.filter(o => o.label.toLowerCase().includes(term.toLowerCase()))
+            },
+          },
+        },
+      },
       gender: {
         type: 'string',
         title: '性别',
