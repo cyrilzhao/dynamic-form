@@ -706,7 +706,7 @@ const DynamicFormInner = React.memo(
             await refreshLinkage()
           },
         }),
-        [methods, schema]
+        [methods, schema, refreshLinkage]
       )
 
       React.useEffect(() => {

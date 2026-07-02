@@ -272,6 +272,34 @@ export function useLinkageManager({
     [linkages, getValues, setValue, taskQueue, setLinkageStates]
   )
 
+  // ✅ 运行时依赖 ref：每次 render 阶段同步更新
+  // 目的：processQueue 是 useRef 固定函数，需要通过此 ref 读取最新运行时依赖，
+  // 避免闭包陈旧（linkages / dependencyGraph / linkageFunctions / applyLinkageResults
+  // 都会随 rerender 变化，直接捕获会导致新增联动不生效、函数更新不触发等问题）。
+  // 必须在 applyLinkageResults 定义之后声明，以便类型推断正确。
+  // render 阶段直接赋值（不用 useLayoutEffect）：React 允许在 render 中写 ref，
+  // 且 render 本身是同步的，赋值在任何 setTimeout 回调之前完成，时序安全。
+  const runtimeRef = useRef<{
+    linkages: Record<string, LinkageConfig[]>
+    linkageFunctions: Record<string, LinkageFunction>
+    dependencyGraph: DependencyGraph
+    getValues: typeof getValues
+    applyLinkageResults: typeof applyLinkageResults
+  }>({
+    linkages,
+    linkageFunctions,
+    dependencyGraph,
+    getValues,
+    applyLinkageResults,
+  })
+  runtimeRef.current = {
+    linkages,
+    linkageFunctions,
+    dependencyGraph,
+    getValues,
+    applyLinkageResults,
+  }
+
   /**
    * 队列处理器：使用拓扑层级并行执行联动任务
    */
@@ -304,10 +332,19 @@ export function useLinkageManager({
         }
 
         // 使用最新的表单数据（优先使用 latestFormDataRef，解决 setValues 批量更新时的时序问题）
+        // ✅ 从 runtimeRef 读取最新运行时依赖，避免闭包陈旧
+        const {
+          linkages: currentLinkages,
+          linkageFunctions: currentLinkageFunctions,
+          dependencyGraph: currentDependencyGraph,
+          getValues: currentGetValues,
+          applyLinkageResults: currentApplyLinkageResults,
+        } = runtimeRef.current
+
         const formData =
           Object.keys(latestFormDataRef.current).length > 0
             ? { ...latestFormDataRef.current }
-            : { ...getValues() }
+            : { ...currentGetValues() }
 
         // ✅ 优化：直接使用任务中的 affectedFields，避免重复调用 getAffectedFields
         const affectedFields = task.affectedFields
@@ -316,17 +353,17 @@ export function useLinkageManager({
         const { states: newStates, updatedFormData } =
           await evaluateLinkagesByLayers({
             fields: affectedFields,
-            linkages,
+            linkages: currentLinkages,
             formData,
-            linkageFunctions,
+            linkageFunctions: currentLinkageFunctions,
             asyncSequenceManager,
-            dependencyGraph,
+            dependencyGraph: currentDependencyGraph,
             cache,
             _caller: `processQueue(trigger=${task.fieldName})`,
           })
 
         // ✅ 使用公共函数应用联动结果
-        await applyLinkageResults({
+        await currentApplyLinkageResults({
           fields: affectedFields,
           states: newStates,
           updatedFormData,

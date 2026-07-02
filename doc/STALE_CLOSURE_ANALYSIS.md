@@ -162,6 +162,71 @@ deps 数组覆盖了所有捕获变量，无陈旧闭包问题。
 
 ---
 
+### 2.5 [MEDIUM] useImperativeHandle — `DynamicForm.tsx:620`
+
+#### 问题描述
+
+```ts
+useImperativeHandle(
+  ref,
+  () => ({
+    ...
+    setValues: (values, options) => {
+      ...
+      if (options?.silence) {
+        setValueWithoutLinkage(() => { ... })  // ← 捕获外部 setValueWithoutLinkage
+      }
+    },
+    refreshLinkage: async () => {
+      await refreshLinkage()   // ← 捕获外部 refreshLinkage
+    },
+  }),
+  [methods, schema]  // ← deps 只有 methods 和 schema！
+)
+```
+
+当前 deps 为 `[methods, schema]`，但工厂函数内还捕获了以下变量：
+
+| 变量 | 来源 | 是否会变化 | 风险 |
+|---|---|---|---|
+| `refreshLinkage` | `useArrayLinkageManager.refresh`，是 `useCallback([generateDynamicLinkages])` | **会变化**：`baseLinkages` / `schema` 更新时 `generateDynamicLinkages` 重建，`refresh` 随之重建 | ❌ 高 |
+| `setValueWithoutLinkage` | `useLinkageManager.setValueWithoutLinkage`，是 `useCallback(fn, [])` | 不变（无 deps，捕获的 `skipLinkageRef` 是 ref，始终最新） | ✅ 安全 |
+| `setFormValues` | 文件级纯函数 | 不变 | ✅ 安全 |
+| `callbacksRef` | `useRef`，读 `.current` | 通过 ref 读取，始终最新 | ✅ 安全 |
+
+#### 问题复现场景
+
+```
+初始渲染：baseLinkages = { province: [...] }，refresh 版本 v1
+           ↓
+schema 联动更新：baseLinkages 变化 → refresh 版本 v2（捕获新 baseLinkages）
+           ↓
+外部异步数据加载完成，调用 formRef.current.refreshLinkage()
+           ↓
+useImperativeHandle 未重建（refreshLinkage 不在 deps 中）
+           ↓
+调用的是 refresh v1，内部 generateDynamicLinkages 基于旧 baseLinkages 生成联动
+           ↓
+新 baseLinkages 对应的动态联动未被刷新 ← 静默失败
+```
+
+#### 影响范围
+
+外部代码中典型的 `refreshLinkage` 调用场景：
+
+```ts
+// 加载异步数据后手动刷新联动
+useEffect(() => {
+  if (shouldRefreshLinkage && data.length > 0) {
+    formRef.current?.refreshLinkage()  // ← 可能调用到旧版本
+  }
+}, [shouldRefreshLinkage, data])
+```
+
+若 schema / linkages 在异步数据加载完成之前发生了变化，`refreshLinkage` 将使用旧 `baseLinkages` 重新生成动态联动，导致刷新不完整。
+
+---
+
 ## 3. 根本原因
 
 `processQueue` 必须是一个**引用稳定的函数**，因为：
@@ -186,37 +251,127 @@ deps 数组覆盖了所有捕获变量，无陈旧闭包问题。
 
 ### 4.1 核心方案：Latest Runtime Ref
 
-在 `useLinkageManager` 中引入一个 `runtimeRef`，在每次 render 时同步更新：
+在 `useLinkageManager` 中引入一个 `runtimeRef`，在每次 render 时同步更新。
+
+#### 4.1.1 声明顺序
+
+`runtimeRef` 必须在 `applyLinkageResults` 定义之后声明，否则 `typeof applyLinkageResults` 是前向引用，TypeScript 编译报错。推荐的声明顺序是：
+
+```
+1. dependencyGraph（useMemo）
+2. linkageStates（useState）
+3. applyLinkageResults（useCallback）   ← 先定义
+4. runtimeRef（useRef）                 ← 再声明，此时 typeof applyLinkageResults 合法
+5. processQueue（useRef）               ← 最后定义
+```
+
+如果希望将类型定义放在更早的位置，可以独立提取接口而不依赖 `typeof`：
 
 ```ts
-// 1. 定义运行时依赖类型
+// 独立定义类型，不依赖 typeof applyLinkageResults
 interface LinkageRuntime {
   linkages: Record<string, LinkageConfig[]>
   linkageFunctions: Record<string, LinkageFunction>
   dependencyGraph: DependencyGraph
-  applyLinkageResults: (params: ApplyLinkageResultsParams) => Promise<void>
+  getValues: () => Record<string, any>
+  applyLinkageResults: (params: {
+    fields: string[]
+    states: Record<string, LinkageResult>
+    updatedFormData: Record<string, any>
+    preMarkFields?: boolean
+  }) => Promise<void>
 }
+```
 
-// 2. 在 hook 内部维护 runtimeRef
-const runtimeRef = useRef<LinkageRuntime>({
+#### 4.1.2 render 阶段直接赋值 vs useLayoutEffect
+
+**两种方案对比：**
+
+| | render 阶段直接赋值 | useLayoutEffect |
+|---|---|---|
+| 执行时机 | render 阶段同步，最早 | DOM 更新后、绘制前，比 useEffect 早 |
+| 写法 | `runtimeRef.current = {...}` | 需要额外 hook 注册 |
+| React Strict Mode 双调用 | 写两次相同值，无害 | 同样执行两次，无害 |
+| 竞态安全 | ✅ render 本身是同步的，赋值完成再进行绘制和异步回调 | ✅ 在 setTimeout 之前完成 |
+| React 官方建议 | ✅ React 文档明确允许在 render 阶段写 ref | 官方推荐用于 DOM 副作用，对 ref 赋值属于"用 hook 做了不必要的事" |
+
+**推荐：render 阶段直接赋值**。语义更清晰（"每次 render 后立即更新"），不需要额外的 hook，也不存在 useEffect 的异步执行顺序问题：
+
+```ts
+// ✅ 推荐：在 render 阶段直接写 ref，每次 render 后立即有效
+// 注意：这里不在 useEffect 内，是 render 阶段的同步代码
+// React 允许在 render 中写 ref（不影响 render 输出就安全）
+runtimeRef.current = {
   linkages,
   linkageFunctions,
   dependencyGraph,
+  getValues,
+  applyLinkageResults,
+}
+```
+
+#### 4.1.3 关于 `getValues` / `form` 是否需要加入 runtimeRef
+
+`form` 参数来自 react-hook-form 的 `useForm()` 返回值，其引用在整个组件生命周期内保持稳定（react-hook-form 的设计保证）。因此 `form.getValues` 是一个稳定引用，无论捕获哪次 render 的版本，行为都一致。
+
+但有一个边界情况：在 `DynamicForm.tsx` 中，`formToUse` 可能在初始化阶段从 `linkageStateContext?.form`（父级表单）切换到 `methodsRef.current`（自身表单），或者反之。如果切换发生在首次 render 之后，且 `useLinkageManager` 内部捕获的 `form` 是旧版本，理论上可能读到错误的表单实例。
+
+**结论**：实践中风险极低，因为 `formToUse` 在初始化后不会再切换。但若追求零风险，可以将 `getValues` 也放入 `runtimeRef`：
+
+```ts
+runtimeRef.current = {
+  linkages,
+  linkageFunctions,
+  dependencyGraph,
+  getValues,           // ← 加入，消除边界情况风险
+  applyLinkageResults,
+}
+```
+
+然后 `processQueue` 中的 fallback 改为：
+
+```ts
+const { getValues: currentGetValues, ... } = runtimeRef.current
+const formData =
+  Object.keys(latestFormDataRef.current).length > 0
+    ? { ...latestFormDataRef.current }
+    : { ...currentGetValues() }
+```
+
+#### 4.1.4 完整修改片段
+
+在 `applyLinkageResults` useCallback 之后、`processQueue` useRef 之前插入：
+
+```ts
+// ✅ 运行时依赖 ref：每次 render 同步更新，确保 processQueue 读取最新依赖
+// 必须在 applyLinkageResults 定义之后声明（需要其类型）
+const runtimeRef = useRef<{
+  linkages: Record<string, LinkageConfig[]>
+  linkageFunctions: Record<string, LinkageFunction>
+  dependencyGraph: DependencyGraph
+  getValues: UseFormReturn<any>['getValues']
+  applyLinkageResults: typeof applyLinkageResults
+}>({
+  linkages,
+  linkageFunctions,
+  dependencyGraph,
+  getValues,
   applyLinkageResults,
 })
 
-// 3. 每次 render 同步更新（无需 deps，每次都更新）
-// 注意：useLayoutEffect 比 useEffect 更早，确保在 setTimeout 回调前已更新
-useLayoutEffect(() => {
-  runtimeRef.current = {
-    linkages,
-    linkageFunctions,
-    dependencyGraph,
-    applyLinkageResults,
-  }
-})
+// render 阶段直接赋值（不用 useLayoutEffect），每次 render 后立即生效
+runtimeRef.current = {
+  linkages,
+  linkageFunctions,
+  dependencyGraph,
+  getValues,
+  applyLinkageResults,
+}
+```
 
-// 4. processQueue 内部通过 runtimeRef 读取最新依赖
+修改 `processQueue`：
+
+```ts
 const processQueue = useRef(async () => {
   if (taskQueue.getRefreshing()) return
   if (taskQueue.getProcessing()) return
@@ -229,129 +384,19 @@ const processQueue = useRef(async () => {
       if (!task) break
       if (!taskQueue.isTaskValid(task.fieldName, task.timestamp)) continue
 
-      // ✅ 每次执行时读取最新依赖，而不是使用首次 render 的闭包值
-      const {
-        linkages,
-        linkageFunctions,
-        dependencyGraph,
-        applyLinkageResults,
-      } = runtimeRef.current
-
-      const formData =
-        Object.keys(latestFormDataRef.current).length > 0
-          ? { ...latestFormDataRef.current }
-          : { ...form.getValues() }
-
-      const affectedFields = task.affectedFields
-
-      const { states: newStates, updatedFormData } =
-        await evaluateLinkagesByLayers({
-          fields: affectedFields,
-          linkages,
-          formData,
-          linkageFunctions,
-          asyncSequenceManager,
-          dependencyGraph,
-          cache,
-          _caller: `processQueue(trigger=${task.fieldName})`,
-        })
-
-      await applyLinkageResults({
-        fields: affectedFields,
-        states: newStates,
-        updatedFormData,
-        preMarkFields: true,
-      })
-    }
-  } finally {
-    taskQueue.setProcessing(false)
-    if (!taskQueue.isEmpty()) {
-      processQueue()
-    }
-  }
-}).current
-```
-
-### 4.2 为什么用 useLayoutEffect 而不是 useEffect
-
-`useEffect` 在浏览器绘制之后执行，而 `setTimeout(fn, 0)` 也可能在浏览器绘制之后执行。两者的执行顺序不确定，存在以下竞态：
-
-```
-render → 浏览器绘制
-                   → setTimeout 回调开始执行（此时 useEffect 可能还未更新 runtimeRef）
-                   → useEffect 执行，runtimeRef 更新
-```
-
-`useLayoutEffect` 在浏览器绘制之前、DOM 更新之后同步执行，确保 `runtimeRef` 在任何 `setTimeout` 回调之前已经是最新值：
-
-```
-render → useLayoutEffect 执行（runtimeRef 更新）→ 浏览器绘制 → setTimeout 回调
-```
-
-### 4.3 完整修改后的 `useLinkageManager.ts` 关键片段
-
-在 `dependencyGraph` useMemo 之后、`processQueue` useRef 之前添加：
-
-```ts
-// --- 新增：运行时依赖 ref ---
-const runtimeRef = useRef<{
-  linkages: Record<string, LinkageConfig[]>
-  linkageFunctions: Record<string, LinkageFunction>
-  dependencyGraph: DependencyGraph
-  applyLinkageResults: typeof applyLinkageResults
-}>({
-  linkages,
-  linkageFunctions,
-  dependencyGraph,
-  applyLinkageResults: null as any, // applyLinkageResults 在后面定义，首次由 useLayoutEffect 填充
-})
-// --- 结束新增 ---
-```
-
-在 `applyLinkageResults` useCallback 之后添加：
-
-```ts
-// 每次 render 后同步更新运行时依赖，确保 processQueue 读取到最新值
-useLayoutEffect(() => {
-  runtimeRef.current = {
-    linkages,
-    linkageFunctions,
-    dependencyGraph,
-    applyLinkageResults,
-  }
-})
-```
-
-然后修改 `processQueue` 的 useRef：
-
-```ts
-const processQueue = useRef(async () => {
-  if (taskQueue.getRefreshing()) return
-  if (taskQueue.getProcessing()) return
-
-  taskQueue.setProcessing(true)
-
-  try {
-    while (!taskQueue.isEmpty()) {
-      const task = taskQueue.dequeue()
-      if (!task) break
-
-      if (!taskQueue.isTaskValid(task.fieldName, task.timestamp)) {
-        continue
-      }
-
-      // ✅ 从 runtimeRef 读取最新运行时依赖
+      // ✅ 从 runtimeRef 读取最新依赖，而不是首次 render 的闭包值
       const {
         linkages: currentLinkages,
         linkageFunctions: currentLinkageFunctions,
         dependencyGraph: currentDependencyGraph,
+        getValues: currentGetValues,
         applyLinkageResults: currentApplyLinkageResults,
       } = runtimeRef.current
 
       const formData =
         Object.keys(latestFormDataRef.current).length > 0
           ? { ...latestFormDataRef.current }
-          : { ...form.getValues() }
+          : { ...currentGetValues() }
 
       const affectedFields = task.affectedFields
 
@@ -376,7 +421,6 @@ const processQueue = useRef(async () => {
     }
   } finally {
     taskQueue.setProcessing(false)
-
     if (!taskQueue.isEmpty()) {
       processQueue()
     }
@@ -384,21 +428,64 @@ const processQueue = useRef(async () => {
 }).current
 ```
 
+### 4.2 修复 useImperativeHandle — `DynamicForm.tsx:620`
+
+修复方案很简单：将 `refreshLinkage` 加入 `useImperativeHandle` 的 deps 数组。`setValueWithoutLinkage` 无需加入（引用稳定，见 2.5 节分析）。
+
+```ts
+useImperativeHandle(
+  ref,
+  () => ({
+    setValue: (name, value, options) => { ... },
+    getValue: (name) => { ... },
+    getValues: () => { ... },
+    setValues: (values, options) => {
+      ...
+      if (options?.silence) {
+        setValueWithoutLinkage(() => { ... })
+      }
+    },
+    reset: (values) => { ... },
+    validate: async (name) => { ... },
+    getErrors: () => { ... },
+    clearErrors: (name) => { ... },
+    setError: (name, error) => { ... },
+    getFormState: () => { ... },
+    refreshLinkage: async () => {
+      await refreshLinkage()
+    },
+  }),
+  [methods, schema, refreshLinkage]  // ✅ 新增 refreshLinkage
+)
+```
+
+当 `baseLinkages` / `schema` 变化导致 `refreshLinkage` 重建时，`useImperativeHandle` 会同步重建，外部通过 `formRef.current.refreshLinkage()` 调用时始终使用最新版本。
+
 ---
 
 ## 5. 方案对比
 
+### 5.1 processQueue 修复方案对比
+
 | 方案 | 优点 | 缺点 |
 |---|---|---|
-| **Latest Ref 模式**（推荐） | 引用稳定 + 读取最新依赖；改动最小 | `useLayoutEffect` 需要了解其时序语义 |
+| **Latest Ref 模式 + render 阶段赋值**（推荐） | 引用稳定 + 读取最新依赖；改动最小；render 阶段同步赋值，无额外 hook | 需理解"render 阶段写 ref 是合法的"这一 React 约定 |
+| Latest Ref 模式 + useLayoutEffect | 与推荐方案等效 | 多一个 hook 注册；对 ref 赋值不需要 useLayoutEffect 的语义 |
 | 改为 `useCallback` | 每次 deps 变化时函数更新 | 新旧函数版本可能并发执行，破坏队列串行保证 |
-| 每次执行前先 `await` 等待旧版完成 | 可保证串行 | 实现复杂，性能差；本质上是在绕过根本问题 |
+| 每次执行前 `await` 等待旧版完成 | 可保证串行 | 实现复杂，性能差；本质上是在绕过根本问题 |
+
+### 5.2 useImperativeHandle 修复方案对比
+
+| 方案 | 优点 | 缺点 |
+|---|---|---|
+| **在 deps 中添加 `refreshLinkage`**（推荐） | 改动最小（一行）；语义清晰 | `refreshLinkage` 变化时 ref 对象重建（代价极低） |
+| 用 Latest Ref 在 `refreshLinkage` 上包一层 | 可以不动 deps | 多余的复杂性；`useImperativeHandle` 本身就是做这件事的 |
 
 ---
 
 ## 6. 非问题确认
 
-扫描后以下位置**确认无闭包陈旧问题**：
+扫描后以下位置**确认无独立闭包陈旧问题**：
 
 | 文件/位置 | 结论 | 原因 |
 |---|---|---|
@@ -406,8 +493,9 @@ const processQueue = useRef(async () => {
 | `useArrayLinkageManager.ts:219` watch 订阅 | ✅ 无问题 | `generateDynamicLinkages` 在 `useEffect` deps 中，变化时重新订阅 |
 | `useArrayLinkageManager.ts:254` `refresh` | ✅ 无问题 | 仅依赖 `generateDynamicLinkages`，deps 正确 |
 | `useLinkageManager.ts:436` `refreshLinkage` | ✅ 无问题 | 正常 `useCallback`，deps 完整 |
-| `useLinkageManager.ts:494` `setValueWithoutLinkage` | ✅ 无问题 | 无外部依赖 |
-| `useLinkageManager.ts:184` `applyLinkageResults` | ✅ 无独立问题（依赖 `processQueue` 修复） | 本身 `useCallback` deps 正确；被 `processQueue` 陈旧调用是 2.1 的次生影响 |
+| `useLinkageManager.ts:494` `setValueWithoutLinkage` | ✅ 无问题 | 无外部依赖；捕获的 `skipLinkageRef` 是 ref，始终最新 |
+| `useLinkageManager.ts:184` `applyLinkageResults` | ✅ 无独立问题 | 本身 `useCallback` deps 正确；被陈旧 `processQueue` 调用是 2.1 的次生影响，随 2.1 修复一并解决 |
+| `DynamicForm.tsx` `useImperativeHandle` 中的 `setValueWithoutLinkage` | ✅ 无问题 | `setValueWithoutLinkage` 引用稳定，内部通过 ref 读取最新值 |
 
 ---
 
@@ -442,8 +530,19 @@ const processQueue = useRef(async () => {
 // 期望：items.1.subtotal 联动执行（而非静默失败）
 ```
 
+### 场景 4：useImperativeHandle.refreshLinkage 在 baseLinkages 变化后仍有效
+
+```ts
+// 1. 初始渲染，baseLinkages 基于初始 schema
+// 2. schema 联动更新，baseLinkages 变化，refresh 版本更新
+// 3. 异步数据加载完成，外部调用 formRef.current.refreshLinkage()
+// 期望：refreshLinkage 基于最新 baseLinkages 重新生成动态联动，而非使用初始版本
+```
+
 ---
 
-**文档版本**: 1.0
+**文档版本**: 1.1
 **创建日期**: 2026-07-02
-**适用文件**: `src/components/DynamicForm/hooks/useLinkageManager.ts`
+**适用文件**:
+- `src/components/DynamicForm/hooks/useLinkageManager.ts`
+- `src/components/DynamicForm/DynamicForm.tsx`
