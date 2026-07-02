@@ -18,6 +18,9 @@ export interface FormFieldProps {
   linkageState?: LinkageResult
   layout?: 'vertical' | 'horizontal' | 'inline'
   labelWidth?: number | string
+  fieldRowStyle?: React.CSSProperties
+  fieldLabelStyle?: React.CSSProperties
+  fieldControlStyle?: React.CSSProperties
   enableVirtualScroll?: boolean
   virtualScrollHeight?: number
   columnsCount?: number
@@ -182,6 +185,9 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
   linkageState,
   layout = 'vertical',
   labelWidth,
+  fieldRowStyle,
+  fieldLabelStyle,
+  fieldControlStyle,
   enableVirtualScroll,
   virtualScrollHeight,
   columnsCount = 1,
@@ -243,8 +249,11 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
       style.flexShrink = 0
       style.marginRight = '12px'
     }
-    return style
-  }, [effectiveLayout, effectiveLabelWidth])
+    return {
+      ...style,
+      ...fieldLabelStyle,
+    }
+  }, [effectiveLayout, effectiveLabelWidth, fieldLabelStyle])
 
   const widgetProps = field.schema?.ui?.widgetProps
   const resolvedCallbacks = resolveCallbackProps(
@@ -276,7 +285,10 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
       helperText={
         field.description ? <FieldHelp text={field.description} /> : undefined
       }
-      style={formGroupStyle}
+      style={{
+        ...formGroupStyle,
+        ...fieldRowStyle,
+      }}
     >
       <Controller
         name={field.name}
@@ -355,6 +367,9 @@ export function arePropsEqual(
     prevProps.readonly !== nextProps.readonly ||
     prevProps.layout !== nextProps.layout ||
     prevProps.labelWidth !== nextProps.labelWidth ||
+    prevProps.fieldRowStyle !== nextProps.fieldRowStyle ||
+    prevProps.fieldLabelStyle !== nextProps.fieldLabelStyle ||
+    prevProps.fieldControlStyle !== nextProps.fieldControlStyle ||
     prevProps.enableVirtualScroll !== nextProps.enableVirtualScroll ||
     prevProps.virtualScrollHeight !== nextProps.virtualScrollHeight
   ) {

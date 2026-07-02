@@ -365,6 +365,10 @@ const DynamicFormInner = React.memo(
         readonly = false,
         className,
         style,
+        fieldsWrapperStyle,
+        fieldRowStyle,
+        fieldLabelStyle,
+        fieldControlStyle,
         pathPrefix = '',
         asNestedForm = false,
         enableVirtualScroll = false,
@@ -618,13 +622,23 @@ const DynamicFormInner = React.memo(
         () => ({
           setValue: (name, value, options) => {
             const fieldSchema = getSchemaAtPath(schema, name)
-            const reverseFn = resolveTransformFn(fieldSchema?.ui?.transform?.reverseCallback, callbacksRef.current)
-            methods.setValue(name, reverseFn ? reverseFn(value) : value, options)
+            const reverseFn = resolveTransformFn(
+              fieldSchema?.ui?.transform?.reverseCallback,
+              callbacksRef.current
+            )
+            methods.setValue(
+              name,
+              reverseFn ? reverseFn(value) : value,
+              options
+            )
           },
           getValue: (name: string) => {
             const displayValue = methods.getValues(name as any)
             const fieldSchema = getSchemaAtPath(schema, name)
-            const fn = resolveTransformFn(fieldSchema?.ui?.transform?.callback, callbacksRef.current)
+            const fn = resolveTransformFn(
+              fieldSchema?.ui?.transform?.callback,
+              callbacksRef.current
+            )
             return fn ? fn(displayValue) : displayValue
           },
           getValues: () => {
@@ -746,7 +760,13 @@ const DynamicFormInner = React.memo(
           pathPrefix: pathPrefix,
           linkageFunctions: effectiveLinkageFunctions,
         }),
-        [linkageStates, processedLinkages, schema, pathPrefix, effectiveLinkageFunctions] // ✅ 移除 methods 依赖
+        [
+          linkageStates,
+          processedLinkages,
+          schema,
+          pathPrefix,
+          effectiveLinkageFunctions,
+        ] // ✅ 移除 methods 依赖
       )
 
       // 使用 useMemo 缓存字段内容，避免每次渲染都创建新的 children
@@ -754,15 +774,16 @@ const DynamicFormInner = React.memo(
         () => (
           <div
             className="dynamic-form__fields"
-            style={
-              columnsCount > 1
+            style={{
+              ...fieldsWrapperStyle,
+              ...(columnsCount > 1
                 ? {
                     display: 'grid',
                     gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
                     gap: '0 16px',
                   }
-                : undefined
-            }
+                : undefined),
+            }}
           >
             {fields.map((field) => {
               const linkageState = linkageStates[field.name]
@@ -788,6 +809,9 @@ const DynamicFormInner = React.memo(
                   linkageState={linkageState}
                   layout={layout}
                   labelWidth={labelWidth}
+                  fieldRowStyle={fieldRowStyle}
+                  fieldLabelStyle={fieldLabelStyle}
+                  fieldControlStyle={fieldControlStyle}
                   enableVirtualScroll={enableVirtualScroll}
                   virtualScrollHeight={virtualScrollHeight}
                   columnsCount={columnsCount}
@@ -797,15 +821,19 @@ const DynamicFormInner = React.memo(
           </div>
         ),
         [
-          fields,
-          linkageStates,
           disabled,
+          enableVirtualScroll,
+          fields,
+          fieldControlStyle,
+          fieldLabelStyle,
+          fieldRowStyle,
+          linkageStates,
+          labelWidth,
+          layout,
           loading,
           readonly,
-          layout,
-          labelWidth,
-          enableVirtualScroll,
           virtualScrollHeight,
+          fieldsWrapperStyle,
           columnsCount,
         ]
       )
