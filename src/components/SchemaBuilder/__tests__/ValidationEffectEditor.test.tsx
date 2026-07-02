@@ -4,11 +4,11 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { ValidationEffectEditor } from '../ValidationEffectEditor';
+import { ValidationEffectEditor } from '../components/PropertyEditor/components/ValidationEffectEditor';
 import { basicSchema } from './testHelpers';
 
 // Mock FieldPathSelector 组件以便测试
-jest.mock('../FieldPathSelector', () => ({
+jest.mock('../components/PropertyEditor/components/FieldPathSelector', () => ({
   FieldPathSelector: ({ value, onChange, disabled, placeholder }: any) => (
     <input
       data-testid="field-path-selector"

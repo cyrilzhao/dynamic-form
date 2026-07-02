@@ -176,7 +176,7 @@ describe('generateCacheKey', () => {
       const formData = { user: { profile: { name: 'John' } } };
       const key = generateCacheKey(
         'targetField',
-        ['#/properties/user/profile/name'],
+        ['#/properties/user/properties/profile/properties/name'],
         formData
       );
       expect(key).toBe('targetField:user.profile.name="John"');

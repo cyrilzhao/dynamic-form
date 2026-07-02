@@ -23,6 +23,7 @@ describe('LinkageStateContext', () => {
     form: ReturnType<typeof useForm>
   ): LinkageStateContextValue => ({
     parentLinkageStates: {},
+    parentLinkages: {},
     form,
     rootSchema: mockSchema,
     pathPrefix: '',

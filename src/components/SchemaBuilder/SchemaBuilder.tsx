@@ -648,7 +648,6 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(({
                         <DynamicForm
                           schema={schema}
                           onChange={setPreviewData}
-                          columnsCount={schema.ui?.columnsCount}
                         />
                         <Divider />
                         <div className="preview-data">
@@ -673,7 +672,6 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(({
                   <DynamicForm
                     schema={schema}
                     onChange={setPreviewData}
-                    columnsCount={schema.ui?.columnsCount}
                   />
                   <Divider />
                   <div className="preview-data">

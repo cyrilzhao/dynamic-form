@@ -597,3 +597,76 @@ describe('动态 schema 联动的默认值测试', () => {
     });
   });
 });
+
+describe('useImperativeHandle.refreshLinkage 闭包陈旧修复', () => {
+  it('linkageFunctions 更新后，通过 ref 调用的 refreshLinkage 应使用最新函数', async () => {
+    const formRef = React.createRef<DynamicFormRef>();
+
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        country: {
+          type: 'string',
+          title: 'Country',
+        },
+        province: {
+          type: 'string',
+          title: 'Province',
+          ui: {
+            linkages: [
+              {
+                type: 'options',
+                dependencies: ['#/properties/country'],
+                fulfill: { function: 'loadOptions' },
+              },
+            ],
+          },
+        },
+      },
+    };
+
+    const initialFn = jest
+      .fn()
+      .mockReturnValue([{ label: 'Old Option', value: 'old' }]);
+    const updatedFn = jest
+      .fn()
+      .mockReturnValue([{ label: 'New Option', value: 'new' }]);
+
+    const { rerender } = render(
+      <DynamicForm
+        ref={formRef}
+        schema={schema}
+        linkageFunctions={{ loadOptions: initialFn }}
+        onSubmit={jest.fn()}
+      />
+    );
+
+    // 初始刷新，验证旧函数被调用
+    await act(async () => {
+      await formRef.current?.refreshLinkage();
+    });
+    await waitFor(() => {
+      expect(initialFn).toHaveBeenCalled();
+    });
+
+    // re-render：更新 linkageFunctions
+    rerender(
+      <DynamicForm
+        ref={formRef}
+        schema={schema}
+        linkageFunctions={{ loadOptions: updatedFn }}
+        onSubmit={jest.fn()}
+      />
+    );
+
+    // 再次通过 ref 调用 refreshLinkage
+    await act(async () => {
+      await formRef.current?.refreshLinkage();
+    });
+
+    // 应使用新函数（不是旧的闭包版本）
+    await waitFor(() => {
+      expect(updatedFn).toHaveBeenCalled();
+    });
+  });
+});

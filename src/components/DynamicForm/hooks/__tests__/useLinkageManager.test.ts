@@ -1530,4 +1530,127 @@ describe('useLinkageManager', () => {
       });
     });
   });
+
+  describe('processQueue 闭包陈旧修复', () => {
+    it('linkages 在 rerender 后更新，watch 触发的 processQueue 应使用最新 linkages', async () => {
+      const loadOptions = jest
+        .fn()
+        .mockReturnValue([{ label: 'Beijing', value: 'beijing' }]);
+
+      const { result, rerender } = renderHook(
+        ({
+          linkages,
+          linkageFunctions,
+        }: {
+          linkages: Record<string, LinkageConfig[]>;
+          linkageFunctions: Record<string, (...args: any[]) => any>;
+        }) => {
+          const form = useForm({
+            defaultValues: { country: 'china', province: '' },
+          });
+          const manager = useLinkageManager({ form, linkages, linkageFunctions });
+          return { manager, form };
+        },
+        {
+          initialProps: {
+            linkages: {} as Record<string, LinkageConfig[]>,
+            linkageFunctions: {},
+          },
+        }
+      );
+
+      // 初始无联动
+      await act(async () => {
+        await result.current.manager.refreshLinkage();
+      });
+      expect(result.current.manager.linkageStates).toEqual({});
+
+      // rerender：传入新的 linkages 和 linkageFunctions
+      act(() => {
+        rerender({
+          linkages: {
+            province: [
+              {
+                type: 'options',
+                dependencies: ['country'],
+                fulfill: { function: 'loadOptions' },
+              },
+            ],
+          },
+          linkageFunctions: { loadOptions },
+        });
+      });
+
+      // 触发字段变化，让 watch 回调将任务入队并执行 processQueue
+      await act(async () => {
+        result.current.form.setValue('country', 'usa');
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      // processQueue 应读取最新 linkages，调用 loadOptions
+      await waitFor(() => {
+        expect(loadOptions).toHaveBeenCalled();
+        expect(result.current.manager.linkageStates.province?.options).toBeDefined();
+      });
+    });
+
+    it('linkageFunctions 在 rerender 后更新，watch 触发的 processQueue 应使用最新函数', async () => {
+      const initialFn = jest
+        .fn()
+        .mockReturnValue([{ label: 'Old', value: 'old' }]);
+      const updatedFn = jest
+        .fn()
+        .mockReturnValue([{ label: 'New', value: 'new' }]);
+
+      const linkages: Record<string, LinkageConfig[]> = {
+        province: [
+          {
+            type: 'options',
+            dependencies: ['country'],
+            fulfill: { function: 'loadOptions' },
+          },
+        ],
+      };
+
+      const { result, rerender } = renderHook(
+        ({
+          linkageFunctions,
+        }: {
+          linkageFunctions: Record<string, (...args: any[]) => any>;
+        }) => {
+          const form = useForm({
+            defaultValues: { country: 'china', province: '' },
+          });
+          const manager = useLinkageManager({ form, linkages, linkageFunctions });
+          return { manager, form };
+        },
+        { initialProps: { linkageFunctions: { loadOptions: initialFn } } }
+      );
+
+      // 初始化联动，验证旧函数被调用
+      await act(async () => {
+        await result.current.manager.refreshLinkage();
+      });
+      await waitFor(() => {
+        expect(result.current.manager.linkageStates.province?.options?.[0].value).toBe('old');
+      });
+
+      // rerender：更新 linkageFunctions
+      act(() => {
+        rerender({ linkageFunctions: { loadOptions: updatedFn } });
+      });
+
+      // 触发字段变化，watch 回调将任务入队
+      await act(async () => {
+        result.current.form.setValue('country', 'usa');
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      // processQueue 应使用新函数，返回 new 选项
+      await waitFor(() => {
+        expect(updatedFn).toHaveBeenCalled();
+        expect(result.current.manager.linkageStates.province?.options?.[0].value).toBe('new');
+      });
+    });
+  });
 });
