@@ -494,14 +494,15 @@ const DynamicFormInner = React.memo(
               pathPrefix
             )
 
-            // 过滤掉已经在父级 DynamicForm 计算过的联动。
-            // 原因：嵌套表单架构中，每层 DynamicForm 只负责本层字段的联动，通过 LinkageStateContext
-            // 将自己的联动状态传递给子层。若子层重复计算父层已处理的联动，会导致同一字段被两个
-            // useLinkageManager 实例同时管理，引发竞态条件和状态不一致。
+            // 过滤掉已经由外层 DynamicForm 负责的联动配置。
+            // 联动以数组字段为边界分层计算，每层只负责本层数组边界以内、下一层数组边界以外的联动。
+            // 若内层重复计算外层已处理的联动，会导致同一字段被两个 useLinkageManager 实例同时管理，
+            // 引发竞态条件和状态不一致。
             //
-            // 修复方案：使用父级的静态配置（parentLinkages）而不是运行时状态（parentLinkageStates）
-            // 来判断哪些联动应该过滤。这样避免了时序问题：子级在初始化时就能立即知道哪些联动
-            // 已经由父级负责，无需等待父级的 refreshLinkage 执行。
+            // 使用外层的静态配置（parentLinkages）而不是运行时状态（parentLinkageStates）进行过滤：
+            // parentLinkageStates 在外层 refreshLinkage 执行前为空，内层初始化时若依赖它做过滤，
+            // 会因时序问题导致过滤失败，内层错误接管外层的联动，产生空对象覆盖有效状态的问题。
+            // parentLinkages 是静态配置，在外层 useMemo 时即可确定，内层初始化时立即可读。
             if (linkageStateContext?.parentLinkages) {
               const filtered: Record<string, LinkageConfig[]> = {}
               Object.entries(transformed).forEach(([key, value]) => {

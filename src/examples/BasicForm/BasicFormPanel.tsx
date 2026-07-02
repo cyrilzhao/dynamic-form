@@ -253,6 +253,7 @@ export const BasicFormPanel: React.FC = () => {
             },
           },
         },
+        required: ['format'],
       },
     },
     required: ['username', 'email', 'password', 'agreeTerms', 'rate'],
