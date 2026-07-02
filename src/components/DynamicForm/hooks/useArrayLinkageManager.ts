@@ -25,7 +25,12 @@ interface ArrayLinkageManagerOptions {
 /**
  * 数组联动管理器 Hook
  *
- * 扩展基础联动管理器，支持数组元素内部的相对路径联动和 JSON Pointer 路径解析
+ * 扩展基础联动管理器，支持数组元素内部的相对路径联动和 JSON Pointer 路径解析。
+ *
+ * 分层职责说明：
+ * - 数组字段以外（根字段、普通嵌套对象字段）的联动由根级 DynamicForm 统一管理
+ * - 数组元素内部字段的联动由各元素对应的独立 DynamicForm 通过本 Hook 管理
+ * - baseLinkages 中已通过 parentLinkages 过滤掉了根级负责的联动，不会重复计算
  */
 export function useArrayLinkageManager({
   form,
@@ -103,7 +108,7 @@ export function useArrayLinkageManager({
   // 合并基础联动和动态联动，并进行循环依赖检测
   // v3.1 更新：支持数组格式的联动配置
   // ✅ 优化：使用 useRef 做引用稳定化，避免内容未变时产生新对象触发下游重算。
-  // 背景：baseLinkages 会因 parentLinkageStates 变化而产生新引用（即使内容不变），
+  // 背景：baseLinkages 会因 parentLinkages 变化而产生新引用（即使内容不变），
   // 若直接将其传入 useLinkageManager，会导致 dependencyGraph → init useEffect 不断重跑，形成死循环。
   const allLinkagesRef = useRef<Record<string, LinkageConfig[]>>({});
 

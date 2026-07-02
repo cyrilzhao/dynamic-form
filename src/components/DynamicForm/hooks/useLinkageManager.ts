@@ -309,18 +309,10 @@ export function useLinkageManager({
             ? { ...latestFormDataRef.current }
             : { ...getValues() }
 
-        console.log(
-          `[DEBUG processQueue] task=${task.fieldName}, formData=`,
-          JSON.stringify(formData)
-        )
-
         // ✅ 优化：直接使用任务中的 affectedFields，避免重复调用 getAffectedFields
         const affectedFields = task.affectedFields
 
         // 使用拓扑层级并行计算受影响的字段
-        console.log(
-          `[DEBUG processQueue] 开始计算 affectedFields=${JSON.stringify(affectedFields)}, trigger=${task.fieldName}`
-        )
         const { states: newStates, updatedFormData } =
           await evaluateLinkagesByLayers({
             fields: affectedFields,
@@ -332,9 +324,6 @@ export function useLinkageManager({
             cache,
             _caller: `processQueue(trigger=${task.fieldName})`,
           })
-        console.log(
-          `[DEBUG processQueue] 计算完成 states=${JSON.stringify(newStates)}`
-        )
 
         // ✅ 使用公共函数应用联动结果
         await applyLinkageResults({
@@ -380,8 +369,9 @@ export function useLinkageManager({
       // 保存最新的 formData（解决 setValues 批量更新时的时序问题）
       latestFormDataRef.current = formData as Record<string, any>
 
-      // ✅ 精确监听优化：检查该字段及其所有父级路径是否被任何联动依赖
-      // 支持数组内部字段变化触发上层依赖：当 items.0.price 变化时，也会检查 items 是否被依赖
+      // ✅ 精确监听优化：检查该字段及其所有祖先路径是否被任何联动依赖
+      // 支持跨数组边界的依赖：当数组元素内部字段（如 items.0.price）变化时，
+      // 也会向上检查数组字段本身（items）是否被外部字段依赖（如 totalPrice 依赖 items）
       let affectedFields = dependencyGraph.getAffectedFields(name)
 
       if (affectedFields.length === 0) {
@@ -554,10 +544,7 @@ async function evaluateLinkagesByLayers({
   updatedFormData: Record<string, any>
 }> {
   const callId = ++_evaluateLinkagesByLayersCallCount
-  console.log(
-    `[DEBUG evaluateLinkagesByLayers #${callId}] 调用来源: ${_caller}, fields=${JSON.stringify(fields)}, skipSequenceCheck=${skipSequenceCheck}`
-  )
-  console.trace(`[DEBUG evaluateLinkagesByLayers #${callId}] 调用堆栈`)
+  void callId // 仅用于调试时标识调用批次，生产环境不输出
 
   const states: Record<string, LinkageResult> = {}
   const updatedFormData = { ...formData }

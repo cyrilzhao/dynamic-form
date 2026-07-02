@@ -939,21 +939,37 @@ watch 触发阶段：
 
 ### 6.4 分层计算策略
 
-当表单包含嵌套结构时，联动状态的计算采用分层策略。
+联动计算以**数组字段**为分层边界，而不是以 DynamicForm 的嵌套层级为边界。
 
-**核心原则**：
+**核心规则**：
 
-1. 每层 DynamicForm 只计算自己范围内的联动
-2. 通过 Context 共享表单实例和父级联动状态
-3. 子级过滤掉已在父级计算的联动，避免重复计算
+- **数组字段以外**（根字段、普通嵌套对象字段）：联动由**根级 DynamicForm** 统一管理。`parseSchemaLinkages` 遇到 `type: 'object'` 会继续递归，因此像 `ocr.format` 这样的嵌套对象内部字段联动，也由根级统一收集并计算。
+- **数组元素内部字段**：`parseSchemaLinkages` 遇到 `type: 'array'` 停止递归，数组元素内部的联动（如 `contacts.0.companyName` 依赖 `contacts.0.type`）由 `NestedFormWidget` 为每个数组元素创建的独立 DynamicForm 自行管理。
+
+**关于普通嵌套对象（如 `ocr`）**：
+
+虽然 `NestedFormWidget` 在渲染 `ocr` 字段时会创建一个 `asNestedForm=true` 的子级 DynamicForm，但这个子级 DynamicForm 的联动配置会被**完全过滤掉**（因为根级已通过 `parentLinkages` 声明了所有权），该子级只负责渲染字段，不参与任何联动计算。
+
+**分层边界示意**：
+
+```
+根级 DynamicForm 管理范围
+├── username（根字段）
+├── ocr.model（普通嵌套对象字段，根级管理）
+├── ocr.format（联动依赖 ocr.model，根级管理）
+└── contacts（数组字段，边界）
+    └── NestedFormWidget 为每个元素创建独立 DynamicForm
+        ├── contacts.0.type
+        └── contacts.0.companyName（联动依赖 contacts.0.type，元素级管理）
+```
 
 **Context 定义**：
 
 ```typescript
 interface LinkageStateContextValue {
-  /** 父级联动状态（运行时，用于子级读取父级计算结果） */
+  /** 根级（数组外）联动状态（运行时，用于数组内子级读取结果） */
   parentLinkageStates: Record<string, LinkageResult>;
-  /** 父级联动配置（静态，用于子级过滤，避免时序依赖） */
+  /** 根级联动配置（静态，用于数组内子级过滤，避免时序依赖） */
   parentLinkages: Record<string, LinkageConfig[]>;
   form: UseFormReturn<any>;
   rootSchema: ExtendedJSONSchema;
@@ -964,9 +980,9 @@ interface LinkageStateContextValue {
 
 **为什么需要 `parentLinkages`**：
 
-子级 DynamicForm 初始化时需要过滤掉父级已经负责的联动配置，避免同一字段被两个管理器重复计算。过滤依据**不能**使用 `parentLinkageStates`（运行时状态），因为子级初始化时父级的 `refreshLinkage` 可能尚未执行，导致 `parentLinkageStates` 为空，过滤失败，子级会错误地接管本该由父级管理的联动，最终产生空对象覆盖父级有效状态的问题。
+数组元素内的子级 DynamicForm 初始化时，需要过滤掉根级已负责的联动配置，避免同一字段被两个管理器重复计算。过滤依据**不能**使用 `parentLinkageStates`（运行时状态），因为子级初始化时根级的 `refreshLinkage` 可能尚未执行，导致 `parentLinkageStates` 为空，过滤失败，子级会错误接管本该由根级管理的联动，最终产生空对象覆盖有效状态的问题。
 
-`parentLinkages` 是静态的联动配置，在父级 `useMemo` 计算时就已确定，子级初始化时可以立即读取，彻底消除时序依赖。
+`parentLinkages` 是静态配置，在根级 `useMemo` 时即可确定，子级初始化时立即可读，彻底消除时序依赖。
 
 ### 6.5 DynamicForm 集成
 
