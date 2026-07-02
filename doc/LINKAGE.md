@@ -943,8 +943,28 @@ watch 触发阶段：
 
 **核心规则**：
 
-- **数组字段以外**（根字段、普通嵌套对象字段）：联动由**根级 DynamicForm** 统一管理。`parseSchemaLinkages` 遇到 `type: 'object'` 会继续递归，因此像 `ocr.format` 这样的嵌套对象内部字段联动，也由根级统一收集并计算。
-- **数组元素内部字段**：`parseSchemaLinkages` 遇到 `type: 'array'` 停止递归，数组元素内部的联动（如 `contacts.0.companyName` 依赖 `contacts.0.type`）由 `NestedFormWidget` 为每个数组元素创建的独立 DynamicForm 自行管理。
+联动分层以**数组字段**为边界，形成递归的层级结构：
+
+- 每层 DynamicForm 只负责**本层数组边界以内、下一层数组边界以外**的联动
+- 根级 DynamicForm 负责根字段和普通嵌套对象字段的联动（直到遇到第一个数组边界）
+- 每个数组元素对应一个独立的 DynamicForm，负责该元素内部、其嵌套数组边界以外的联动
+- 每层通过 `parentLinkages` 将自己负责的联动配置传给内层，内层过滤后不再重复计算
+
+**分层边界示意**（嵌套数组场景）：
+
+```
+根级 DynamicForm 管理范围
+├── username（根字段）
+├── ocr.format（普通嵌套对象字段，根级管理）
+└── departments（数组边界 #1）
+    └── departments.0 的 DynamicForm 管理范围
+        ├── departments.0.name
+        ├── departments.0.type
+        └── departments.0.employees（数组边界 #2）
+            └── departments.0.employees.0 的 DynamicForm 管理范围
+                ├── departments.0.employees.0.techStack
+                └── （依赖 departments.0.type 的联动，由 departments.0 层管理）
+```
 
 **关于普通嵌套对象（如 `ocr`）**：
 
