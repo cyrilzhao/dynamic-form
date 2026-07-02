@@ -947,49 +947,102 @@ watch 触发阶段：
 
 - 每层 DynamicForm 只负责**本层数组边界以内、下一层数组边界以外**的联动
 - 根级 DynamicForm 负责根字段和普通嵌套对象字段的联动（直到遇到第一个数组边界）
-- 每个数组元素对应一个独立的 DynamicForm，负责该元素内部、其嵌套数组边界以外的联动
+- 每个对象数组元素对应一个独立的 DynamicForm，负责该元素内部、其下一层数组边界以外的联动
 - 每层通过 `parentLinkages` 将自己负责的联动配置传给内层，内层过滤后不再重复计算
+
+**实现机制**：
+
+分层并不是通过判断 `asNestedForm && pathPrefix` 是否来自数组字段来完成的。实际机制分为两步：
+
+1. `parseSchemaLinkages(schema)` 在解析联动配置时会递归普通对象字段，但遇到数组字段时停止递归。因此外层 DynamicForm 会解析普通嵌套对象内的联动，但不会解析数组元素内部的联动。
+2. 内层 DynamicForm 会先用 `pathPrefix` 将相对联动路径转换为绝对路径，再根据 `parentLinkages` 过滤父级已经负责的联动。普通嵌套对象的联动会被过滤掉；数组元素内部的联动因为父级没有解析到，会被保留下来。
+
+也就是说，`asNestedForm && pathPrefix` 只表示“当前 DynamicForm 是嵌套渲染出来的，需要做路径转换和去重过滤”，并不等价于“当前层一定是数组元素层”。
+
+**`pathPrefix` 的生成链路**：
+
+`pathPrefix` 来自字段渲染路径，而不是联动系统单独生成的路径。
+
+普通嵌套对象场景：
+
+```text
+FormField(name="ocr")
+  → NestedFormWidget(name="ocr")
+  → fullPath = joinPath(parentPathPrefix, name)
+  → DynamicForm(pathPrefix="ocr", asNestedForm=true)
+```
+
+对象数组元素场景：
+
+```text
+ArrayFieldWidget(name="contacts")
+  → ArrayItem(name={`${name}.${index}`})
+  → ArrayItem(name="contacts.0")
+  → NestedFormWidget(name="contacts.0")
+  → fullPath = joinPath(parentPathPrefix, name)
+  → DynamicForm(pathPrefix="contacts.0", asNestedForm=true)
+```
+
+如果数组位于普通嵌套对象或另一层数组元素内，路径前缀会先体现在内层 DynamicForm 解析出的字段名上，再由 ArrayFieldWidget 继续拼接数组索引。当前实现中，`asNestedForm=true` 的 DynamicForm 会把字段名转换为 `${pathPrefix}.${field.name}`，同时给子级 `PathPrefixProvider` 传空前缀，避免再次重复拼接。例如 `departments.0.employees.0` 的生成链路是：
+
+```text
+根级 DynamicForm
+  → departments 数组字段
+  → ArrayItem(name="departments.0")
+  → NestedFormWidget fullPath="departments.0"
+  → DynamicForm(pathPrefix="departments.0", asNestedForm=true)
+      → fields 中的 employees 被转换为 departments.0.employees
+      → ArrayFieldWidget(name="departments.0.employees")
+      → ArrayItem(name="departments.0.employees.0")
+      → NestedFormWidget fullPath="departments.0.employees.0"
+      → DynamicForm(pathPrefix="departments.0.employees.0", asNestedForm=true)
+```
 
 **分层边界示意**（嵌套数组场景）：
 
-```
+```text
 根级 DynamicForm 管理范围
 ├── username（根字段）
 ├── ocr.format（普通嵌套对象字段，根级管理）
-└── departments（数组边界 #1）
+└── departments（数组边界 #1，根级停止解析元素内部）
     └── departments.0 的 DynamicForm 管理范围
         ├── departments.0.name
         ├── departments.0.type
-        └── departments.0.employees（数组边界 #2）
+        └── departments.0.employees（数组边界 #2，departments.0 层停止解析元素内部）
             └── departments.0.employees.0 的 DynamicForm 管理范围
-                ├── departments.0.employees.0.techStack
-                └── （依赖 departments.0.type 的联动，由 departments.0 层管理）
+                ├── departments.0.employees.0.role
+                ├── departments.0.employees.0.level
+                └── departments.0.employees.0.techStack
 ```
+
+**嵌套数组的所有权示例**：
+
+| 联动目标 | 依赖字段 | 负责计算的 DynamicForm | 说明 |
+|---|---|---|---|
+| `ocr.format` | `ocr.model` | 根级 | 普通嵌套对象会被根级递归解析 |
+| `departments.0.name` | `departments.0.type` | `departments.0` 层 | 根级在 `departments` 数组处停止，元素内部由元素层负责 |
+| `departments.0.employees.0.techStack` | `departments.0.employees.0.level` | `departments.0.employees.0` 层 | `departments.0` 层在 `employees` 数组处停止，员工元素内部由员工元素层负责 |
+| `departments.0.employeeSummary` | `departments.0.employees` | `departments.0` 层 | 目标字段位于 `departments.0` 层的下一层数组边界之外 |
+| `departmentCount` | `departments` | 根级 | 目标字段位于根级，依赖整个数组也由根级处理 |
 
 **关于普通嵌套对象（如 `ocr`）**：
 
-虽然 `NestedFormWidget` 在渲染 `ocr` 字段时会创建一个 `asNestedForm=true` 的子级 DynamicForm，但这个子级 DynamicForm 的联动配置会被**完全过滤掉**（因为根级已通过 `parentLinkages` 声明了所有权），该子级只负责渲染字段，不参与任何联动计算。
+虽然 `NestedFormWidget` 在渲染 `ocr` 字段时也会创建一个 `asNestedForm=true`、`pathPrefix="ocr"` 的子级 DynamicForm，但这个子级 DynamicForm 的联动配置会被**完全过滤掉**：
 
-**分层边界示意**：
+1. 根级 `parseSchemaLinkages(rootSchema)` 会递归普通对象字段，得到 `ocr.model`、`ocr.format` 等绝对联动配置。
+2. `ocr` 子级 DynamicForm 解析自己的 `ocrSchema`，得到相对配置 `model`、`format`。
+3. 子级通过 `transformToAbsolutePaths(rawLinkages, 'ocr')` 转换为 `ocr.model`、`ocr.format`。
+4. 子级发现这些 key 已存在于 `parentLinkages`，因此全部过滤。
 
-```
-根级 DynamicForm 管理范围
-├── username（根字段）
-├── ocr.model（普通嵌套对象字段，根级管理）
-├── ocr.format（联动依赖 ocr.model，根级管理）
-└── contacts（数组字段，边界）
-    └── NestedFormWidget 为每个元素创建独立 DynamicForm
-        ├── contacts.0.type
-        └── contacts.0.companyName（联动依赖 contacts.0.type，元素级管理）
-```
+因此普通嵌套对象的子级 DynamicForm 只负责渲染字段，不参与联动计算；对象数组元素的子级 DynamicForm 才会保留父级未解析到的元素内部联动。
 
 **Context 定义**：
 
 ```typescript
 interface LinkageStateContextValue {
-  /** 根级（数组外）联动状态（运行时，用于数组内子级读取结果） */
+  /** 父级联动状态（运行时，用于子级读取和合并结果） */
   parentLinkageStates: Record<string, LinkageResult>;
-  /** 根级联动配置（静态，用于数组内子级过滤，避免时序依赖） */
+  /** 父级联动配置（静态，用于子级过滤，避免时序依赖） */
   parentLinkages: Record<string, LinkageConfig[]>;
   form: UseFormReturn<any>;
   rootSchema: ExtendedJSONSchema;
@@ -1000,9 +1053,9 @@ interface LinkageStateContextValue {
 
 **为什么需要 `parentLinkages`**：
 
-数组元素内的子级 DynamicForm 初始化时，需要过滤掉根级已负责的联动配置，避免同一字段被两个管理器重复计算。过滤依据**不能**使用 `parentLinkageStates`（运行时状态），因为子级初始化时根级的 `refreshLinkage` 可能尚未执行，导致 `parentLinkageStates` 为空，过滤失败，子级会错误接管本该由根级管理的联动，最终产生空对象覆盖有效状态的问题。
+子级 DynamicForm 初始化时，需要过滤掉父级已负责的联动配置，避免同一字段被两个管理器重复计算。过滤依据**不能**使用 `parentLinkageStates`（运行时状态），因为子级初始化时父级的 `refreshLinkage` 可能尚未执行，导致 `parentLinkageStates` 为空，过滤失败，子级会错误接管本该由父级管理的联动，最终产生空对象覆盖有效状态的问题。
 
-`parentLinkages` 是静态配置，在根级 `useMemo` 时即可确定，子级初始化时立即可读，彻底消除时序依赖。
+`parentLinkages` 是静态配置，在父级 `useMemo` 时即可确定，子级初始化时立即可读，彻底消除时序依赖。
 
 ### 6.5 DynamicForm 集成
 
@@ -2285,12 +2338,32 @@ async function evaluateFieldLinkages({
 
 ---
 
-**文档版本**: 2.6
+**文档版本**: 2.7
 **创建日期**: 2025-12-26
-**最后更新**: 2026-01-16
+**最后更新**: 2026-07-02
 **文档状态**: 已更新
 
 ## 变更历史
+
+### v2.7 (2026-07-02)
+
+**新增内容**：补充分层计算策略中的路径生成机制和嵌套数组场景说明
+
+**主要变更**：
+
+1. **补充 `pathPrefix` 生成链路**
+   - ✅ 说明普通嵌套对象场景下 `pathPrefix="ocr"` 的来源
+   - ✅ 说明对象数组元素场景下 `pathPrefix="contacts.0"` 的来源
+   - ✅ 说明嵌套数组场景下 `departments.0.employees.0` 的逐层生成过程
+
+2. **澄清分层计算的实际机制**
+   - ✅ 明确 `asNestedForm && pathPrefix` 不等价于数组元素层判断
+   - ✅ 说明真正的数组边界来自 `parseSchemaLinkages` 遇到数组字段时停止递归
+   - ✅ 说明内层 DynamicForm 通过 `parentLinkages` 过滤父级已负责的联动
+
+3. **补充嵌套数组所有权示例**
+   - ✅ 对比普通嵌套对象、一级对象数组、二级嵌套对象数组的联动归属
+   - ✅ 说明跨数组边界场景中目标字段由哪一层 DynamicForm 负责
 
 ### v2.6 (2026-01-16)
 
