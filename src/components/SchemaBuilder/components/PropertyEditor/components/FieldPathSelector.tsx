@@ -36,7 +36,7 @@ export const FieldPathSelector: React.FC<FieldPathSelectorProps> = ({
   value,
   onChange,
   disabled,
-  placeholder = '#/properties/fieldName or ./fieldName',
+  placeholder = 'Click search button to select a field',
   visibleFields,
   selectableFields,
   excludeCurrentField = true,
@@ -46,6 +46,106 @@ export const FieldPathSelector: React.FC<FieldPathSelectorProps> = ({
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [pathType, setPathType] = useState<'absolute' | 'relative'>('absolute');
   const treeContainerRef = useRef<HTMLDivElement>(null);
+
+  // 根据路径获取字段的 title
+  const getFieldTitleFromPath = (path: string, rootSchema: ExtendedJSONSchema): string => {
+    if (!path || !rootSchema) return path;
+
+    // 相对路径直接返回
+    if (path.startsWith('./')) {
+      const fieldName = path.substring(2);
+      return fieldName;
+    }
+
+    // 解析绝对路径
+    if (!path.startsWith('#/')) return path;
+
+    const pathSegments = path.replace(/^#\//, '').split('/');
+    let currentSchema: ExtendedJSONSchema = rootSchema;
+    let fieldName = '';
+
+    for (let i = 0; i < pathSegments.length; i++) {
+      const segment = pathSegments[i];
+
+      if (segment === 'properties') {
+        // 下一个段是字段名
+        fieldName = pathSegments[i + 1];
+        if (!fieldName || !currentSchema.properties) break;
+
+        const fieldSchema = currentSchema.properties[fieldName];
+        if (!fieldSchema || typeof fieldSchema === 'boolean') break;
+
+        currentSchema = fieldSchema as ExtendedJSONSchema;
+        i++; // 跳过字段名
+      } else if (segment === 'items') {
+        // 进入数组的 items
+        if (!currentSchema.items || typeof currentSchema.items === 'boolean') break;
+        currentSchema = currentSchema.items as ExtendedJSONSchema;
+      }
+    }
+
+    // 返回 title 或字段名
+    return currentSchema.title || fieldName || path;
+  };
+
+  // 格式化显示值：Address.City 或 Users[].Name
+  const getDisplayValue = (path: string): string => {
+    if (!path) return '';
+
+    // 处理相对路径：转换为绝对路径再显示
+    let absolutePath = path;
+    if (path.startsWith('./')) {
+      // 相对路径需要基于 currentFieldPath 转换为绝对路径
+      const fieldName = path.substring(2);
+
+      // 找到 currentFieldPath 的父级路径
+      // 例如: #/properties/users/items/properties/name
+      // 父级: #/properties/users/items/properties
+      const lastPropertiesIndex = currentFieldPath.lastIndexOf('/properties/');
+      if (lastPropertiesIndex !== -1) {
+        const parentPath = currentFieldPath.substring(0, lastPropertiesIndex);
+        absolutePath = `${parentPath}/properties/${fieldName}`;
+      } else {
+        // 无法确定父级路径，直接返回字段名
+        return fieldName;
+      }
+    }
+
+    // 解析绝对路径
+    if (!absolutePath.startsWith('#/')) return absolutePath;
+
+    const pathSegments = absolutePath.replace(/^#\//, '').split('/');
+    let currentSchema: ExtendedJSONSchema = schema;
+    const titles: string[] = [];
+
+    for (let i = 0; i < pathSegments.length; i++) {
+      const segment = pathSegments[i];
+
+      if (segment === 'properties') {
+        // 下一个段是字段名
+        const fieldName = pathSegments[i + 1];
+        if (!fieldName || !currentSchema.properties) break;
+
+        const fieldSchema = currentSchema.properties[fieldName];
+        if (!fieldSchema || typeof fieldSchema === 'boolean') break;
+
+        const typedSchema = fieldSchema as ExtendedJSONSchema;
+        // 使用 title 或 fieldName
+        titles.push(typedSchema.title || fieldName);
+        currentSchema = typedSchema;
+        i++; // 跳过字段名
+      } else if (segment === 'items') {
+        // 数组的 items，添加 [] 标记
+        titles[titles.length - 1] = titles[titles.length - 1] + '[]';
+
+        // 进入数组的 items schema
+        if (!currentSchema.items || typeof currentSchema.items === 'boolean') break;
+        currentSchema = currentSchema.items as ExtendedJSONSchema;
+      }
+    }
+
+    return titles.length > 0 ? titles.join('.') : absolutePath;
+  };
 
   // 获取路径的所有父级路径（不包含自己）
   const getParentPaths = (path: string): string[] => {
@@ -239,7 +339,7 @@ export const FieldPathSelector: React.FC<FieldPathSelectorProps> = ({
     <>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1 }}>
         <InputGroup
-          value={value}
+          value={getDisplayValue(value)}
           readOnly
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}

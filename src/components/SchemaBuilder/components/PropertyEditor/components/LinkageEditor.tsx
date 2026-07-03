@@ -1,33 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react'
 import {
   FormGroup,
   HTMLSelect,
   Button,
-  Card,
-  Elevation,
   Callout,
   Tag,
   Divider,
   Switch,
-} from '@blueprintjs/core';
+  Tooltip,
+  Icon,
+} from '@blueprintjs/core'
 import type {
   LinkageConfig,
   LinkageType,
   ConditionExpression,
   LinkageEffect,
-} from '../../../../DynamicForm/types/linkage';
-import type { ExtendedJSONSchema } from '../../../../DynamicForm/types/schema';
-import { ConditionEditor } from './ConditionEditor';
-import { EffectEditor } from './EffectEditor';
-import { FieldPathSelector } from './FieldPathSelector';
-import './LinkageEditor.scss';
+} from '../../../../DynamicForm/types/linkage'
+import type { ExtendedJSONSchema } from '../../../../DynamicForm/types/schema'
+import { ConditionEditor } from './ConditionEditor'
+import { EffectEditor } from './EffectEditor'
+import { FieldPathSelector } from './FieldPathSelector'
+import './LinkageEditor.scss'
 
 interface LinkageEditorProps {
-  value?: LinkageConfig;
-  onChange: (value: LinkageConfig | undefined) => void;
-  currentFieldPath: string;
-  schema: ExtendedJSONSchema;
-  disabled?: boolean;
+  value: LinkageConfig
+  onChange: (value: LinkageConfig) => void
+  currentFieldPath: string
+  schema: ExtendedJSONSchema
+  disabled?: boolean
+  onSave: (value: LinkageConfig) => void
+  onCancel: () => void
 }
 
 /**
@@ -40,13 +42,13 @@ export const LinkageEditor: React.FC<LinkageEditorProps> = ({
   currentFieldPath,
   schema,
   disabled,
+  onSave,
+  onCancel,
 }) => {
-  const [isEnabled, setIsEnabled] = useState(!!value);
-
-  // 同步 value 变化到 isEnabled 状态
-  useEffect(() => {
-    setIsEnabled(!!value);
-  }, [value]);
+  const [errors, setErrors] = useState<{
+    dependencies?: string
+    fulfill?: string
+  }>({})
 
   // 联动类型选项
   const linkageTypeOptions: Array<{ label: string; value: LinkageType }> = [
@@ -56,139 +58,173 @@ export const LinkageEditor: React.FC<LinkageEditorProps> = ({
     { label: 'Value (Auto Calculate)', value: 'value' },
     { label: 'Options (Dynamic Options)', value: 'options' },
     { label: 'Schema (Dynamic Schema)', value: 'schema' },
-  ];
+  ]
 
-  const handleEnableToggle = () => {
-    if (isEnabled) {
-      // 禁用联动
-      setIsEnabled(false);
-      onChange(undefined);
-    } else {
-      // 启用联动，创建默认配置
-      setIsEnabled(true);
-      onChange({
-        type: 'visibility',
-        dependencies: [],
-      });
+  const validateLinkage = (): boolean => {
+    const newErrors: { dependencies?: string; fulfill?: string } = {}
+
+    // 校验 dependencies
+    const validDeps = value.dependencies.filter((d) => d.trim())
+    if (validDeps.length === 0) {
+      newErrors.dependencies = 'At least one dependency is required'
     }
-  };
+
+    // 校验 fulfill
+    if (!value.fulfill) {
+      newErrors.fulfill = 'Fulfill effect is required'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleSave = () => {
+    if (validateLinkage()) {
+      onSave(value)
+    }
+  }
 
   const handleTypeChange = (type: LinkageType) => {
-    if (!value) return;
     // 切换类型时重置 fulfill 和 otherwise
     onChange({
       ...value,
       type,
       fulfill: undefined,
       otherwise: undefined,
-    });
-  };
+    })
+    // 清除 fulfill 错误
+    if (errors.fulfill) {
+      setErrors({ ...errors, fulfill: undefined })
+    }
+  }
 
   const handleAddDependency = () => {
-    if (!value) return;
     onChange({
       ...value,
       dependencies: [...value.dependencies, ''],
-    });
-  };
+    })
+  }
 
   const handleDependencyChange = (index: number, newValue: string) => {
-    if (!value) return;
-    const newDeps = [...value.dependencies];
-    newDeps[index] = newValue;
+    const newDeps = [...value.dependencies]
+    newDeps[index] = newValue
     onChange({
       ...value,
       dependencies: newDeps,
-    });
-  };
+    })
+    // 清除 dependencies 错误
+    if (errors.dependencies && newValue.trim()) {
+      setErrors({ ...errors, dependencies: undefined })
+    }
+  }
 
   const handleRemoveDependency = (index: number) => {
-    if (!value) return;
-    const newDeps = value.dependencies.filter((_, i) => i !== index);
+    const newDeps = value.dependencies.filter((_, i) => i !== index)
     onChange({
       ...value,
       dependencies: newDeps,
-    });
-  };
+    })
+  }
 
-  const handleConditionChange = (condition: ConditionExpression | undefined) => {
-    if (!value) return;
+  const handleConditionChange = (
+    condition: ConditionExpression | undefined
+  ) => {
     onChange({
       ...value,
       when: condition,
-    });
-  };
+    })
+  }
 
   const handleFulfillChange = (effect: LinkageEffect | undefined) => {
-    if (!value) return;
     onChange({
       ...value,
       fulfill: effect,
-    });
-  };
+    })
+    // 清除 fulfill 错误
+    if (errors.fulfill && effect) {
+      setErrors({ ...errors, fulfill: undefined })
+    }
+  }
 
   const handleOtherwiseChange = (effect: LinkageEffect | undefined) => {
-    if (!value) return;
     onChange({
       ...value,
       otherwise: effect,
-    });
-  };
+    })
+  }
 
   const handleEnableCacheChange = (enableCache: boolean) => {
-    if (!value) return;
     onChange({
       ...value,
       enableCache,
-    });
-  };
-
-  // 判断是否显示 enableCache 选项（仅对异步联动类型有效）
-  const showEnableCacheOption = ['value', 'options', 'schema'].includes(value?.type || '');
-
-  if (!isEnabled) {
-    return (
-      <div className="linkage-editor">
-        <Callout intent="none">
-          <p>No linkage configured for this field.</p>
-          <Button
-            text="Enable Linkage"
-            icon="add"
-            intent="primary"
-            onClick={handleEnableToggle}
-            disabled={disabled}
-          />
-        </Callout>
-      </div>
-    );
+    })
   }
+
+  // 所有联动类型都可以使用 function，因此都可能需要缓存优化
+  const showEnableCacheOption = true
 
   return (
     <div className="linkage-editor">
-      <Card elevation={Elevation.ONE} style={{ marginBottom: 10 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h4 style={{ margin: 0 }}>Linkage Configuration</h4>
-          <Button
-            text="Disable Linkage"
-            icon="cross"
-            intent="danger"
-            minimal
-            small
-            onClick={handleEnableToggle}
-            disabled={disabled}
-          />
-        </div>
-      </Card>
-
       {/* 联动类型 */}
-      <FormGroup label="Linkage Type" helperText="What should this linkage control?">
+      <FormGroup
+        label={
+          <span style={{ display: 'flex', gap: '4px' }}>
+            Linkage Type{' '}
+            <Tooltip
+              content={
+                <div style={{ maxWidth: 300 }}>
+                  <p style={{ marginBottom: 8, fontWeight: 'bold' }}>
+                    What should this linkage control?
+                  </p>
+                  <ul style={{ margin: 0, paddingLeft: 20 }}>
+                    <li>
+                      <strong>Visibility:</strong> Show or hide the target field
+                      based on conditions
+                    </li>
+                    <li>
+                      <strong>Disabled:</strong> Enable or disable the target
+                      field
+                    </li>
+                    <li>
+                      <strong>Readonly:</strong> Make the target field readonly
+                      or editable
+                    </li>
+                    <li>
+                      <strong>Value:</strong> Automatically calculate and set
+                      field value (async function supported)
+                    </li>
+                    <li>
+                      <strong>Options:</strong> Dynamically update
+                      dropdown/select options (async function supported)
+                    </li>
+                    <li>
+                      <strong>Schema:</strong> Dynamically change field schema
+                      (async function supported)
+                    </li>
+                  </ul>
+                </div>
+              }
+              placement="right"
+            >
+              <Icon
+                icon="info-sign"
+                size={12}
+                style={{
+                  display: 'block',
+                  color: '#5c7080',
+                }}
+              />
+            </Tooltip>
+          </span>
+        }
+      >
         <HTMLSelect
-          value={value?.type || 'visibility'}
-          onChange={e => handleTypeChange(e.target.value as LinkageType)}
+          value={value.type || 'visibility'}
+          onChange={(e) => handleTypeChange(e.target.value as LinkageType)}
           disabled={disabled}
           fill
         >
-          {linkageTypeOptions.map(opt => (
+          {linkageTypeOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>
@@ -198,18 +234,45 @@ export const LinkageEditor: React.FC<LinkageEditorProps> = ({
 
       {/* 依赖字段 */}
       <FormGroup
-        label="Dependencies"
-        helperText="Fields that this linkage depends on. Use JSON Pointer format (e.g., #/properties/fieldName) or relative path (e.g., ./fieldName)"
+        label={
+          <span style={{ display: 'flex', gap: '4px' }}>
+            Dependencies <span style={{ color: '#c23030' }}>*</span>{' '}
+            <Tooltip
+              content={
+                <div style={{ maxWidth: 300 }}>
+                  <p style={{ marginBottom: 8, fontWeight: 'bold' }}>
+                    Fields that this linkage depends on
+                  </p>
+                  <p style={{ margin: 0 }}>
+                    When any of these dependency fields change, the linkage will
+                    re-evaluate conditions and apply effects. Select at least
+                    one field that this linkage should watch for changes.
+                  </p>
+                </div>
+              }
+              placement="right"
+            >
+              <Icon
+                icon="info-sign"
+                size={12}
+                style={{
+                  display: 'block',
+                  color: '#5c7080',
+                }}
+              />
+            </Tooltip>
+          </span>
+        }
+        intent={errors.dependencies ? 'danger' : 'none'}
       >
-        {value?.dependencies.map((dep, index) => (
+        {value.dependencies.map((dep, index) => (
           <div key={index} className="dependency-item">
             <FieldPathSelector
               schema={schema}
               currentFieldPath={currentFieldPath}
               value={dep}
-              onChange={newValue => handleDependencyChange(index, newValue)}
+              onChange={(newValue) => handleDependencyChange(index, newValue)}
               disabled={disabled}
-              placeholder="#/properties/fieldName or ./fieldName"
             />
             <Button
               icon="trash"
@@ -220,6 +283,11 @@ export const LinkageEditor: React.FC<LinkageEditorProps> = ({
             />
           </div>
         ))}
+        {errors.dependencies && (
+          <div style={{ color: '#c23030', fontSize: 12, marginTop: 4 }}>
+            {errors.dependencies}
+          </div>
+        )}
         <Button
           text="Add Dependency"
           icon="add"
@@ -229,27 +297,52 @@ export const LinkageEditor: React.FC<LinkageEditorProps> = ({
         />
       </FormGroup>
 
-      {/* 提示信息 */}
-      <Callout intent="primary" icon="info-sign" style={{ marginTop: 10 }}>
-        <h5>Path Format Guide</h5>
-        <ul style={{ margin: '8px 0', paddingLeft: 20 }}>
-          <li>
-            <strong>Same level field:</strong> <Tag minimal>./fieldName</Tag>
-          </li>
-          <li>
-            <strong>Top level field:</strong> <Tag minimal>#/properties/fieldName</Tag>
-          </li>
-          <li>
-            <strong>Array element field:</strong>{' '}
-            <Tag minimal>#/properties/arrayName/items/properties/fieldName</Tag>
-          </li>
-        </ul>
-      </Callout>
-
       <Divider style={{ margin: '16px 0' }} />
 
       {/* 条件配置 */}
-      <FormGroup label="Condition (When)" helperText="Define when this linkage should be triggered">
+      <FormGroup
+        label={
+          <span style={{ display: 'flex', gap: '4px' }}>
+            Condition (When){' '}
+            <Tooltip
+              content={
+                <div style={{ maxWidth: 300 }}>
+                  <p style={{ marginBottom: 8, fontWeight: 'bold' }}>
+                    Define when this linkage should be triggered
+                  </p>
+                  <p style={{ margin: 0 }}>
+                    Set up conditions using dependency field values. When
+                    conditions are met, the "Fulfill" effect will be applied.
+                    When conditions are not met, the "Otherwise" effect will be
+                    applied (if configured).
+                  </p>
+                  <p
+                    style={{
+                      marginTop: 8,
+                      marginBottom: 0,
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    <strong>Default behavior:</strong> If no condition is set,
+                    the "Fulfill" effect will always be applied whenever
+                    dependency fields change.
+                  </p>
+                </div>
+              }
+              placement="right"
+            >
+              <Icon
+                icon="info-sign"
+                size={12}
+                style={{
+                  display: 'block',
+                  color: '#5c7080',
+                }}
+              />
+            </Tooltip>
+          </span>
+        }
+      >
         <ConditionEditor
           value={typeof value?.when === 'object' ? value.when : undefined}
           onChange={handleConditionChange}
@@ -263,23 +356,97 @@ export const LinkageEditor: React.FC<LinkageEditorProps> = ({
       <Divider style={{ margin: '16px 0' }} />
 
       {/* Fulfill 效果 */}
-      <FormGroup label="Effect (Fulfill)" helperText="What happens when the condition is met">
+      <FormGroup
+        label={
+          <span style={{ display: 'flex', gap: '4px' }}>
+            Effect (Fulfill) <span style={{ color: '#c23030' }}>*</span>{' '}
+            <Tooltip
+              content={
+                <div style={{ maxWidth: 300 }}>
+                  <p style={{ marginBottom: 8, fontWeight: 'bold' }}>
+                    What happens when the condition is met
+                  </p>
+                  <p style={{ margin: 0 }}>
+                    Define the action to take when conditions are satisfied (or
+                    immediately if no condition is set). For example: show the
+                    field, set a specific value, or load dynamic options.
+                  </p>
+                </div>
+              }
+              placement="right"
+            >
+              <Icon
+                icon="info-sign"
+                size={12}
+                style={{
+                  display: 'block',
+                  color: '#5c7080',
+                }}
+              />
+            </Tooltip>
+          </span>
+        }
+        intent={errors.fulfill ? 'danger' : 'none'}
+      >
         <EffectEditor
-          value={value?.fulfill}
+          value={value.fulfill}
           onChange={handleFulfillChange}
-          linkageType={value?.type || 'visibility'}
+          linkageType={value.type || 'visibility'}
           disabled={disabled}
           label="Fulfill Effect"
           isFulfill={true}
         />
+        {errors.fulfill && (
+          <div style={{ color: '#c23030', fontSize: 12, marginTop: 4 }}>
+            {errors.fulfill}
+          </div>
+        )}
       </FormGroup>
 
       <Divider style={{ margin: '16px 0' }} />
 
       {/* Otherwise 效果 */}
       <FormGroup
-        label="Effect (Otherwise)"
-        helperText="What happens when the condition is NOT met (optional)"
+        label={
+          <span style={{ display: 'flex', gap: '4px' }}>
+            Effect (Otherwise){' '}
+            <Tooltip
+              content={
+                <div style={{ maxWidth: 300 }}>
+                  <p style={{ marginBottom: 8, fontWeight: 'bold' }}>
+                    What happens when the condition is NOT met
+                  </p>
+                  <p style={{ margin: 0 }}>
+                    Define the alternative action when conditions are not
+                    satisfied. For example: hide the field, clear its value, or
+                    show different options.
+                  </p>
+                  <p
+                    style={{
+                      marginTop: 8,
+                      marginBottom: 0,
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    <strong>Optional:</strong> If not configured, no action will
+                    be taken when conditions fail. The field will maintain its
+                    current state.
+                  </p>
+                </div>
+              }
+              placement="right"
+            >
+              <Icon
+                icon="info-sign"
+                size={12}
+                style={{
+                  display: 'block',
+                  color: '#5c7080',
+                }}
+              />
+            </Tooltip>
+          </span>
+        }
       >
         <EffectEditor
           value={value?.otherwise}
@@ -295,23 +462,71 @@ export const LinkageEditor: React.FC<LinkageEditorProps> = ({
       {showEnableCacheOption && (
         <>
           <Divider style={{ margin: '16px 0' }} />
-          <FormGroup
-            label="Advanced Options"
-            helperText="Configure caching for async linkage operations"
-          >
+          <FormGroup label="Advanced Options">
             <Switch
-              label="Enable Cache"
-              checked={!!value?.enableCache}
-              onChange={e => handleEnableCacheChange(e.currentTarget.checked)}
+              style={{ display: 'flex', alignItems: 'center' }}
+              labelElement={
+                <span
+                  style={{ display: 'flex', gap: '4px', alignItems: 'center' }}
+                >
+                  Enable Cache{' '}
+                  <Tooltip
+                    content={
+                      <div style={{ maxWidth: 300 }}>
+                        <p style={{ marginBottom: 8, fontWeight: 'bold' }}>
+                          Configure caching for async linkage operations
+                        </p>
+                        <p style={{ margin: 0 }}>
+                          When enabled, results from async functions (Value,
+                          Options, Schema linkage types) will be cached based on
+                          input parameters. This avoids redundant requests when
+                          the same inputs produce the same outputs.
+                        </p>
+                        <p
+                          style={{
+                            marginTop: 8,
+                            marginBottom: 0,
+                            fontStyle: 'italic',
+                          }}
+                        >
+                          <strong>Recommendation:</strong> Enable this for
+                          stable data sources (like configuration APIs). Disable
+                          for frequently changing data.
+                        </p>
+                      </div>
+                    }
+                    placement="right"
+                  >
+                    <Icon
+                      icon="info-sign"
+                      size={12}
+                      style={{
+                        display: 'block',
+                        color: '#5c7080',
+                      }}
+                    />
+                  </Tooltip>
+                </span>
+              }
+              checked={!!value.enableCache}
+              onChange={(e) => handleEnableCacheChange(e.currentTarget.checked)}
               disabled={disabled}
             />
-            <p style={{ fontSize: 12, color: '#5c7080', marginTop: 4 }}>
-              When enabled, async results will be cached to avoid redundant requests with the same
-              parameters.
-            </p>
           </FormGroup>
         </>
       )}
+
+      {/* Save/Cancel 按钮 */}
+      <Divider style={{ margin: '16px 0' }} />
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <Button text="Cancel" onClick={onCancel} disabled={disabled} />
+        <Button
+          text="Save"
+          intent="primary"
+          onClick={handleSave}
+          disabled={disabled}
+        />
+      </div>
     </div>
-  );
-};
+  )
+}

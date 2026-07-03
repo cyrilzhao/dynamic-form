@@ -54,7 +54,10 @@ export interface LinkageEffect {
   // 直接指定 Schema（用于 schema 类型）
   schema?: any; // ExtendedJSONSchema
   // 通过函数计算（根据 linkage.type 决定计算结果的用途）
-  function?: string;
+  // 支持两种方式：
+  // 1. 函数名（从 callbacks 中查找）
+  // 2. 内联脚本对象
+  function?: string | { type: 'script'; code: string };
 }
 
 /**

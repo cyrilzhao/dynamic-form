@@ -1546,8 +1546,8 @@ A single field can have multiple linkage configs of the same type in its `linkag
 | `visibility` | **AND** — field is visible only if **all** configs resolve to `visible: true`       | Two visibility rules: both must pass for the field to show |
 | `disabled`   | **OR** — field is disabled if **any** config resolves to `disabled: true`           | Two disabled rules: either one disabling is enough         |
 | `readonly`   | **OR** — field is readonly if **any** config resolves to `readonly: true`           | Two readonly rules: either one is enough                   |
-| `value`      | **Last wins** — the last config (by array order) that produces a value takes effect | Useful for fallback chaining                               |
-| `options`    | **Last wins** — the last config (by array order) that produces options takes effect | Useful for fallback chaining                               |
+| `value`      | **Last wins** — the last config (by definition order) that produces a value takes effect | Useful for fallback chaining                               |
+| `options`    | **Last wins** — the last config (by definition order) that produces options takes effect | Useful for fallback chaining                               |
 | `schema`     | **Shallow merge** — later configs' schema properties override earlier ones          | `{ ...schema1, ...schema2 }`                               |
 
 **Example — `visibility` AND logic:**

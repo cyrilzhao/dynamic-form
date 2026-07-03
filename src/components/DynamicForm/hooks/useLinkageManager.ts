@@ -14,6 +14,9 @@ import { LinkageTaskQueue } from '../utils/linkageTaskQueue'
 import { LinkageResultCache } from '../utils/linkageResultCache'
 import { generateCacheKey } from '../utils/generateCacheKey'
 
+// 用于执行动态脚本
+const DynamicFn = globalThis['Function'] as FunctionConstructor // trusted-dynamic-code
+
 /**
  * 异步结果过期错误
  * 当异步联动函数的结果因为新的计算而过期时抛出
@@ -661,7 +664,7 @@ async function evaluateLinkagesByLayers({
                   mergedResult.options = linkageResult.options
                 }
               } else if (linkageType === 'schema') {
-                // schema: 深度合并（后者覆盖前者的属性）
+                // schema: 浅层合并（后者覆盖前者的属性）
                 if (linkageResult.schema !== undefined) {
                   mergedResult.schema = mergedResult.schema
                     ? { ...mergedResult.schema, ...linkageResult.schema }
@@ -784,7 +787,36 @@ async function evaluateLinkage({
 
   // 2. 应用函数计算
   if (effect.function) {
-    const fn = linkageFunctions[effect.function]
+    let fn: LinkageFunction | undefined
+
+    // 判断是函数名还是内联脚本
+    if (typeof effect.function === 'string') {
+      // 函数名：从 linkageFunctions 中查找
+      fn = linkageFunctions[effect.function]
+      if (!fn) {
+        // if (process.env.NODE_ENV !== 'production') {
+        //   console.warn('[evaluateLinkage] 联动函数未找到:', {
+        //     fieldPath,
+        //     functionName: effect.function,
+        //     availableFunctions: Object.keys(linkageFunctions),
+        //   });
+        // }
+      }
+    } else if (effect.function.type === 'script' && effect.function.code.trim()) {
+      // 内联脚本：使用 DynamicFn 执行
+      try {
+        fn = DynamicFn(`return (${effect.function.code})`)() as LinkageFunction
+      } catch (e) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('[evaluateLinkage] 脚本执行错误:', {
+            fieldPath,
+            error: (e as Error).message,
+            code: effect.function.code,
+          })
+        }
+      }
+    }
+
     if (fn) {
       // 使用 fieldPath:type 作为序列号键。
       // 同一字段的不同联动类型（options、value、schema 等）在 evaluateLinkagesByLayers 中
