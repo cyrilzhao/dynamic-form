@@ -73,6 +73,7 @@ const groups = [
   {
     label: '联动',
     items: [
+      { id: 'schema-linkage', label: 'Schema 联动', component: namedLazy(() => import('./examples/SchemaLinkageExample'), 'SchemaLinkageExample') },
       { id: 'category-action', label: 'Category-Action', component: namedLazy(() => import('./examples/CategoryActionExample'), 'CategoryActionExample') },
       { id: 'multiple-linkages', label: '多联动', component: namedLazy(() => import('./examples/MultipleLinkagesExample'), 'MultipleLinkagesExample') },
       { id: 'refresh-linkage', label: '刷新联动', component: namedLazy(() => import('./examples/RefreshLinkageExample'), 'RefreshLinkageExample') },

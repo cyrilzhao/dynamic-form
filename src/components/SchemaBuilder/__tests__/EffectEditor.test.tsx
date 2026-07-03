@@ -106,7 +106,7 @@ describe('EffectEditor', () => {
   })
 
   describe('value 类型', () => {
-    it('应该显示函数名和固定值输入框', () => {
+    it('应该显示配置模式选择器', () => {
       render(
         <EffectEditor
           {...defaultProps}
@@ -115,13 +115,12 @@ describe('EffectEditor', () => {
         />
       )
 
-      expect(screen.getByText('Function Name')).toBeInTheDocument()
-      expect(screen.getByText('Or Fixed Value')).toBeInTheDocument()
+      expect(screen.getByText('Configuration Mode')).toBeInTheDocument()
     })
   })
 
   describe('options 类型', () => {
-    it('应该显示函数名和静态选项配置', () => {
+    it('应该显示配置模式选择器', () => {
       render(
         <EffectEditor
           {...defaultProps}
@@ -130,13 +129,12 @@ describe('EffectEditor', () => {
         />
       )
 
-      expect(screen.getByText('Function Name')).toBeInTheDocument()
-      expect(screen.getByText('Or Static Options')).toBeInTheDocument()
+      expect(screen.getByText('Configuration Mode')).toBeInTheDocument()
     })
   })
 
   describe('schema 类型', () => {
-    it('应该显示函数名和静态 Schema 配置', () => {
+    it('应该显示配置模式选择器', () => {
       render(
         <EffectEditor
           {...defaultProps}
@@ -145,8 +143,7 @@ describe('EffectEditor', () => {
         />
       )
 
-      expect(screen.getByText('Function Name')).toBeInTheDocument()
-      expect(screen.getByText('Or Static Schema')).toBeInTheDocument()
+      expect(screen.getByText('Configuration Mode')).toBeInTheDocument()
     })
   })
 
@@ -212,8 +209,8 @@ describe('EffectEditor', () => {
 
       fireEvent.click(screen.getByText('Add Test Effect'))
 
+      // 组件默认创建 static 模式的效果（只有 value，没有 function）
       expect(onChange).toHaveBeenCalledWith({
-        function: '',
         value: '',
       })
     })
@@ -232,8 +229,8 @@ describe('EffectEditor', () => {
 
       fireEvent.click(screen.getByText('Add Test Effect'))
 
+      // 组件默认创建 static 模式的效果（只有 options，没有 function）
       expect(onChange).toHaveBeenCalledWith({
-        function: '',
         options: [],
       })
     })
@@ -252,8 +249,8 @@ describe('EffectEditor', () => {
 
       fireEvent.click(screen.getByText('Add Test Effect'))
 
+      // 组件默认创建 static 模式的效果（只有 schema，没有 function）
       expect(onChange).toHaveBeenCalledWith({
-        function: '',
         schema: {},
       })
     })
@@ -317,12 +314,14 @@ describe('EffectEditor', () => {
           {...defaultProps}
           linkageType="value"
           onChange={onChange}
-          value={{ function: '', value: '' }}
+          value={{ value: '50' }}  // Static 模式：只有 value，没有 function
         />
       )
 
+      // 在 Static 模式下查找 value 输入框
       const inputs = screen.getAllByRole('textbox')
-      fireEvent.change(inputs[1], { target: { value: '100' } })
+      // Static 模式下只有一个 value 输入框
+      fireEvent.change(inputs[0], { target: { value: '100' } })
 
       expect(onChange).toHaveBeenCalled()
     })

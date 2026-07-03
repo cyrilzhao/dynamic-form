@@ -48,7 +48,7 @@ describe('createSchemaResolver', () => {
   it('hidden 字段的校验错误被过滤掉', async () => {
     const ref = createRef<Record<string, { visible?: boolean; disabled?: boolean }>>();
     (ref as any).current = { email: { visible: false } };
-    const resolver = createSchemaResolver(schema, ref);
+    const resolver = createSchemaResolver(schema, {}, ref);
     const result = await resolver({ name: 'Alice', email: '' }, undefined, {} as any);
     expect((result.errors as any).email).toBeUndefined();
     expect(result.errors).toEqual({});
@@ -57,7 +57,7 @@ describe('createSchemaResolver', () => {
   it('disabled 字段的校验错误被过滤掉', async () => {
     const ref = createRef<Record<string, { visible?: boolean; disabled?: boolean }>>();
     (ref as any).current = { email: { disabled: true } };
-    const resolver = createSchemaResolver(schema, ref);
+    const resolver = createSchemaResolver(schema, {}, ref);
     const result = await resolver({ name: 'Alice', email: '' }, undefined, {} as any);
     expect((result.errors as any).email).toBeUndefined();
   });
@@ -65,7 +65,7 @@ describe('createSchemaResolver', () => {
   it('visible=true 的字段不被过滤', async () => {
     const ref = createRef<Record<string, { visible?: boolean; disabled?: boolean }>>();
     (ref as any).current = { email: { visible: true } };
-    const resolver = createSchemaResolver(schema, ref);
+    const resolver = createSchemaResolver(schema, {}, ref);
     const result = await resolver({ name: 'Alice', email: '' }, undefined, {} as any);
     expect((result.errors as any).email?.message).toBe('Email is required');
   });
@@ -83,7 +83,7 @@ describe('createSchemaResolver', () => {
     };
     const ref = createRef<Record<string, { visible?: boolean; disabled?: boolean }>>();
     (ref as any).current = { address: { visible: false } };
-    const resolver = createSchemaResolver(nestedSchema, ref);
+    const resolver = createSchemaResolver(nestedSchema, {}, ref);
     const result = await resolver({ address: {} }, undefined, {} as any);
     expect((result.errors as any).address?.city).toBeUndefined();
   });
@@ -104,7 +104,7 @@ describe('createSchemaResolver', () => {
     };
     const ref = createRef<Record<string, { visible?: boolean; disabled?: boolean }>>();
     (ref as any).current = { items: { visible: false } };
-    const resolver = createSchemaResolver(arraySchema, ref);
+    const resolver = createSchemaResolver(arraySchema, {}, ref);
     const result = await resolver({ items: [{}] }, undefined, {} as any);
     expect((result.errors as any).items).toBeUndefined();
   });

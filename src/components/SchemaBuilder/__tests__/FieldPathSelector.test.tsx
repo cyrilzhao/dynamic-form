@@ -30,7 +30,8 @@ describe('FieldPathSelector', () => {
     it('应该显示当前选中的值', () => {
       render(<FieldPathSelector {...defaultProps} value="#/properties/age" />)
 
-      expect(screen.getByRole('textbox')).toHaveValue('#/properties/age')
+      // 组件显示的是字段的友好名称（title），而不是原始路径
+      expect(screen.getByRole('textbox')).toHaveValue('Age')
     })
 
     it('应该显示 placeholder', () => {

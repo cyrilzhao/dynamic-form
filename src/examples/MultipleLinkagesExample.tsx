@@ -98,7 +98,9 @@ const schema: ExtendedJSONSchema = {
       ui: {
         widget: 'textarea',
         placeholder: 'Optional description',
-        rows: 3,
+        widgetProps: {
+          rows: 3,
+        },
       },
     },
   },
