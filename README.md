@@ -1798,16 +1798,42 @@ Use `ui.transform` when a field needs to accept input in one domain (e.g. percen
 
 **Configuration:**
 
+The `callback` and `reverseCallback` support two forms:
+
+**Form 1: Function name reference** (recommended for reusability)
 ```typescript
 ui: {
   transform: {
-    callback: string          // required — function name from the `callbacks` registry
+    callback: string          // function name from the `callbacks` registry
                               // signature: (inputValue: any) => storedValue
-    reverseCallback?: string  // optional — reverse function name
+    reverseCallback?: string  // reverse function name
                               // signature: (storedValue: any) => inputValue
   }
 }
 ```
+
+**Form 2: Inline JavaScript code** (for simple one-off transforms)
+```typescript
+ui: {
+  transform: {
+    callback: {
+      type: 'script',
+      code: string            // JavaScript expression, e.g. 'return value / 100'
+                              // receives `value` parameter, must return transformed value
+    },
+    reverseCallback?: {
+      type: 'script',
+      code: string            // JavaScript expression for reverse transform
+    }
+  }
+}
+```
+
+**Which form to use:**
+- Use **function name reference** when the transform logic is reused across multiple fields, or requires external dependencies
+- Use **inline JavaScript** for simple, self-contained transforms that are field-specific
+
+⚠️ **Security note**: Inline JavaScript uses `Function` constructor and should only be used with trusted code sources. Never accept inline scripts from untrusted user input.
 
 **When to provide `reverseCallback`:**
 
@@ -1861,6 +1887,45 @@ const schema: ExtendedJSONSchema = {
     percentToDecimal: (val: number) => val / 100,
     decimalToPercent: (val: number) => val * 100,
   }}
+  onSubmit={(data) => {
+    console.log(data.rate); // 0.96 — stored domain
+  }}
+/>
+```
+
+**Alternative: Using inline JavaScript** (for field-specific transforms)
+
+```typescript
+const schema: ExtendedJSONSchema = {
+  type: 'object',
+  properties: {
+    rate: {
+      type: 'number',
+      title: 'Interest Rate',
+      default: 50,
+      maximum: 100,
+      ui: {
+        widget: 'number',
+        placeholder: 'Enter percentage, e.g. 96',
+        transform: {
+          // Inline JavaScript code - no callbacks registry needed
+          callback: {
+            type: 'script',
+            code: 'return value / 100',  // value parameter is automatically provided
+          },
+          reverseCallback: {
+            type: 'script',
+            code: 'return value * 100',
+          },
+        },
+      },
+    },
+  },
+};
+
+<DynamicForm
+  schema={schema}
+  // No callbacks prop needed for inline transforms
   onSubmit={(data) => {
     console.log(data.rate); // 0.96 — stored domain
   }}
