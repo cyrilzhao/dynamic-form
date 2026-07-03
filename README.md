@@ -1398,7 +1398,7 @@ When options change, DynamicForm automatically clears the field value if it's no
 
 **6. schema** - Dynamic schema switching
 
-> **Constraint**: `schema` linkage is only supported on fields of `type: 'object'` that are rendered via the `NestedFormWidget` (i.e., non-root nested object fields). It has no effect on primitive fields, array fields, or the root schema.
+> **Note**: Schema linkage works on all field types (string, number, boolean, object, array). It allows you to dynamically change validation rules, UI configuration, or the entire schema structure based on other field values.
 
 Dynamically change nested form structure based on field values:
 
@@ -1535,6 +1535,134 @@ When `userType = 'company'`, the equivalent structure is:
 
 // When userType = 'company':
 { userType: 'company', details: { companyName: 'Acme Inc', taxId: '123456789' } }
+```
+
+**Schema Linkage for Primitive Fields:**
+
+Schema linkage also works on primitive field types (string, number, boolean) to dynamically change validation rules or UI configuration.
+
+**Example 1 — Dynamic validation rules:**
+
+```typescript
+// Change validation pattern based on document type
+const schema = {
+  type: 'object',
+  properties: {
+    documentType: {
+      type: 'string',
+      title: 'Document Type',
+      enum: ['passport', 'id_card', 'license'],
+      enumNames: ['Passport', 'ID Card', 'Driver License'],
+    },
+    documentNumber: {
+      type: 'string',
+      title: 'Document Number',
+      ui: {
+        linkages: [
+          {
+            type: 'schema',
+            dependencies: ['#/properties/documentType'],
+            fulfill: { function: 'getDocumentValidation' },
+          },
+        ],
+      },
+    },
+  },
+};
+
+const linkageFunctions = {
+  getDocumentValidation: (context: any) => {
+    const { documentType } = context.formData;
+    
+    // Return different validation rules based on document type
+    if (documentType === 'passport') {
+      return {
+        pattern: '^[A-Z]{2}[0-9]{7}$',
+        minLength: 9,
+        maxLength: 9,
+        ui: { placeholder: 'e.g., AB1234567' },
+      };
+    }
+    
+    if (documentType === 'id_card') {
+      return {
+        pattern: '^[0-9]{9}$',
+        minLength: 9,
+        maxLength: 9,
+        ui: { placeholder: 'e.g., 123456789' },
+      };
+    }
+    
+    if (documentType === 'license') {
+      return {
+        pattern: '^[A-Z]{1}[0-9]{8}$',
+        minLength: 9,
+        maxLength: 9,
+        ui: { placeholder: 'e.g., D12345678' },
+      };
+    }
+    
+    return {};
+  },
+};
+```
+
+**Example 2 — Dynamic widget:**
+
+```typescript
+// Change widget based on input type
+const schema = {
+  type: 'object',
+  properties: {
+    inputType: {
+      type: 'string',
+      title: 'Input Type',
+      enum: ['short', 'long', 'formatted'],
+      enumNames: ['Short Text', 'Long Text', 'Formatted Text'],
+    },
+    content: {
+      type: 'string',
+      title: 'Content',
+      ui: {
+        linkages: [
+          {
+            type: 'schema',
+            dependencies: ['#/properties/inputType'],
+            fulfill: { function: 'getContentWidget' },
+          },
+        ],
+      },
+    },
+  },
+};
+
+const linkageFunctions = {
+  getContentWidget: (context: any) => {
+    const { inputType } = context.formData;
+    
+    if (inputType === 'short') {
+      return {
+        ui: { widget: 'input', placeholder: 'Enter short text' },
+        maxLength: 100,
+      };
+    }
+    
+    if (inputType === 'long') {
+      return {
+        ui: { widget: 'textarea', placeholder: 'Enter long text' },
+        maxLength: 1000,
+      };
+    }
+    
+    if (inputType === 'formatted') {
+      return {
+        ui: { widget: 'markdown', placeholder: 'Enter markdown text' },
+      };
+    }
+    
+    return {};
+  },
+};
 ```
 
 #### Multiple Linkages of the Same Type

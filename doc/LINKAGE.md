@@ -1244,7 +1244,7 @@ const renderFields = () => {
 | `disabled` | `FormField` props | 传入 `disabled` prop |
 | `readonly` | `FormField` props | 传入 `readonly` prop |
 | `options` | `DynamicForm.tsx` 渲染阶段 | 覆盖 `field.options`，再传入 `FormField` |
-| `schema` | `FormField` → Widget | 通过 `linkageState` prop 传递给 Widget（如 `NestedFormWidget`） |
+| `schema` | `DynamicForm.tsx` 渲染阶段 | 在渲染字段前合并到 `fieldSchema`，支持所有字段类型 |
 
 **关键设计原则**：`value` 联动的表单写入**只发生在 `useLinkageManager` 中**，`FormField` 不应主动调用 `setValue`。
 
@@ -1259,6 +1259,200 @@ useLinkageManager 计算完成
   → setValue('field', value)        ← 再次写入（无保护）
   → watch 触发 → 重新入队 → 重新计算 → 死循环
 ```
+
+#### 6.8.1 Schema 联动的统一处理机制
+
+**设计目标**：
+
+Schema 联动应该支持所有类型的字段（string、number、boolean、object、array 等），而不仅限于 object 类型的嵌套字段。这样可以实现：
+
+- 动态改变字段的校验规则（pattern、format、minLength、maximum 等）
+- 动态改变字段的 UI 配置（widget、placeholder、errorMessages 等）
+- 动态改变字段的元信息（title、description）
+
+**核心思路**：
+
+在 DynamicForm 渲染字段之前，统一检查并合并 schema 联动结果，使所有类型的字段都能受益：
+
+```typescript
+// 伪代码示意
+const renderField = (fieldName: string, fieldSchema: ExtendedJSONSchema) => {
+  // 1. 获取联动 schema
+  const linkageSchema = linkageStates[fieldName]?.schema;
+  
+  // 2. 如果存在，合并到字段 schema
+  const effectiveSchema = linkageSchema 
+    ? mergeSchemaWithLinkage(fieldSchema, linkageSchema)
+    : fieldSchema;
+  
+  // 3. 使用合并后的 schema 渲染字段
+  return <FieldComponent schema={effectiveSchema} ... />;
+};
+```
+
+**合并策略**：
+
+`mergeSchemaWithLinkage` 函数负责将联动 schema 合并到原始 schema，遵循以下规则：
+
+1. **校验属性**：联动覆盖原始（pattern、format、min/max、enum、required、dependencies、if/then/else、allOf/anyOf/oneOf 等）
+2. **UI 配置**：浅层合并，联动覆盖原始的同名属性，但保留原始的 `ui.linkages`
+3. **元信息**：联动覆盖原始（title、description）
+4. **类型**：保持原始（不允许动态改变字段类型，避免类型不一致）
+5. **Object 特殊处理**：对于 type='object' 的字段，联动 schema 的 properties 会完全替换原始 properties
+
+**实现示例**：
+
+```typescript
+function mergeSchemaWithLinkage(
+  originalSchema: ExtendedJSONSchema,
+  linkageSchema: Partial<ExtendedJSONSchema>
+): ExtendedJSONSchema {
+  const validationProps = [
+    'pattern', 'format', 
+    'minLength', 'maxLength',
+    'minimum', 'maximum',
+    'exclusiveMinimum', 'exclusiveMaximum',
+    'multipleOf',
+    'enum', 'enumNames', 'const',
+    'minItems', 'maxItems', 'uniqueItems',
+    'minProperties', 'maxProperties',
+    'required',
+    'allOf', 'anyOf', 'oneOf', 'not',
+    'if', 'then', 'else',
+    'dependencies'
+  ];
+  
+  const merged: ExtendedJSONSchema = { ...originalSchema };
+  
+  // 1. 覆盖校验属性
+  validationProps.forEach(prop => {
+    if (prop in linkageSchema) {
+      merged[prop] = linkageSchema[prop];
+    }
+  });
+  
+  // 2. 覆盖元信息
+  if (linkageSchema.title !== undefined) {
+    merged.title = linkageSchema.title;
+  }
+  if (linkageSchema.description !== undefined) {
+    merged.description = linkageSchema.description;
+  }
+  
+  // 3. 合并 ui 配置（保留原始的 linkages）
+  if (linkageSchema.ui) {
+    const originalLinkages = originalSchema.ui?.linkages;
+    merged.ui = {
+      ...originalSchema.ui,
+      ...linkageSchema.ui,
+      linkages: originalLinkages
+    };
+  }
+  
+  // 4. 对于 object 类型，替换 properties
+  if (originalSchema.type === 'object' && linkageSchema.properties) {
+    merged.properties = linkageSchema.properties;
+  }
+  
+  return merged;
+}
+```
+
+**应用场景示例**：
+
+场景 1：根据输入类型动态改变校验规则
+
+```typescript
+{
+  inputType: {
+    type: 'string',
+    enum: ['phone', 'email', 'url']
+  },
+  inputValue: {
+    type: 'string',
+    title: 'Input Value',
+    ui: {
+      linkages: [{
+        type: 'schema',
+        dependencies: ['#/properties/inputType'],
+        fulfill: { function: 'getInputSchema' }
+      }]
+    }
+  }
+}
+
+// 联动函数
+const getInputSchema = (formData) => {
+  switch (formData.inputType) {
+    case 'phone':
+      return { 
+        pattern: '^\\d{11}$',
+        ui: { 
+          placeholder: 'Enter 11-digit phone number',
+          errorMessages: { pattern: 'Invalid phone format' }
+        }
+      };
+    case 'email':
+      return { 
+        format: 'email',
+        ui: { placeholder: 'Enter email address' }
+      };
+    case 'url':
+      return { 
+        format: 'uri',
+        ui: { placeholder: 'Enter URL' }
+      };
+  }
+};
+```
+
+场景 2：动态改变字段 widget 和相关配置
+
+```typescript
+{
+  fieldMode: {
+    type: 'string',
+    enum: ['normal', 'password', 'textarea']
+  },
+  fieldValue: {
+    type: 'string',
+    title: 'Field Value',
+    ui: {
+      linkages: [{
+        type: 'schema',
+        dependencies: ['#/properties/fieldMode'],
+        fulfill: { function: 'getFieldUI' }
+      }]
+    }
+  }
+}
+
+// 联动函数
+const getFieldUI = (formData) => {
+  return {
+    ui: {
+      widget: formData.fieldMode,
+      placeholder: `Enter text in ${formData.fieldMode} mode`
+    }
+  };
+};
+```
+
+**与 NestedFormWidget 的关系**：
+
+在统一处理机制下，NestedFormWidget 被简化：
+
+- **移除**：所有 schema 联动相关的状态管理（currentSchema、linkageSchema）
+- **移除**：从 linkageStateContext 读取和处理 schema 的逻辑
+- **保留**：嵌套表单渲染逻辑和默认值提取逻辑
+- **结果**：NestedFormWidget 只负责渲染嵌套表单，schema 联动由 DynamicForm 统一处理后传入
+
+**架构优势**：
+
+1. **统一性**：所有类型字段的 schema 联动在同一位置处理
+2. **扩展性**：原始类型字段自动获得 schema 联动支持，无需修改各个 widget
+3. **简洁性**：NestedFormWidget 代码大幅简化，职责更清晰
+4. **可维护性**：联动逻辑集中，易于理解和修改
 
 ### 6.9 异步函数支持
 

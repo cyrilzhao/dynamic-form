@@ -2,6 +2,7 @@ import type { Resolver, FieldErrors } from 'react-hook-form';
 import type { RefObject } from 'react';
 import { SchemaValidator } from '../core/SchemaValidator';
 import { runAllFieldValidators } from './runFieldValidators';
+import { mergeSchemaWithLinkage } from './mergeSchemaWithLinkage';
 import type { ExtendedJSONSchema } from '../types/schema';
 
 /**
@@ -83,10 +84,39 @@ function isHiddenOrDisabled(
 export function createSchemaResolver(
   schema: ExtendedJSONSchema,
   callbacks: Record<string, (...args: any[]) => any> = {},
-  linkageStatesRef?: RefObject<Record<string, { visible?: boolean; disabled?: boolean }>>
+  linkageStatesRef?: RefObject<Record<string, { visible?: boolean; disabled?: boolean; schema?: Partial<ExtendedJSONSchema> }>>
 ): Resolver {
   return async (values) => {
-    const validator = new SchemaValidator(schema);
+    const linkageStates = linkageStatesRef?.current ?? {};
+
+    // 构建应用了 schema 联动的动态 schema
+    let effectiveSchema = schema;
+
+    // 如果有 schema 联动，需要构建合并后的 schema
+    const hasSchemaLinkage = Object.values(linkageStates).some(state => state.schema);
+
+    if (hasSchemaLinkage && schema.properties) {
+      // 深拷贝 schema，避免修改原始 schema
+      effectiveSchema = {
+        ...schema,
+        properties: { ...schema.properties },
+      };
+
+      // 对每个字段应用 schema 联动
+      for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
+        const linkageState = linkageStates[fieldName];
+        if (linkageState?.schema) {
+          // 合并原始 schema 和联动 schema
+          effectiveSchema.properties![fieldName] = mergeSchemaWithLinkage(
+            fieldSchema as ExtendedJSONSchema,
+            linkageState.schema
+          );
+        }
+      }
+    }
+
+    // 使用合并后的 schema 进行验证
+    const validator = new SchemaValidator(effectiveSchema);
     const schemaErrors = validator.validate(values);
     const fieldValidatorErrors = await runAllFieldValidators(values, schema, callbacks);
     const errors = { ...schemaErrors, ...fieldValidatorErrors };
@@ -95,7 +125,6 @@ export function createSchemaResolver(
       return { values, errors: {} };
     }
 
-    const linkageStates = linkageStatesRef?.current ?? {};
     const fieldErrors: FieldErrors = {};
     for (const [field, message] of Object.entries(errors)) {
       if (isHiddenOrDisabled(field, linkageStates, schema)) continue;

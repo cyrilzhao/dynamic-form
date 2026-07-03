@@ -45,6 +45,7 @@ import {
 } from './utils/extractSchemaDefaults'
 import { createSchemaResolver } from './utils/createSchemaResolver'
 import { resolveTransformFn } from './utils/resolveTransformFn'
+import { mergeSchemaWithLinkage } from './utils/mergeSchemaWithLinkage'
 import '@blueprintjs/core/lib/css/blueprint.css'
 
 // 空对象常量，避免每次渲染创建新对象
@@ -793,10 +794,19 @@ const DynamicFormInner = React.memo(
                 return null
               }
 
+              // 如果存在 schema 联动，合并到字段 schema
+              let effectiveField = field
+              if (linkageState?.schema) {
+                effectiveField = {
+                  ...field,
+                  schema: mergeSchemaWithLinkage(field.schema, linkageState.schema),
+                }
+              }
+
               return (
                 <FormField
                   key={field.name}
-                  field={field}
+                  field={effectiveField}
                   disabled={
                     disabled ||
                     field.disabled ||

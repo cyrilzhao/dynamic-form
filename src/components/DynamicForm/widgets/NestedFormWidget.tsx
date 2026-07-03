@@ -1,4 +1,4 @@
-import { forwardRef, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { forwardRef, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Card } from '@blueprintjs/core';
 import { DynamicForm } from '../DynamicForm';
@@ -6,7 +6,6 @@ import type { FieldWidgetProps } from '../types';
 import type { ExtendedJSONSchema } from '../types/schema';
 import { useNestedSchemaRegistry } from '../context/NestedSchemaContext';
 import { usePathPrefix, joinPath } from '../context/PathPrefixContext';
-import { useLinkageStateContext } from '../context/LinkageStateContext';
 import { extractSchemaDefaults, mergeDefaults } from '../utils/extractSchemaDefaults';
 
 export interface NestedFormWidgetProps extends FieldWidgetProps {
@@ -31,7 +30,6 @@ export interface NestedFormWidgetProps extends FieldWidgetProps {
 
 export const NestedFormWidget = forwardRef<HTMLDivElement, NestedFormWidgetProps>(
   ({ name, schema, disabled, readonly, layout, labelWidth, noCard = false }, ref) => {
-    const [currentSchema, setCurrentSchema] = useState<ExtendedJSONSchema>(schema);
     // 获取外层表单的 context，用于在动态 schema 变化时设置默认值
     const parentFormContext = useFormContext();
 
@@ -43,91 +41,30 @@ export const NestedFormWidget = forwardRef<HTMLDivElement, NestedFormWidgetProps
     // 获取嵌套 schema 注册表
     const nestedSchemaRegistry = useNestedSchemaRegistry();
 
-    // 获取联动状态 Context
-    const linkageStateContext = useLinkageStateContext();
-
-    // 保存当前的 schema key 值，用于检测切换
-    // const previousKeyRef = useRef<string | undefined>();
-
-    // 保存上次的 value 序列化值，用于检测 value 是否真正变化
-    // const previousValueRef = useRef<string>('');
-
-    // 注册当前 schema 到 Context（当 currentSchema 变化时更新）
+    // 注册当前 schema 到 Context（当 schema 变化时更新）
     useEffect(() => {
-      nestedSchemaRegistry.register(fullPath, currentSchema);
+      nestedSchemaRegistry.register(fullPath, schema);
 
       return () => {
         nestedSchemaRegistry.unregister(fullPath);
       };
-    }, [fullPath, currentSchema, nestedSchemaRegistry]);
+    }, [fullPath, schema, nestedSchemaRegistry]);
 
-    // 获取当前字段的联动 schema（用于依赖追踪）
-    const linkageSchema = linkageStateContext?.parentLinkageStates[fullPath]?.schema;
-
-    // 保存上一次的 schema prop 引用，用于检测变化
+    // 保存上一次的 schema 引用，用于检测变化
     const prevSchemaRef = useRef<ExtendedJSONSchema>(schema);
 
-    // 同步 schema prop 到 currentSchema 状态
-    // 当父组件传入新的 schema prop 时（例如父级 schema 联动导致子级 schema 变化），
-    // 需要更新 currentSchema 状态以触发重新渲染
+    // 当 schema 变化时，提取并应用新 schema 的默认值
+    // 这解决了动态加载 schema（如 schema 联动）后，新 schema 中的 default 值未被应用的问题
     useEffect(() => {
-      // 如果有联动 schema，优先使用联动 schema（由下面的 useEffect 处理）
-      if (linkageSchema) {
-        prevSchemaRef.current = schema;
+      // 只在 schema 真正变化时处理（不是初始化）
+      if (schema === prevSchemaRef.current) {
         return;
       }
 
-      // 比较 schema 引用是否变化
-      if (schema !== prevSchemaRef.current) {
-        prevSchemaRef.current = schema;
-        setCurrentSchema(schema);
-      }
-    }, [schema, linkageSchema, fullPath]);
-
-    // 处理 schema 联动（新的联动系统）
-    useEffect(() => {
-      // 如果没有联动 schema，不需要更新
-      if (!linkageSchema) return;
-
-      // 选择性合并 schema，只更新 properties 和校验相关字段
-      // 保留原有的 ui 配置（包括 ui.linkage）
-      setCurrentSchema(prevSchema => ({
-        ...prevSchema,
-        // 更新 properties
-        properties: linkageSchema.properties || prevSchema.properties,
-        // 更新校验相关字段
-        required: linkageSchema.required,
-        minProperties: linkageSchema.minProperties,
-        maxProperties: linkageSchema.maxProperties,
-        dependencies: linkageSchema.dependencies,
-        if: linkageSchema.if,
-        then: linkageSchema.then,
-        else: linkageSchema.else,
-        allOf: linkageSchema.allOf,
-        anyOf: linkageSchema.anyOf,
-        oneOf: linkageSchema.oneOf,
-        not: linkageSchema.not,
-        // 保留原有的 ui 配置
-        ui: prevSchema.ui,
-      }));
-    }, [linkageSchema]);
-
-    // 保存上一次的联动 schema 引用，用于检测变化
-    const prevLinkageSchemaRef = useRef<ExtendedJSONSchema | undefined>(undefined);
-
-    // 当动态 schema 变化时，提取并应用新 schema 的默认值
-    // 这解决了异步加载 schema 后，新 schema 中的 default 值未被应用的问题
-    useEffect(() => {
-      // 只在 linkageSchema 真正变化时处理（不是初始化）
-      if (!linkageSchema || linkageSchema === prevLinkageSchemaRef.current) {
-        prevLinkageSchemaRef.current = linkageSchema;
-        return;
-      }
-
-      prevLinkageSchemaRef.current = linkageSchema;
+      prevSchemaRef.current = schema;
 
       // 提取新 schema 的默认值
-      const newDefaults = extractSchemaDefaults(linkageSchema);
+      const newDefaults = extractSchemaDefaults(schema);
 
       // 如果没有默认值，不需要更新
       if (Object.keys(newDefaults).length === 0) {
@@ -153,19 +90,19 @@ export const NestedFormWidget = forwardRef<HTMLDivElement, NestedFormWidgetProps
           shouldDirty: false,
         });
       }
-    }, [linkageSchema, fullPath, parentFormContext]);
+    }, [schema, fullPath, parentFormContext]);
 
     // ✅ 使用 useCallback 缓存 onSubmit 函数，避免每次渲染都创建新函数
     const handleSubmit = useCallback(() => {}, []);
 
-    if (!currentSchema || !currentSchema.properties) {
+    if (!schema || !schema.properties) {
       return null;
     }
 
     // 内部表单内容
     const formContent = (
       <DynamicForm
-        schema={currentSchema}
+        schema={schema}
         disabled={disabled}
         readonly={readonly}
         layout={layout}
