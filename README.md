@@ -1156,6 +1156,8 @@ When options change, DynamicForm automatically clears the field value if it's no
 
 **6. schema** - Dynamic schema switching
 
+> **Constraint**: `schema` linkage is only supported on fields of `type: 'object'` that are rendered via the `NestedFormWidget` (i.e., non-root nested object fields). It has no effect on primitive fields, array fields, or the root schema.
+
 Dynamically change nested form structure based on field values:
 
 ```typescript
@@ -1205,6 +1207,186 @@ const linkageFunctions = {
     return userSchemas[formData.userType] || { type: 'object', properties: {} };
   }
 };
+```
+
+**Effective Schema After Linkage:**
+
+The `schema` linkage performs a **selective merge** — it only replaces `properties` and validation-related fields (`required`, `if/then/else`, `allOf`, etc.) from the dynamic schema. The original field's `title`, `type`, and `ui` configuration (including `linkages`) are always preserved.
+
+When `userType = 'personal'`, the effective schema for `details` becomes:
+
+```typescript
+// Effective structure when userType = 'personal'
+{
+  type: 'object',
+  properties: {
+    userType: {
+      type: 'string',
+      title: 'User Type',
+      enum: ['personal', 'company'],
+      enumNames: ['Personal', 'Company']
+    },
+    details: {
+      type: 'object',
+      title: 'Details',           // preserved from original schema
+      ui: {                        // preserved from original schema
+        widget: 'nested-form',
+        linkages: [{ type: 'schema', dependencies: ['userType'], fulfill: { function: 'loadUserSchema' } }]
+      },
+      // replaced by userSchemas.personal:
+      properties: {
+        firstName: { type: 'string', title: 'First Name' },
+        lastName: { type: 'string', title: 'Last Name' }
+      }
+    }
+  }
+}
+```
+
+When `userType = 'company'`, the equivalent structure is:
+
+```typescript
+// Effective structure when userType = 'company'
+{
+  type: 'object',
+  properties: {
+    userType: {
+      type: 'string',
+      title: 'User Type',
+      enum: ['personal', 'company'],
+      enumNames: ['Personal', 'Company']
+    },
+    details: {
+      type: 'object',
+      title: 'Details',           // preserved from original schema
+      ui: {                        // preserved from original schema
+        widget: 'nested-form',
+        linkages: [{ type: 'schema', dependencies: ['userType'], fulfill: { function: 'loadUserSchema' } }]
+      },
+      // replaced by userSchemas.company:
+      properties: {
+        companyName: { type: 'string', title: 'Company Name' },
+        taxId: { type: 'string', title: 'Tax ID' }
+      }
+    }
+  }
+}
+```
+
+**Complete Component Usage:**
+
+```typescript
+<DynamicForm
+  schema={schema}
+  linkageFunctions={linkageFunctions}
+  onSubmit={handleSubmit}
+/>
+```
+
+**Submitted Data Structure:**
+
+```typescript
+// When userType = 'personal':
+{ userType: 'personal', details: { firstName: 'John', lastName: 'Doe' } }
+
+// When userType = 'company':
+{ userType: 'company', details: { companyName: 'Acme Inc', taxId: '123456789' } }
+```
+
+#### Multiple Linkages of the Same Type
+
+A single field can have multiple linkage configs of the same type in its `linkages` array. When multiple configs of the same type produce results, they are merged using the following strategy (derived from `evaluateLinkagesByLayers`):
+
+| Linkage Type | Merge Strategy | Example |
+| ------------ | -------------- | ------- |
+| `visibility` | **AND** — field is visible only if **all** configs resolve to `visible: true` | Two visibility rules: both must pass for the field to show |
+| `disabled`   | **OR** — field is disabled if **any** config resolves to `disabled: true` | Two disabled rules: either one disabling is enough |
+| `readonly`   | **OR** — field is readonly if **any** config resolves to `readonly: true` | Two readonly rules: either one is enough |
+| `value`      | **Last wins** — the last config (by array order) that produces a value takes effect | Useful for fallback chaining |
+| `options`    | **Last wins** — the last config (by array order) that produces options takes effect | Useful for fallback chaining |
+| `schema`     | **Shallow merge** — later configs' schema properties override earlier ones | `{ ...schema1, ...schema2 }` |
+
+**Example — `visibility` AND logic:**
+
+```typescript
+// Field is shown only when BOTH conditions are true
+ui: {
+  linkages: [
+    {
+      type: 'visibility',
+      dependencies: ['#/properties/isLoggedIn'],
+      when: { field: '#/properties/isLoggedIn', operator: '==', value: true },
+      fulfill: { state: { visible: true } },
+      otherwise: { state: { visible: false } }
+    },
+    {
+      type: 'visibility',
+      dependencies: ['#/properties/role'],
+      when: { field: '#/properties/role', operator: '==', value: 'admin' },
+      fulfill: { state: { visible: true } },
+      otherwise: { state: { visible: false } }
+    }
+  ]
+}
+// → visible only when isLoggedIn === true AND role === 'admin'
+```
+
+**Example — `disabled` OR logic:**
+
+```typescript
+// Field is disabled if EITHER condition is true
+ui: {
+  linkages: [
+    {
+      type: 'disabled',
+      dependencies: ['#/properties/isReadonlyMode'],
+      when: { field: '#/properties/isReadonlyMode', operator: '==', value: true },
+      fulfill: { state: { disabled: true } },
+      otherwise: { state: { disabled: false } }
+    },
+    {
+      type: 'disabled',
+      dependencies: ['#/properties/userRole'],
+      when: { field: '#/properties/userRole', operator: '==', value: 'guest' },
+      fulfill: { state: { disabled: true } },
+      otherwise: { state: { disabled: false } }
+    }
+  ]
+}
+// → disabled when isReadonlyMode === true OR userRole === 'guest'
+```
+
+**Async Linkages and Execution Order:**
+
+When multiple linkage configs of the same type use **async linkage functions** (functions that return Promises), they execute **concurrently for performance**. However, the final result is **guaranteed to strictly follow the definition order** (array index order).
+
+**Behavior guarantee:**
+
+- For `value`, `options`, and `schema` types: The **last defined** linkage in the array always wins, regardless of which async function resolves first
+- For `visibility`, `disabled`, and `readonly` types: The merge strategy (AND/OR) applies as documented in the table above
+- **Mixed sync/async linkages**: The result still strictly follows array order — the last defined linkage wins, whether it's synchronous or asynchronous
+
+**Example:**
+
+```typescript
+const schema = {
+  type: 'object',
+  properties: {
+    price: {
+      type: 'number',
+      title: 'Price',
+      ui: {
+        linkages: [
+          { type: 'value', dependencies: ['country'], fulfill: { function: 'fetchPriceFromAPI1' } },  // async, returns 100
+          { type: 'value', dependencies: ['country'], fulfill: { function: 'fetchPriceFromAPI2' } },  // async, returns 200
+          { type: 'value', dependencies: ['country'], fulfill: { function: 'fetchPriceFromAPI3' } }   // async, returns 300
+        ]
+      }
+    }
+  }
+};
+
+// Result: price = 300 (always the last defined linkage, regardless of which completes first)
 ```
 
 #### Static vs Dynamic Linkage
