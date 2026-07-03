@@ -449,7 +449,11 @@ const DynamicFormInner = React.memo(
         defaultValues: processedDefaultValues,
         mode: validateMode,
         reValidateMode: reValidateMode,
-        resolver: createSchemaResolver(schema, stableCallbacks, linkageStatesRef),
+        resolver: createSchemaResolver(
+          schema,
+          stableCallbacks,
+          linkageStatesRef
+        ),
       })
 
       // 根据模式选择使用哪个 form methods
@@ -797,9 +801,29 @@ const DynamicFormInner = React.memo(
               // 如果存在 schema 联动，合并到字段 schema
               let effectiveField = field
               if (linkageState?.schema) {
+                const mergedSchema = mergeSchemaWithLinkage(
+                  field.schema || { type: 'object', properties: {} },
+                  linkageState.schema
+                )
                 effectiveField = {
                   ...field,
-                  schema: mergeSchemaWithLinkage(field.schema, linkageState.schema),
+                  schema: mergedSchema,
+                  // 重新提取 UI 属性到 field 对象，确保 UI 联动生效
+                  placeholder:
+                    mergedSchema.ui?.placeholder ?? field.placeholder,
+                  description: mergedSchema.ui?.help ?? field.description,
+                  widget: mergedSchema.ui?.widget ?? field.widget,
+                  disabled: mergedSchema.ui?.disabled ?? field.disabled,
+                  readonly: mergedSchema.ui?.readonly ?? field.readonly,
+                  hidden: mergedSchema.ui?.hidden ?? field.hidden,
+                  // 统一在此处应用 options 联动
+                  options: linkageState?.options ?? field.options,
+                }
+              } else if (linkageState?.options) {
+                // 只有 options 联动时，也需要更新 field
+                effectiveField = {
+                  ...field,
+                  options: linkageState.options,
                 }
               }
 
