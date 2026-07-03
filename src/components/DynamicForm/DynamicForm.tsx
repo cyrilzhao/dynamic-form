@@ -448,7 +448,7 @@ const DynamicFormInner = React.memo(
         defaultValues: processedDefaultValues,
         mode: validateMode,
         reValidateMode: reValidateMode,
-        resolver: createSchemaResolver(schema, linkageStatesRef),
+        resolver: createSchemaResolver(schema, stableCallbacks, linkageStatesRef),
       })
 
       // 根据模式选择使用哪个 form methods

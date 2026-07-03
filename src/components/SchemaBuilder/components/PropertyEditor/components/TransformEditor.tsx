@@ -1,5 +1,11 @@
 import React, { useState } from 'react'
-import { Button, FormGroup, InputGroup, Callout, HTMLSelect } from '@blueprintjs/core'
+import {
+  Button,
+  FormGroup,
+  InputGroup,
+  Callout,
+  HTMLSelect,
+} from '@blueprintjs/core'
 import { CodeEditor } from '../../../../CodeEditor'
 import type { UIConfig } from '../../../../DynamicForm/types/schema'
 
@@ -25,7 +31,9 @@ function TransformFnEditor({
   placeholder: string
 }) {
   const isScript = value != null && typeof value !== 'string'
-  const [mode, setMode] = useState<'callback' | 'script'>(isScript ? 'script' : 'callback')
+  const [mode, setMode] = useState<'callback' | 'script'>(
+    isScript ? 'script' : 'callback'
+  )
 
   const handleModeChange = (newMode: 'callback' | 'script') => {
     setMode(newMode)
@@ -37,31 +45,42 @@ function TransformFnEditor({
       <FormGroup label={label} style={{ marginBottom: 4 }}>
         <HTMLSelect
           value={mode}
-          onChange={e => handleModeChange(e.target.value as 'callback' | 'script')}
+          onChange={(e) =>
+            handleModeChange(e.target.value as 'callback' | 'script')
+          }
           disabled={disabled}
           style={{ marginBottom: 6 }}
         >
-          <option value="callback">Callback name (from callbacks registry)</option>
+          <option value="callback">
+            Callback name (from callbacks registry)
+          </option>
           <option value="script">Inline JS script</option>
         </HTMLSelect>
 
         {mode === 'callback' ? (
           <InputGroup
             value={typeof value === 'string' ? value : ''}
-            onChange={e => onChange(e.target.value || undefined)}
+            onChange={(e) => onChange(e.target.value || undefined)}
             placeholder={placeholder}
             disabled={disabled}
           />
         ) : (
           <>
-            <Callout intent="warning" icon="warning-sign" style={{ fontSize: 12, marginBottom: 4 }}>
-              Only use in trusted internal environments. Code runs in the browser.
+            <Callout
+              intent="warning"
+              icon="warning-sign"
+              style={{ fontSize: 12, marginBottom: 4 }}
+            >
+              Only use in trusted internal environments. Code runs in the
+              browser.
             </Callout>
             <CodeEditor
-              value={isScript ? (value as { type: 'script'; code: string }).code : ''}
+              value={
+                isScript ? (value as { type: 'script'; code: string }).code : ''
+              }
               language="javascript"
-              config={{ initialMode: 'edit', previewLines: 4 }}
-              onChange={code =>
+              config={{ initialMode: 'preview', previewLines: 4 }}
+              onChange={(code) =>
                 onChange(code ? { type: 'script', code } : undefined)
               }
               disabled={disabled}
@@ -73,11 +92,14 @@ function TransformFnEditor({
   )
 }
 
-export const TransformEditor: React.FC<TransformEditorProps> = ({ value, onChange, disabled }) => {
+export const TransformEditor: React.FC<TransformEditorProps> = ({
+  value,
+  onChange,
+  disabled,
+}) => {
   const enabled = value != null
 
-  const handleEnable = () =>
-    onChange({ callback: '' })
+  const handleEnable = () => onChange({ callback: '' })
 
   const handleDisable = () => onChange(undefined)
 
@@ -94,18 +116,24 @@ export const TransformEditor: React.FC<TransformEditorProps> = ({ value, onChang
       <TransformFnEditor
         label="callback (input domain → stored domain)"
         value={value.callback}
-        onChange={cb => onChange({ ...value, callback: cb ?? '' })}
+        onChange={(cb) => onChange({ ...value, callback: cb ?? '' })}
         disabled={disabled}
         placeholder="e.g. percentToDecimal"
       />
       <TransformFnEditor
         label="reverseCallback (stored domain → input domain, optional)"
         value={value.reverseCallback}
-        onChange={rc => onChange({ ...value, reverseCallback: rc })}
+        onChange={(rc) => onChange({ ...value, reverseCallback: rc })}
         disabled={disabled}
         placeholder="e.g. decimalToPercent"
       />
-      <Button small icon="trash" intent="danger" onClick={handleDisable} disabled={disabled}>
+      <Button
+        small
+        icon="trash"
+        intent="danger"
+        onClick={handleDisable}
+        disabled={disabled}
+      >
         Remove Transform
       </Button>
     </div>

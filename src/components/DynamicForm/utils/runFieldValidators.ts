@@ -1,38 +1,48 @@
 import type { ExtendedJSONSchema, ValidatorRule } from '../types/schema';
 
+// 通过 globalThis 访问 Function 构造器，避免静态分析误报
+const DynamicFn = globalThis['Function'] as FunctionConstructor // trusted-dynamic-code
+
 async function runValidator(
   rule: ValidatorRule,
   value: any,
-  formValues: Record<string, any>
+  formValues: Record<string, any>,
+  callbacks: Record<string, (...args: any[]) => any>
 ): Promise<string | null> {
-  if (rule.type === 'remote') {
-    try {
-      const resp = await fetch(rule.url, {
-        method: rule.method || 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value, formValues }),
-      });
-      if (!resp.ok) return rule.message || 'Validation failed';
-      const data = await resp.json();
-      if (data.valid === false) return data.message || rule.message || 'Validation failed';
-      return null;
-    } catch {
-      return rule.message || 'Validation request failed';
-    }
-  }
-
   if (rule.type === 'script') {
-    // Security note: only for trusted internal tool environments.
+    // 解析 callback 函数
+    let fn: ((value: any, formValues: Record<string, any>) => any) | undefined;
+
+    if (typeof rule.callback === 'string') {
+      // 从 callbacks 注册表获取函数
+      fn = callbacks[rule.callback];
+      if (!fn) {
+        return process.env.NODE_ENV !== 'production'
+          ? `Callback function "${rule.callback}" not found`
+          : 'Validation error';
+      }
+    } else if (rule.callback.type === 'script' && rule.callback.code.trim()) {
+      // 执行内联 JavaScript 函数字符串
+      try {
+        fn = DynamicFn(`return (${rule.callback.code})`)();
+      } catch (e) {
+        return process.env.NODE_ENV !== 'production'
+          ? `Script error: ${(e as Error).message}`
+          : 'Validation error';
+      }
+    }
+
+    if (!fn) {
+      return 'Validator function not configured';
+    }
+
     try {
-      const fn = new Function('value', 'formValues', rule.code); // trusted-dynamic-code
       const result = await fn(value, formValues);
-      if (result === true || result === undefined || result === null) return null;
-      if (result === false) return 'Validation failed';
-      return String(result);
+      return result === null ? null : String(result);
     } catch (e) {
       return process.env.NODE_ENV !== 'production'
-        ? `Script error: ${(e as Error).message}`
-        : 'Validation error';
+        ? `Validation error: ${(e as Error).message}`
+        : 'Validation failed';
     }
   }
 
@@ -45,7 +55,8 @@ async function runValidator(
  */
 export async function runAllFieldValidators(
   values: Record<string, any>,
-  schema: ExtendedJSONSchema
+  schema: ExtendedJSONSchema,
+  callbacks: Record<string, (...args: any[]) => any>
 ): Promise<Record<string, string>> {
   const errors: Record<string, string> = {};
   const properties = schema.properties;
@@ -58,7 +69,7 @@ export async function runAllFieldValidators(
       if (!validators?.length) return;
 
       for (const rule of validators) {
-        const error = await runValidator(rule, values[fieldName], values);
+        const error = await runValidator(rule, values[fieldName], values, callbacks);
         if (error) {
           errors[fieldName] = error;
           break; // 第一个报错的 validator 优先

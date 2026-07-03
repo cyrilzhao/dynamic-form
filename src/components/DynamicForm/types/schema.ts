@@ -42,26 +42,29 @@ export interface ErrorMessages {
 }
 
 /**
- * Remote 校验器：向指定接口发送 { value, formValues }，根据响应判断是否合法
- */
-export interface RemoteValidator {
-  type: 'remote'
-  url: string
-  method?: 'GET' | 'POST'
-  message?: string // 兜底错误文案
-}
-
-/**
- * Script 校验器：执行自定义 JS 代码字符串
- * 代码体接收 (value, formValues)，返回 true（合法）或错误字符串（不合法）
- * ⚠️ 仅适用于受信任的内部工具环境
+ * Script 校验器：执行自定义 JS 函数进行验证
+ *
+ * callback 支持两种形式：
+ * 1. string：从 callbacks 注册表获取函数名（推荐用于可复用的验证逻辑）
+ * 2. { type: 'script'; code: string }：内联 JavaScript 函数字符串（用于简单的一次性验证）
+ *
+ * 函数签名：(value, formValues) => Promise<string | null> | string | null
+ * 函数接收两个参数：
+ * - value: 当前字段的值
+ * - formValues: 整个表单的数据对象
+ *
+ * 返回值：
+ * - null: 校验通过
+ * - string: 校验失败，返回的字符串作为错误信息
+ *
+ * ⚠️ 内联 script 仅适用于受信任的内部工具环境
  */
 export interface ScriptValidator {
   type: 'script'
-  code: string // 函数体，可 return true / false / string / Promise
+  callback: string | { type: 'script'; code: string }
 }
 
-export type ValidatorRule = RemoteValidator | ScriptValidator
+export type ValidatorRule = ScriptValidator
 
 export interface UIConfig {
   widget?: WidgetType | string

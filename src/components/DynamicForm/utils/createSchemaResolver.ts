@@ -82,12 +82,13 @@ function isHiddenOrDisabled(
  */
 export function createSchemaResolver(
   schema: ExtendedJSONSchema,
+  callbacks: Record<string, (...args: any[]) => any> = {},
   linkageStatesRef?: RefObject<Record<string, { visible?: boolean; disabled?: boolean }>>
 ): Resolver {
   return async (values) => {
     const validator = new SchemaValidator(schema);
     const schemaErrors = validator.validate(values);
-    const fieldValidatorErrors = await runAllFieldValidators(values, schema);
+    const fieldValidatorErrors = await runAllFieldValidators(values, schema, callbacks);
     const errors = { ...schemaErrors, ...fieldValidatorErrors };
 
     if (Object.keys(errors).length === 0) {
