@@ -221,7 +221,7 @@ describe('SchemaValidator', () => {
       expect(errors.license).toBe('License is required');
     });
 
-    it('嵌套对象 recursive=true 时 required 包含不存在字段应跳过', () => {
+    it('嵌套对象验证时 required 包含不存在字段应跳过', () => {
       const schema: ExtendedJSONSchema = {
         type: 'object',
         properties: {
@@ -236,13 +236,13 @@ describe('SchemaValidator', () => {
       };
 
       const validator = new SchemaValidator(schema);
-      const errors = validator.validate({ user: { name: '' } }, true);
+      const errors = validator.validate({ user: { name: '' } });
 
       expect(errors['user.name']).toBe('Name is required');
       expect(errors['user.phantomField']).toBeUndefined(); // 幻象字段被跳过
     });
 
-    it('嵌套对象 recursive=true 时 required 包含存在字段应正常报错', () => {
+    it('嵌套对象验证时 required 包含存在字段应正常报错', () => {
       const schema: ExtendedJSONSchema = {
         type: 'object',
         properties: {
@@ -258,7 +258,7 @@ describe('SchemaValidator', () => {
       };
 
       const validator = new SchemaValidator(schema);
-      const errors = validator.validate({ address: { city: '', street: '' } }, true);
+      const errors = validator.validate({ address: { city: '', street: '' } });
 
       expect(errors['address.city']).toBe('City is required');
       expect(errors['address.street']).toBe('Street is required');
@@ -1745,7 +1745,7 @@ describe('SchemaValidator', () => {
     });
   });
 
-  describe('递归验证 (recursive=true)', () => {
+  describe('递归验证（嵌套字段验证）', () => {
     describe('数组递归验证', () => {
       it('递归验证数组中对象元素的 required 字段', () => {
         const schema: ExtendedJSONSchema = {
@@ -1774,7 +1774,6 @@ describe('SchemaValidator', () => {
               { name: 'John', email: '' },
             ],
           },
-          true
         );
 
         expect(errors['users[0].name']).toBe('Name is required');
@@ -1809,7 +1808,6 @@ describe('SchemaValidator', () => {
               { name: 'Valid Product', price: 100 },
             ],
           },
-          true
         );
 
         expect(errors['products[0].name']).toBeDefined();
@@ -1840,7 +1838,6 @@ describe('SchemaValidator', () => {
           {
             scores: [-5, 50, 150],
           },
-          true
         );
 
         expect(errors['scores[0]']).toBeDefined();
@@ -1869,7 +1866,6 @@ describe('SchemaValidator', () => {
           {
             emails: ['invalid', 'test@example.com', 'also-invalid'],
           },
-          true
         );
 
         expect(errors['emails[0]']).toBeDefined();
@@ -1900,7 +1896,6 @@ describe('SchemaValidator', () => {
           {
             items: [{ name: 'A', enabled: true }],
           },
-          true
         );
 
         expect(errors['items[0].name']).toBeDefined();
@@ -1930,7 +1925,6 @@ describe('SchemaValidator', () => {
           {
             address: { city: '', street: '' },
           },
-          true
         );
 
         // 递归验证时，错误信息使用字段路径作为 key
@@ -1961,7 +1955,6 @@ describe('SchemaValidator', () => {
               bio: 'A'.repeat(150),
             },
           },
-          true
         );
 
         // 递归验证时，错误信息使用字段路径作为 key
@@ -1989,7 +1982,6 @@ describe('SchemaValidator', () => {
           {
             settings: { theme: 'AB', enabled: true },
           },
-          true
         );
 
         expect(errors['settings.theme']).toBeDefined();
@@ -2027,7 +2019,6 @@ describe('SchemaValidator', () => {
               address: { country: 'A' },
             },
           },
-          true
         );
 
         expect(errors['company.name']).toBeDefined();
@@ -2077,7 +2068,6 @@ describe('SchemaValidator', () => {
             hasAddress: true,
             address: { city: 'A', street: '' },
           },
-          true
         );
 
         // 应该验证嵌套的 address 对象
@@ -2124,7 +2114,6 @@ describe('SchemaValidator', () => {
             userType: 'premium',
             profile: { name: 'AB' },
           },
-          true
         );
 
         // 应该验证嵌套的 profile 对象
@@ -2172,7 +2161,6 @@ describe('SchemaValidator', () => {
             userType: 'basic',
             basicInfo: { nickname: 'A' },
           },
-          true
         );
 
         // 应该验证 else 分支中的 basicInfo
@@ -2215,7 +2203,6 @@ describe('SchemaValidator', () => {
           {
             data: { value: 'AB' },
           },
-          true
         );
 
         // 应该验证 allOf 中的嵌套对象
@@ -2270,7 +2257,6 @@ describe('SchemaValidator', () => {
           {
             contact: { email: 'invalid', phone: '123' },
           },
-          true
         );
 
         // 应该有错误
@@ -2326,7 +2312,6 @@ describe('SchemaValidator', () => {
           {
             payment: { method: 'unknown' },
           },
-          true
         );
 
         // 应该有错误
@@ -2365,7 +2350,6 @@ describe('SchemaValidator', () => {
               deep: { value: 'AB' },
             },
           },
-          true
         );
 
         // 应该递归验证到最深层
@@ -2405,7 +2389,6 @@ describe('SchemaValidator', () => {
           {
             items: [{ nested: { value: 'A' } }],
           },
-          true
         );
 
         // 应该递归验证数组中的嵌套对象
@@ -2444,7 +2427,6 @@ describe('SchemaValidator', () => {
               settings: { option: 'A' },
             },
           },
-          true
         );
 
         // 应该递归验证嵌套的 settings 对象
@@ -2561,7 +2543,6 @@ describe('SchemaValidator', () => {
               { name: 'A', age: 16 }, // name 太短，age 太小
             ],
           },
-          true // recursive = true
         );
 
         // 应该触发 line 689 的 if (itemsSchema.properties) 分支
@@ -2595,7 +2576,6 @@ describe('SchemaValidator', () => {
               { value: '123' }, // 不匹配 pattern
             ],
           },
-          true
         );
 
         expect(errors['items[0].value']).toBe('items[0].value invalid format');
@@ -2629,7 +2609,6 @@ describe('SchemaValidator', () => {
               website: 'not-a-url', // 不是有效的 URI
             },
           },
-          true // recursive = true
         );
 
         // 应该触发 line 774 的 if (schema.properties) 分支
@@ -2666,7 +2645,6 @@ describe('SchemaValidator', () => {
               },
             },
           },
-          true
         );
 
         expect(errors['level1.level2.value']).toBe('level1.level2.value maximum value is 100');
@@ -2695,7 +2673,6 @@ describe('SchemaValidator', () => {
               name: 'AB', // 太短
             },
           },
-          true
         );
 
         // boolean schema 应该被跳过，只验证 name
@@ -2810,7 +2787,6 @@ describe('SchemaValidator', () => {
               { name: 'valid' },
             ],
           },
-          true
         );
 
         // 应该只验证 required，不验证 properties（因为没有）
@@ -2842,7 +2818,6 @@ describe('SchemaValidator', () => {
               { id: '123', email: '' },
             ],
           },
-          true
         );
 
         expect(errors['users[0].id']).toBe('id is required');
@@ -2874,7 +2849,6 @@ describe('SchemaValidator', () => {
               extra: 'value',
             },
           },
-          true
         );
 
         // 应该只验证 required，不验证 properties（因为没有）
@@ -2902,7 +2876,6 @@ describe('SchemaValidator', () => {
               endpoint: 'https://api.example.com',
             },
           },
-          true
         );
 
         expect(errors['settings.apiKey']).toBe('apiKey is required');
@@ -2937,7 +2910,6 @@ describe('SchemaValidator', () => {
               },
             },
           },
-          true
         );
 
         expect(errors['level1.level2.value']).toBe('value is required');

@@ -23,22 +23,13 @@ export class SchemaValidator {
    * 5. allOf（逻辑与）
    * 6. anyOf（逻辑或）
    * 7. oneOf（逻辑异或）
+   *
+   * 注：所有嵌套字段都会被递归验证，确保完整的数据校验
    * @param formData - 表单数据对象
-   * @param recursive - 是否递归验证嵌套字段（默认 false，只验证当前层）
    * @returns 验证错误对象，键为字段名，值为错误信息
    */
-  /**
-   * 验证整个表单数据
-   *
-   * 重构说明：原来 validate 与 validateAgainstSchema 存在大量重复逻辑（required 检查、
-   * properties 约束检查）。现在 validate 作为公开入口，直接委托给
-   * validateAgainstSchema（私有核心方法），消除重复，逻辑集中在一处维护。
-   */
-  validate(
-    formData: Record<string, any>,
-    recursive: boolean = false
-  ): Record<string, string> {
-    return this.validateAgainstSchema(formData, this.schema, recursive)
+  validate(formData: Record<string, any>): Record<string, string> {
+    return this.validateAgainstSchema(formData, this.schema)
   }
 
   /**
@@ -130,7 +121,7 @@ export class SchemaValidator {
     formData: Record<string, any>,
     schema: ExtendedJSONSchema
   ): boolean {
-    const errors = this.validateAgainstSchema(formData, schema, false)
+    const errors = this.validateAgainstSchema(formData, schema)
     return Object.keys(errors).length === 0
   }
 
@@ -141,12 +132,10 @@ export class SchemaValidator {
    * 2. Schema 依赖（对象形式）：当触发字段有值时，验证整个表单数据是否满足依赖 schema
    * @param formData - 表单数据对象
    * @param errors - 错误对象，用于收集验证错误
-   * @param recursive - 是否递归验证嵌套字段
    */
   private validateDependencies(
     formData: Record<string, any>,
-    errors: Record<string, string>,
-    recursive: boolean
+    errors: Record<string, string>
   ): void {
     const dependencies = this.schema.dependencies
     if (!dependencies) return
@@ -169,8 +158,7 @@ export class SchemaValidator {
           // Schema 依赖：验证整个表单数据是否满足依赖 schema
           const dependencyErrors = this.validateAgainstSchema(
             formData,
-            dependentFields as ExtendedJSONSchema,
-            recursive
+            dependentFields as ExtendedJSONSchema
           )
           Object.assign(errors, dependencyErrors)
         }
@@ -183,12 +171,10 @@ export class SchemaValidator {
    * 根据 if 条件是否满足，选择应用 then 或 else schema 进行验证
    * @param formData - 表单数据对象
    * @param errors - 错误对象，用于收集验证错误
-   * @param recursive - 是否递归验证嵌套字段
    */
   private validateConditional(
     formData: Record<string, any>,
-    errors: Record<string, string>,
-    recursive: boolean
+    errors: Record<string, string>
   ): void {
     const { if: ifSchema, then: thenSchema, else: elseSchema } = this.schema
 
@@ -207,8 +193,7 @@ export class SchemaValidator {
       // 验证表单数据是否满足目标 schema
       const conditionalErrors = this.validateAgainstSchema(
         formData,
-        targetSchema as ExtendedJSONSchema,
-        recursive
+        targetSchema as ExtendedJSONSchema
       )
       Object.assign(errors, conditionalErrors)
     }
@@ -219,12 +204,10 @@ export class SchemaValidator {
    * 表单数据必须满足所有子 schema 的验证规则
    * @param formData - 表单数据对象
    * @param errors - 错误对象，用于收集验证错误
-   * @param recursive - 是否递归验证嵌套字段
    */
   private validateAllOf(
     formData: Record<string, any>,
-    errors: Record<string, string>,
-    recursive: boolean
+    errors: Record<string, string>
   ): void {
     const allOf = this.schema.allOf
     if (!allOf || !Array.isArray(allOf)) return
@@ -233,8 +216,7 @@ export class SchemaValidator {
     for (const subSchema of allOf) {
       const subErrors = this.validateAgainstSchema(
         formData,
-        subSchema as ExtendedJSONSchema,
-        recursive
+        subSchema as ExtendedJSONSchema
       )
       Object.assign(errors, subErrors)
     }
@@ -246,12 +228,10 @@ export class SchemaValidator {
    * 如果没有任何 schema 匹配，会收集所有子 schema 的错误信息
    * @param formData - 表单数据对象
    * @param errors - 错误对象，用于收集验证错误
-   * @param recursive - 是否递归验证嵌套字段
    */
   private validateAnyOf(
     formData: Record<string, any>,
-    errors: Record<string, string>,
-    recursive: boolean
+    errors: Record<string, string>
   ): void {
     const anyOf = this.schema.anyOf
     if (!anyOf || !Array.isArray(anyOf)) return
@@ -263,8 +243,7 @@ export class SchemaValidator {
     for (const subSchema of anyOf) {
       const subErrors = this.validateAgainstSchema(
         formData,
-        subSchema as ExtendedJSONSchema,
-        recursive
+        subSchema as ExtendedJSONSchema
       )
       if (Object.keys(subErrors).length === 0) {
         hasMatch = true
@@ -301,12 +280,10 @@ export class SchemaValidator {
    * 如果多个 schema 匹配，返回互斥条件冲突错误
    * @param formData - 表单数据对象
    * @param errors - 错误对象，用于收集验证错误
-   * @param recursive - 是否递归验证嵌套字段
    */
   private validateOneOf(
     formData: Record<string, any>,
-    errors: Record<string, string>,
-    recursive: boolean
+    errors: Record<string, string>
   ): void {
     const oneOf = this.schema.oneOf
     if (!oneOf || !Array.isArray(oneOf)) return
@@ -319,8 +296,7 @@ export class SchemaValidator {
     for (const subSchema of oneOf) {
       const subErrors = this.validateAgainstSchema(
         formData,
-        subSchema as ExtendedJSONSchema,
-        recursive
+        subSchema as ExtendedJSONSchema
       )
       const errorCount = Object.keys(subErrors).length
 
@@ -351,13 +327,11 @@ export class SchemaValidator {
    * 3. 递归处理嵌套的条件验证（oneOf/anyOf/allOf/if）
    * @param formData - 表单数据对象
    * @param schema - 要验证的 JSON Schema
-   * @param recursive - 是否递归验证嵌套字段
    * @returns 验证错误对象，键为字段名，值为错误信息
    */
   private validateAgainstSchema(
     formData: Record<string, any>,
-    schema: ExtendedJSONSchema,
-    recursive: boolean
+    schema: ExtendedJSONSchema
   ): Record<string, string> {
     const errors: Record<string, string> = {}
 
@@ -385,7 +359,6 @@ export class SchemaValidator {
           schema: fieldSchema,
           fieldName,
           parentSchema: schema,
-          recursive,
         })
         Object.assign(errors, fieldErrors)
       }
@@ -396,11 +369,11 @@ export class SchemaValidator {
     // 导致只有 schema 同时包含条件关键字时 dependencies 才会被验证。
     // 修复后：每个条件独立检查，dependencies 始终生效。
     const nestedValidator = new SchemaValidator(schema, this.rootSchema)
-    if (schema.dependencies) nestedValidator.validateDependencies(formData, errors, recursive)
-    if (schema.if) nestedValidator.validateConditional(formData, errors, recursive)
-    if (schema.allOf) nestedValidator.validateAllOf(formData, errors, recursive)
-    if (schema.anyOf) nestedValidator.validateAnyOf(formData, errors, recursive)
-    if (schema.oneOf) nestedValidator.validateOneOf(formData, errors, recursive)
+    if (schema.dependencies) nestedValidator.validateDependencies(formData, errors)
+    if (schema.if) nestedValidator.validateConditional(formData, errors)
+    if (schema.allOf) nestedValidator.validateAllOf(formData, errors)
+    if (schema.anyOf) nestedValidator.validateAnyOf(formData, errors)
+    if (schema.oneOf) nestedValidator.validateOneOf(formData, errors)
 
     return errors
   }
@@ -419,7 +392,6 @@ export class SchemaValidator {
    * @param schema - 字段的 JSON Schema 定义
    * @param fieldName - 字段名称
    * @param parentSchema - 父级 Schema，用于获取字段标题
-   * @param recursive - 是否递归验证嵌套字段
    * @returns 验证错误对象，键为字段名，值为错误信息
    */
   private validateFieldValue({
@@ -427,13 +399,11 @@ export class SchemaValidator {
     schema,
     fieldName,
     parentSchema,
-    recursive,
   }: {
     value: any
     schema: ExtendedJSONSchema
     fieldName: string
     parentSchema?: ExtendedJSONSchema
-    recursive: boolean
   }): Record<string, string> {
     const errors: Record<string, string> = {}
 
@@ -502,7 +472,6 @@ export class SchemaValidator {
           fieldName,
           errors,
           parentSchema,
-          recursive,
         })
         break
       case 'object':
@@ -512,7 +481,6 @@ export class SchemaValidator {
           fieldName,
           errors,
           parentSchema,
-          recursive,
         })
         break
     }
@@ -641,7 +609,6 @@ export class SchemaValidator {
    * @param fieldName - 字段名称
    * @param errors - 错误对象，用于收集验证错误
    * @param parentSchema - 父级 Schema，用于获取字段标题
-   * @param recursive - 是否递归验证数组元素
    */
   private validateArray({
     value,
@@ -649,14 +616,12 @@ export class SchemaValidator {
     fieldName,
     errors,
     parentSchema,
-    recursive,
   }: {
     value: any[]
     schema: ExtendedJSONSchema
     fieldName: string
     errors: Record<string, string>
     parentSchema?: ExtendedJSONSchema
-    recursive: boolean
   }): void {
     // 验证最小项数
     if (schema.minItems !== undefined && value.length < schema.minItems) {
@@ -679,7 +644,7 @@ export class SchemaValidator {
       }
     }
 
-    // 验证数组元素（items.required 始终检查，属性级别递归验证需要 recursive=true）
+    // 验证数组元素（始终递归验证所有嵌套字段）
     if (
       schema.items &&
       typeof schema.items !== 'boolean' &&
@@ -696,7 +661,7 @@ export class SchemaValidator {
           typeof item === 'object' &&
           item !== null
         ) {
-          // 始终检查 required 字段（不依赖 recursive）
+          // 始终检查 required 字段
           if (itemsSchema.required && Array.isArray(itemsSchema.required)) {
             for (const requiredField of itemsSchema.required) {
               if (itemsSchema.properties && !(requiredField in itemsSchema.properties)) continue
@@ -720,7 +685,6 @@ export class SchemaValidator {
                 schema: propSchema,
                 fieldName: `${fieldName}[${i}].${propName}`,
                 parentSchema: itemsSchema,
-                recursive: true,
               })
               Object.assign(errors, propErrors)
             }
@@ -732,7 +696,6 @@ export class SchemaValidator {
             schema: itemsSchema,
             fieldName: `${fieldName}[${i}]`,
             parentSchema: schema,
-            recursive: true,
           })
           Object.assign(errors, itemErrors)
         }
@@ -747,7 +710,6 @@ export class SchemaValidator {
    * @param fieldName - 字段名称
    * @param errors - 错误对象，用于收集验证错误
    * @param parentSchema - 父级 Schema，用于获取字段标题
-   * @param recursive - 是否递归验证嵌套属性
    */
   private validateObject({
     value,
@@ -755,14 +717,12 @@ export class SchemaValidator {
     fieldName,
     errors,
     parentSchema,
-    recursive,
   }: {
     value: Record<string, any>
     schema: ExtendedJSONSchema
     fieldName: string
     errors: Record<string, string>
     parentSchema?: ExtendedJSONSchema
-    recursive: boolean
   }): void {
     // 验证最小属性数
     if (schema.minProperties !== undefined) {
@@ -782,36 +742,32 @@ export class SchemaValidator {
       }
     }
 
-    // 如果 recursive 为 true，递归验证嵌套属性
-    if (recursive) {
-      // 检查 required 字段
-      if (schema.required && Array.isArray(schema.required)) {
-        for (const requiredField of schema.required) {
-          if (schema.properties && !(requiredField in schema.properties)) continue
-          if (!this.hasValue(value[requiredField])) {
-            errors[`${fieldName}.${requiredField}`] =
-              `${this.getFieldTitle(requiredField, schema)} is required`
-          }
+    // 始终检查 required 字段
+    if (schema.required && Array.isArray(schema.required)) {
+      for (const requiredField of schema.required) {
+        if (schema.properties && !(requiredField in schema.properties)) continue
+        if (!this.hasValue(value[requiredField])) {
+          errors[`${fieldName}.${requiredField}`] =
+            `${this.getFieldTitle(requiredField, schema)} is required`
         }
       }
+    }
 
-      // 递归验证 properties
-      if (schema.properties) {
-        for (const [propName, propSchema] of Object.entries(
-          schema.properties
-        )) {
-          if (typeof propSchema === 'boolean') continue
+    // 始终递归验证嵌套属性
+    if (schema.properties) {
+      for (const [propName, propSchema] of Object.entries(
+        schema.properties
+      )) {
+        if (typeof propSchema === 'boolean') continue
 
-          const propValue = value[propName]
-          const propErrors = this.validateFieldValue({
-            value: propValue,
-            schema: propSchema,
-            fieldName: `${fieldName}.${propName}`,
-            parentSchema: schema,
-            recursive: true,
-          })
-          Object.assign(errors, propErrors)
-        }
+        const propValue = value[propName]
+        const propErrors = this.validateFieldValue({
+          value: propValue,
+          schema: propSchema,
+          fieldName: `${fieldName}.${propName}`,
+          parentSchema: schema,
+        })
+        Object.assign(errors, propErrors)
       }
     }
   }
