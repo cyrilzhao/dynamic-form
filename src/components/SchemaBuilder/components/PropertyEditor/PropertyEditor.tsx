@@ -14,6 +14,8 @@ import {
   Divider,
   Button,
   Tag,
+  Tooltip,
+  Icon,
 } from '@blueprintjs/core'
 import { get } from 'lodash'
 import { useSchemaBuilder } from '../../SchemaBuilder'
@@ -29,6 +31,95 @@ const getNode = (schema: any, path: string[]) => {
   if (path.length === 0) return schema
   return get(schema, path)
 }
+
+interface FieldHelpLabelParams {
+  label: string
+  title: string
+  description: string
+  reasons?: string[]
+}
+
+const renderLabelWithTooltip = ({
+  label,
+  title,
+  description,
+  reasons,
+}: FieldHelpLabelParams) => (
+  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+    {label}{' '}
+    <Tooltip
+      content={
+        <div style={{ maxWidth: 340 }}>
+          <p style={{ marginBottom: 8, fontWeight: 'bold' }}>{title}</p>
+          <p style={{ marginBottom: reasons?.length ? 8 : 0 }}>{description}</p>
+          {reasons?.length ? (
+            <>
+              <p style={{ marginBottom: 6, fontWeight: 'bold' }}>
+                Why configure it?
+              </p>
+              <ul style={{ margin: 0, paddingLeft: 20 }}>
+                {reasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+        </div>
+      }
+      placement="right"
+    >
+      <Icon
+        icon="info-sign"
+        size={12}
+        style={{
+          display: 'block',
+          color: '#5c7080',
+        }}
+      />
+    </Tooltip>
+  </span>
+)
+
+const renderSwitchLabelWithTooltip = ({
+  label,
+  title,
+  description,
+  reasons,
+}: FieldHelpLabelParams) => (
+  <span style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+    {label}{' '}
+    <Tooltip
+      content={
+        <div style={{ maxWidth: 340 }}>
+          <p style={{ marginBottom: 8, fontWeight: 'bold' }}>{title}</p>
+          <p style={{ marginBottom: reasons?.length ? 8 : 0 }}>{description}</p>
+          {reasons?.length ? (
+            <>
+              <p style={{ marginBottom: 6, fontWeight: 'bold' }}>
+                Why configure it?
+              </p>
+              <ul style={{ margin: 0, paddingLeft: 20 }}>
+                {reasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+        </div>
+      }
+      placement="right"
+    >
+      <Icon
+        icon="info-sign"
+        size={12}
+        style={{
+          display: 'block',
+          color: '#5c7080',
+        }}
+      />
+    </Tooltip>
+  </span>
+)
 
 export const PropertyEditor: React.FC = () => {
   const { schema, selectedPath, onUpdate } = useSchemaBuilder()
@@ -291,7 +382,16 @@ export const PropertyEditor: React.FC = () => {
           </Callout>
 
           <FormGroup
-            label="Columns Count"
+            label={renderLabelWithTooltip({
+              label: 'Columns Count',
+              title: 'Form layout column count',
+              description:
+                'Controls how many columns this schema level uses when laying out child fields.',
+              reasons: [
+                'Use it to make long forms easier to scan by grouping fields across columns.',
+                'It defines the grid that field-level Column Span values can use.',
+              ],
+            })}
             helperText="Number of columns for the form layout (default: 1)"
             style={{ marginBottom: 16 }}
           >
@@ -999,7 +1099,18 @@ export const PropertyEditor: React.FC = () => {
             title="UI Config"
             panel={
               <div className="editor-panel">
-                <FormGroup label="Widget">
+                <FormGroup
+                  label={renderLabelWithTooltip({
+                    label: 'Widget',
+                    title: 'Field rendering component',
+                    description:
+                      'Overrides the default widget that DynamicForm would choose from the field type.',
+                    reasons: [
+                      'Choose a widget that matches the business input pattern, such as textarea for long text or radio for a small fixed choice set.',
+                      'This keeps stored schema data stable while changing how users interact with the field.',
+                    ],
+                  })}
+                >
                   <Controller
                     name="ui.widget"
                     control={control}
@@ -1019,7 +1130,16 @@ export const PropertyEditor: React.FC = () => {
 
                 {watch('ui.widget') && (
                   <FormGroup
-                    label="Widget Props"
+                    label={renderLabelWithTooltip({
+                      label: 'Widget Props',
+                      title: 'Widget-specific configuration',
+                      description:
+                        'Passes plain JSON props directly to the selected widget component.',
+                      reasons: [
+                        'Use it when a widget needs extra static options, such as accepted file types, editor language, labels, or display limits.',
+                        'Keeping these values in schema lets the same widget serve multiple business scenarios without custom code per field.',
+                      ],
+                    })}
                     helperText="Additional props passed directly to the widget (JSON object)"
                   >
                     <ObjectEditor
@@ -1030,7 +1150,18 @@ export const PropertyEditor: React.FC = () => {
                   </FormGroup>
                 )}
 
-                <FormGroup label="Placeholder">
+                <FormGroup
+                  label={renderLabelWithTooltip({
+                    label: 'Placeholder',
+                    title: 'Input hint text',
+                    description:
+                      'Shows short guidance inside an empty input before the user enters a value.',
+                    reasons: [
+                      'Use it to clarify expected format or examples without changing validation rules.',
+                      'Good placeholders reduce support cost for fields with business-specific formats like IDs, emails, or percentages.',
+                    ],
+                  })}
+                >
                   <Controller
                     name="ui.placeholder"
                     control={control}
@@ -1052,7 +1183,16 @@ export const PropertyEditor: React.FC = () => {
                   <>
                     <Divider />
                     <FormGroup
-                      label="Boolean Display Labels"
+                      label={renderLabelWithTooltip({
+                        label: 'Boolean Display Labels',
+                        title: 'Human-readable true/false labels',
+                        description:
+                          'Configures the display text for boolean values when rendered as radio or checkbox-style choices.',
+                        reasons: [
+                          'Use business language such as Approved/Rejected or Enabled/Disabled instead of raw true/false.',
+                          'The stored value remains boolean, so downstream logic can stay simple and predictable.',
+                        ],
+                      })}
                       helperText="Configure display labels for boolean values (used with radio/checkbox widget)"
                     >
                       {(() => {
@@ -1159,7 +1299,17 @@ export const PropertyEditor: React.FC = () => {
                   control={control}
                   render={({ field }) => (
                     <Switch
-                      label="Hidden"
+                      style={{ display: 'flex', alignItems: 'center' }}
+                      labelElement={renderSwitchLabelWithTooltip({
+                        label: 'Hidden',
+                        title: 'Hide this field from the form',
+                        description:
+                          'Removes the field from the visible UI when it should not be shown by default.',
+                        reasons: [
+                          'Use it for fields controlled by business rules, internal data, or progressive disclosure.',
+                          'Hidden fields are skipped by static validation, which prevents users from being blocked by fields they cannot see.',
+                        ],
+                      })}
                       checked={!!field.value}
                       onChange={(e) =>
                         handleUIChange('hidden', e.currentTarget.checked)
@@ -1174,7 +1324,17 @@ export const PropertyEditor: React.FC = () => {
                   control={control}
                   render={({ field }) => (
                     <Switch
-                      label="Disabled"
+                      style={{ display: 'flex', alignItems: 'center' }}
+                      labelElement={renderSwitchLabelWithTooltip({
+                        label: 'Disabled',
+                        title: 'Prevent user input',
+                        description:
+                          'Shows the field in a disabled state so users can see it but cannot edit it.',
+                        reasons: [
+                          'Use it for system-managed values, locked workflow states, or fields awaiting another prerequisite.',
+                          'Disabled fields communicate context without allowing accidental changes to protected business data.',
+                        ],
+                      })}
                       checked={!!field.value}
                       onChange={(e) =>
                         handleUIChange('disabled', e.currentTarget.checked)
@@ -1189,7 +1349,17 @@ export const PropertyEditor: React.FC = () => {
                   control={control}
                   render={({ field }) => (
                     <Switch
-                      label="Readonly"
+                      style={{ display: 'flex', alignItems: 'center' }}
+                      labelElement={renderSwitchLabelWithTooltip({
+                        label: 'Readonly',
+                        title: 'Display value as read-only',
+                        description:
+                          'Keeps the field visible while making its current value non-editable.',
+                        reasons: [
+                          'Use it when users need to review calculated, imported, or approved values.',
+                          'Readonly is useful when the value should still be part of the form context but edits must happen elsewhere.',
+                        ],
+                      })}
                       checked={!!field.value}
                       onChange={(e) =>
                         handleUIChange('readonly', e.currentTarget.checked)
@@ -1201,7 +1371,18 @@ export const PropertyEditor: React.FC = () => {
 
                 <Divider />
 
-                <FormGroup label="Layout">
+                <FormGroup
+                  label={renderLabelWithTooltip({
+                    label: 'Layout',
+                    title: 'Field-level layout override',
+                    description:
+                      'Overrides the global form layout for this field: vertical, horizontal, or inline.',
+                    reasons: [
+                      'Use vertical layout for longer inputs, horizontal layout for dense enterprise forms, and inline layout for compact controls.',
+                      'Field-level overrides let important exceptions fit the business workflow without changing the whole form.',
+                    ],
+                  })}
+                >
                   <Controller
                     name="ui.layout"
                     control={control}
@@ -1219,7 +1400,18 @@ export const PropertyEditor: React.FC = () => {
                   />
                 </FormGroup>
 
-                <FormGroup label="Label Width">
+                <FormGroup
+                  label={renderLabelWithTooltip({
+                    label: 'Label Width',
+                    title: 'Label width for horizontal layout',
+                    description:
+                      'Controls the label area width when this field uses horizontal layout.',
+                    reasons: [
+                      'Use it to align fields with long business labels and keep inputs starting at a consistent position.',
+                      'Consistent label width improves scanability in operational forms with many parameters.',
+                    ],
+                  })}
+                >
                   <Controller
                     name="ui.labelWidth"
                     control={control}
@@ -1237,7 +1429,16 @@ export const PropertyEditor: React.FC = () => {
                 </FormGroup>
 
                 <FormGroup
-                  label="Column Span"
+                  label={renderLabelWithTooltip({
+                    label: 'Column Span',
+                    title: 'Grid width for this field',
+                    description:
+                      'Controls how many layout columns this field occupies inside a multi-column form.',
+                    reasons: [
+                      'Use it to give wide fields like textareas, code editors, or nested objects more room.',
+                      'It lets high-priority or complex business fields remain readable in dense layouts.',
+                    ],
+                  })}
                   helperText="Number of columns this field spans in multi-column layout"
                 >
                   <Controller
@@ -1268,7 +1469,16 @@ export const PropertyEditor: React.FC = () => {
                       control={control}
                       render={({ field }) => (
                         <Switch
-                          label="Flatten Path (Transparent)"
+                          labelElement={renderLabelWithTooltip({
+                            label: 'Flatten Path (Transparent)',
+                            title: 'Flatten nested fields in the UI',
+                            description:
+                              'Displays child fields from this object at the parent level while preserving the nested submitted data structure.',
+                            reasons: [
+                              'Use it to simplify deeply nested configuration forms without losing the API contract.',
+                              'It is helpful when nesting exists for backend structure but would make the user workflow harder to read.',
+                            ],
+                          })}
                           checked={!!field.value}
                           onChange={(e) =>
                             handleUIChange('flattenPath', e.currentTarget.checked)
@@ -1283,7 +1493,16 @@ export const PropertyEditor: React.FC = () => {
                       control={control}
                       render={({ field }) => (
                         <Switch
-                          label="Flatten Prefix"
+                          labelElement={renderLabelWithTooltip({
+                            label: 'Flatten Prefix',
+                            title: 'Prefix flattened field labels',
+                            description:
+                              'Adds the parent title as a label prefix when flattened child fields are displayed.',
+                            reasons: [
+                              'Use it to preserve business context after flattening removes visible nesting.',
+                              'Prefixes prevent similarly named fields from different object groups from becoming ambiguous.',
+                            ],
+                          })}
                           checked={!!field.value}
                           onChange={(e) =>
                             handleUIChange('flattenPrefix', e.currentTarget.checked)
@@ -1298,7 +1517,18 @@ export const PropertyEditor: React.FC = () => {
                 {currentType === 'array' && (
                   <>
                     <Divider />
-                    <FormGroup label="Array Mode">
+                    <FormGroup
+                      label={renderLabelWithTooltip({
+                        label: 'Array Mode',
+                        title: 'How users edit array values',
+                        description:
+                          'Chooses between dynamic item editing and static option selection for array fields.',
+                        reasons: [
+                          'Use dynamic mode when users create arbitrary repeated records or values.',
+                          'Use static mode when the business domain is a fixed multi-select list, such as permissions, tags, or supported channels.',
+                        ],
+                      })}
+                    >
                       <Controller
                         name="ui.arrayMode"
                         control={control}
@@ -1318,7 +1548,16 @@ export const PropertyEditor: React.FC = () => {
                     {/* Static 模式下的选项配置 */}
                     {watch('ui.arrayMode') === 'static' && (
                       <FormGroup
-                        label="Array Items Options"
+                        label={renderLabelWithTooltip({
+                          label: 'Array Items Options',
+                          title: 'Static choices for array values',
+                          description:
+                            'Configures the available values and display labels for static array mode.',
+                          reasons: [
+                            'Use it to make multi-select arrays consistent with an approved business vocabulary.',
+                            'Separating stored value from display label keeps integrations stable while showing user-friendly text.',
+                          ],
+                        })}
                         helperText="Configure available options for static array (multi-select checkboxes)"
                       >
                         {(() => {
@@ -1486,7 +1725,18 @@ export const PropertyEditor: React.FC = () => {
                       </FormGroup>
                     )}
 
-                    <FormGroup label="Add Button Text">
+                    <FormGroup
+                      label={renderLabelWithTooltip({
+                        label: 'Add Button Text',
+                        title: 'Array add action label',
+                        description:
+                          'Customizes the button text users click to add another array item.',
+                        reasons: [
+                          'Use domain-specific language like Add Contact, Add Mapping, or Add Header to make the action clear.',
+                          'Clear action text reduces mistakes in repeatable sections where users may add many records.',
+                        ],
+                      })}
+                    >
                       <Controller
                         name="ui.addButtonText"
                         control={control}
@@ -1507,7 +1757,16 @@ export const PropertyEditor: React.FC = () => {
                 <Divider />
 
                 <FormGroup
-                  label="Field Transform"
+                  label={renderLabelWithTooltip({
+                    label: 'Field Transform',
+                    title: 'Convert between input and stored values',
+                    description:
+                      'Configures transformation functions for cases where the displayed input domain differs from the value stored in form data.',
+                    reasons: [
+                      'Use it for business-friendly inputs such as percentages shown as 96 while storing 0.96.',
+                      'Transforms keep external API payloads correct without forcing users to enter backend-oriented values.',
+                    ],
+                  })}
                   helperText="Configure data transformation functions for this field"
                 >
                   <TransformEditor
