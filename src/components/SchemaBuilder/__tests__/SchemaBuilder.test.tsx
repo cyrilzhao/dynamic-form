@@ -9,8 +9,8 @@ import { basicSchema, nestedSchema, arraySchema } from './testHelpers';
 
 // Mock DynamicForm 组件
 jest.mock('../../DynamicForm', () => ({
-  DynamicForm: ({ schema, onChange }: any) => (
-    <div data-testid="dynamic-form">
+  DynamicForm: ({ columnsCount }: any) => (
+    <div data-testid="dynamic-form" data-columns-count={columnsCount}>
       <span>Mock DynamicForm</span>
     </div>
   ),
@@ -24,13 +24,15 @@ describe('SchemaBuilder', () => {
   describe('基础渲染', () => {
     it('应该正确渲染组件', () => {
       render(<SchemaBuilder />);
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
-      expect(screen.getByText('JSON Schema')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
+      expect(screen.getByText('Preview')).toBeInTheDocument();
+      expect(screen.queryByText('Live Preview')).not.toBeInTheDocument();
+      expect(screen.queryByText('JSON Schema')).not.toBeInTheDocument();
     });
 
     it('应该使用 defaultValue 初始化', () => {
       render(<SchemaBuilder defaultValue={basicSchema} />);
-      expect(screen.getByTestId('dynamic-form')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
 
     it('应该应用自定义 className', () => {
@@ -57,24 +59,92 @@ describe('SchemaBuilder', () => {
       render(<SchemaBuilder onChange={onChange} />);
 
       // 组件应该正常渲染
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
 
     it('应该处理 null defaultValue', () => {
       render(<SchemaBuilder defaultValue={null as any} />);
+      expect(screen.getByText('Edit')).toBeInTheDocument();
+    });
+  });
+
+  describe('编辑和预览视图切换', () => {
+    it('默认应该显示编辑态并隐藏预览内容', () => {
+      render(<SchemaBuilder defaultValue={basicSchema} />);
+
+      expect(screen.getByText('Name')).toBeInTheDocument();
+      expect(screen.queryByTestId('dynamic-form')).not.toBeInTheDocument();
+      expect(screen.queryByText('Live Preview')).not.toBeInTheDocument();
+    });
+
+    it('点击 Preview 应该显示预览内容并隐藏 Schema Tree', () => {
+      const { container } = render(<SchemaBuilder defaultValue={basicSchema} />);
+
+      fireEvent.click(screen.getByText('Preview'));
+
       expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('JSON Schema')).toBeInTheDocument();
+      expect(screen.getByTestId('dynamic-form')).toBeInTheDocument();
+      expect(container.querySelector('.schema-builder-left')).not.toBeInTheDocument();
+      expect(container.querySelector('.schema-builder-resizer')).not.toBeInTheDocument();
+    });
+
+    it('预览态应该将 Root 的 columnsCount 配置传递给 DynamicForm', () => {
+      const schemaWithColumns = {
+        ...basicSchema,
+        ui: {
+          ...basicSchema.ui,
+          columnsCount: 3,
+        },
+      };
+
+      render(<SchemaBuilder defaultValue={schemaWithColumns} />);
+
+      fireEvent.click(screen.getByText('Preview'));
+
+      expect(screen.getByTestId('dynamic-form')).toHaveAttribute(
+        'data-columns-count',
+        '3'
+      );
+    });
+
+    it('切换视图前应该 blur 当前焦点元素以提交 onBlur 字段', async () => {
+      const onChange = jest.fn();
+      render(<SchemaBuilder defaultValue={basicSchema} onChange={onChange} />);
+
+      const nameInput = screen.getByDisplayValue('name');
+      fireEvent.change(nameInput, { target: { value: 'newName' } });
+      nameInput.focus();
+
+      fireEvent.click(screen.getByText('Preview'));
+
+      await waitFor(() => {
+        expect(onChange).toHaveBeenCalled();
+      });
+      const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1][0];
+      expect(lastCall.properties.newName).toBeDefined();
+      expect(lastCall.properties.name).toBeUndefined();
+    });
+
+    it('previewMode 为 none 时不显示 Preview 切换按钮', () => {
+      render(<SchemaBuilder defaultValue={basicSchema} previewMode="none" />);
+
+      expect(screen.getByText('Edit')).toBeInTheDocument();
+      expect(screen.queryByText('Preview')).not.toBeInTheDocument();
     });
   });
 
   describe('预览标签页', () => {
     it('默认应该显示 Live Preview 标签页', () => {
       render(<SchemaBuilder defaultValue={basicSchema} />);
+      fireEvent.click(screen.getByText('Preview'));
       expect(screen.getByTestId('dynamic-form')).toBeInTheDocument();
     });
 
     it('点击 JSON Schema 应该切换到 JSON 视图', () => {
       render(<SchemaBuilder defaultValue={basicSchema} />);
 
+      fireEvent.click(screen.getByText('Preview'));
       fireEvent.click(screen.getByText('JSON Schema'));
 
       // JSON 视图应该显示 schema 内容
@@ -88,19 +158,19 @@ describe('SchemaBuilder', () => {
       render(<SchemaBuilder defaultValue={basicSchema} onChange={onChange} />);
 
       // 组件初始化后应该能正常工作
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
   });
 
   describe('嵌套 Schema', () => {
     it('应该正确渲染嵌套对象 Schema', () => {
       render(<SchemaBuilder defaultValue={nestedSchema} />);
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
 
     it('应该正确渲染数组 Schema', () => {
       render(<SchemaBuilder defaultValue={arraySchema} />);
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
   });
 
@@ -130,7 +200,7 @@ describe('SchemaBuilder', () => {
         properties: {},
       };
       render(<SchemaBuilder defaultValue={emptyPropsSchema} />);
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
 
     it('应该为没有 properties 的 Schema 创建占位节点', () => {
@@ -139,7 +209,7 @@ describe('SchemaBuilder', () => {
         title: 'No Props',
       };
       render(<SchemaBuilder defaultValue={noPropsSchema} />);
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
   });
 
@@ -150,7 +220,7 @@ describe('SchemaBuilder', () => {
         title: 'String Schema',
       };
       render(<SchemaBuilder defaultValue={stringSchema as any} />);
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
   });
 
@@ -200,7 +270,7 @@ describe('SchemaBuilder', () => {
 
       rerender(<SchemaBuilder defaultValue={nestedSchema} />);
 
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
   });
 
@@ -247,49 +317,49 @@ describe('SchemaBuilder', () => {
       render(<SchemaBuilder defaultValue={nestedSchema} onChange={onChange} />);
 
       // 组件应该正常渲染
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
 
     it('onUpdate 应该更新节点属性', async () => {
       const onChange = jest.fn();
       render(<SchemaBuilder defaultValue={basicSchema} onChange={onChange} />);
 
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
 
     it('onAddChild 应该添加子节点', async () => {
       const onChange = jest.fn();
       render(<SchemaBuilder defaultValue={basicSchema} onChange={onChange} />);
 
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
 
     it('onAddSibling 应该添加兄弟节点', async () => {
       const onChange = jest.fn();
       render(<SchemaBuilder defaultValue={basicSchema} onChange={onChange} />);
 
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
 
     it('onDelete 应该删除节点', async () => {
       const onChange = jest.fn();
       render(<SchemaBuilder defaultValue={basicSchema} onChange={onChange} />);
 
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
   });
 
   describe('undefined defaultValue 处理', () => {
     it('应该处理 undefined defaultValue', () => {
       render(<SchemaBuilder defaultValue={undefined} />);
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
   });
 
   describe('空对象 defaultValue 处理', () => {
     it('应该处理空对象 defaultValue', () => {
       render(<SchemaBuilder defaultValue={{} as any} />);
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
   });
 
@@ -298,13 +368,13 @@ describe('SchemaBuilder', () => {
       render(<SchemaBuilder defaultValue={basicSchema} />);
 
       // 组件应该正常渲染
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
 
     it('展开嵌套节点应该显示子节点', () => {
       render(<SchemaBuilder defaultValue={nestedSchema} />);
 
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
   });
 
@@ -312,6 +382,7 @@ describe('SchemaBuilder', () => {
     it('JSON Schema 视图应该显示格式化的 JSON', () => {
       render(<SchemaBuilder defaultValue={basicSchema} />);
 
+      fireEvent.click(screen.getByText('Preview'));
       fireEvent.click(screen.getByText('JSON Schema'));
 
       expect(screen.getByText(/\"type\":/)).toBeInTheDocument();
@@ -323,7 +394,7 @@ describe('SchemaBuilder', () => {
     it('应该正确渲染数组类型的 Schema', () => {
       render(<SchemaBuilder defaultValue={arraySchema} />);
 
-      expect(screen.getByText('Live Preview')).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
     });
   });
 

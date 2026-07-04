@@ -11,7 +11,7 @@ import type {
 import type { ExtendedJSONSchema } from '../DynamicForm/types/schema';
 import { SchemaTree } from './components/SchemaTree/SchemaTree';
 import { PropertyEditor } from './components/PropertyEditor/PropertyEditor';
-import { Card, Divider, Tabs, Tab } from '@blueprintjs/core';
+import { Button, ButtonGroup, Divider, Tabs, Tab } from '@blueprintjs/core';
 import { DynamicForm } from '../DynamicForm';
 import './SchemaBuilder.scss';
 
@@ -20,6 +20,8 @@ const defaultSchema: ExtendedJSONSchema = {
   title: 'Root',
   properties: {},
 };
+
+type BuilderViewMode = 'edit' | 'preview';
 
 // 生成随机字段 key 的辅助函数
 const generateRandomKeyStatic = (properties: Record<string, any>): string => {
@@ -183,10 +185,17 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(({
   const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>({ '': true });
   const [previewData, setPreviewData] = useState({});
   const [previewTab, setPreviewTab] = useState<'form' | 'json'>('form');
+  const [builderViewMode, setBuilderViewMode] = useState<BuilderViewMode>('edit');
 
   // Resizable sidebar state
   const [leftPanelWidth, setLeftPanelWidth] = useState(300);
   const isResizingRef = useRef(false);
+  const activeViewMode: BuilderViewMode =
+    previewMode === 'none' ? 'edit' : builderViewMode;
+  const previewColumnsCount =
+    typeof schema.ui?.columnsCount === 'number' && schema.ui.columnsCount > 1
+      ? schema.ui.columnsCount
+      : undefined;
 
   // 暴露 ref 方法
   useImperativeHandle(ref, () => ({
@@ -225,7 +234,8 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(({
         // But we don't have ref to container easily here without adding more refs.
         // Let's assume standard behavior:
         // New Width = Current Width + Movement
-        setLeftPanelWidth(prev => Math.max(200, Math.min(600, prev + e.movementX)));
+        const movementX = Number.isFinite(e.movementX) ? e.movementX : 0;
+        setLeftPanelWidth(prev => Math.max(200, Math.min(600, prev + movementX)));
       }
     };
 
@@ -249,6 +259,17 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(({
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none'; // Prevent text selection
     e.preventDefault();
+  };
+
+  const commitFocusedFieldBeforeViewChange = () => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  };
+
+  const handleViewModeChange = (nextViewMode: BuilderViewMode) => {
+    commitFocusedFieldBeforeViewChange();
+    setBuilderViewMode(nextViewMode);
   };
 
   const handleToggleExpand = useCallback((path: string[], expanded: boolean) => {
@@ -603,6 +624,69 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(({
     [onChange]
   );
 
+  const renderPreviewPanel = () => {
+    if (previewMode === 'both') {
+      return (
+        <Tabs
+          id="preview-tabs"
+          selectedTabId={previewTab}
+          onChange={id => setPreviewTab(id as any)}
+        >
+          <Tab
+            id="form"
+            title="Live Preview"
+            panel={
+              <div className="preview-content">
+                <DynamicForm
+                  schema={schema}
+                  onChange={setPreviewData}
+                  columnsCount={previewColumnsCount}
+                />
+                <Divider />
+                <div className="preview-data">
+                  <h5>Data</h5>
+                  <pre>{JSON.stringify(previewData, null, 2)}</pre>
+                </div>
+              </div>
+            }
+          />
+          <Tab
+            id="json"
+            title="JSON Schema"
+            panel={
+              <div className="preview-content">
+                <pre>{JSON.stringify(schema, null, 2)}</pre>
+              </div>
+            }
+          />
+        </Tabs>
+      );
+    }
+
+    if (previewMode === 'form') {
+      return (
+        <div className="preview-content">
+          <DynamicForm
+            schema={schema}
+            onChange={setPreviewData}
+            columnsCount={previewColumnsCount}
+          />
+          <Divider />
+          <div className="preview-data">
+            <h5>Data</h5>
+            <pre>{JSON.stringify(previewData, null, 2)}</pre>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="preview-content">
+        <pre>{JSON.stringify(schema, null, 2)}</pre>
+      </div>
+    );
+  };
+
   return (
     <SchemaBuilderContext.Provider
       value={{
@@ -620,7 +704,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(({
       }}
     >
       <div className={`schema-builder ${className || ''}`} style={style}>
-        {!hideTree && (
+        {activeViewMode === 'edit' && !hideTree && (
           <>
             <div className="schema-builder-left" style={{ width: leftPanelWidth }}>
               <SchemaTree />
@@ -628,64 +712,34 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(({
             <div className="schema-builder-resizer" onMouseDown={startResizing} />
           </>
         )}
-        <div style={{ display: 'flex', flexGrow: 1 }}>
-          <div className="schema-builder-middle">
-            <PropertyEditor />
-          </div>
-          {previewMode !== 'none' && (
-            <div className="schema-builder-right">
-              {previewMode === 'both' ? (
-                <Tabs
-                  id="preview-tabs"
-                  selectedTabId={previewTab}
-                  onChange={id => setPreviewTab(id as any)}
-                >
-                  <Tab
-                    id="form"
-                    title="Live Preview"
-                    panel={
-                      <div className="preview-content">
-                        <DynamicForm
-                          schema={schema}
-                          onChange={setPreviewData}
-                        />
-                        <Divider />
-                        <div className="preview-data">
-                          <h5>Data</h5>
-                          <pre>{JSON.stringify(previewData, null, 2)}</pre>
-                        </div>
-                      </div>
-                    }
-                  />
-                  <Tab
-                    id="json"
-                    title="JSON Schema"
-                    panel={
-                      <div className="preview-content">
-                        <pre>{JSON.stringify(schema, null, 2)}</pre>
-                      </div>
-                    }
-                  />
-                </Tabs>
-              ) : previewMode === 'form' ? (
-                <div className="preview-content">
-                  <DynamicForm
-                    schema={schema}
-                    onChange={setPreviewData}
-                  />
-                  <Divider />
-                  <div className="preview-data">
-                    <h5>Data</h5>
-                    <pre>{JSON.stringify(previewData, null, 2)}</pre>
-                  </div>
-                </div>
-              ) : (
-                <div className="preview-content">
-                  <pre>{JSON.stringify(schema, null, 2)}</pre>
-                </div>
+        <div className="schema-builder-main">
+          <div className="schema-builder-toolbar">
+            <ButtonGroup>
+              <Button
+                text="Edit"
+                active={activeViewMode === 'edit'}
+                intent={activeViewMode === 'edit' ? 'primary' : 'none'}
+                onClick={() => handleViewModeChange('edit')}
+              />
+              {previewMode !== 'none' && (
+                <Button
+                  text="Preview"
+                  active={activeViewMode === 'preview'}
+                  intent={activeViewMode === 'preview' ? 'primary' : 'none'}
+                  onClick={() => handleViewModeChange('preview')}
+                />
               )}
-            </div>
-          )}
+            </ButtonGroup>
+          </div>
+          <div
+            className={
+              activeViewMode === 'preview'
+                ? 'schema-builder-preview'
+                : 'schema-builder-middle'
+            }
+          >
+            {activeViewMode === 'preview' ? renderPreviewPanel() : <PropertyEditor />}
+          </div>
         </div>
       </div>
     </SchemaBuilderContext.Provider>
