@@ -83,6 +83,7 @@ export interface UIConfig {
   prefixLabel?: string // 字段标签前缀（由 flattenPrefix 场景写入）
 
   // 多列布局
+  columnsCount?: number // object 类型字段的多列布局列数（默认 1）
   colSpan?: number // 在多列布局下，该字段占用的列数（默认 1）
 
   // 字段透明化渲染配置

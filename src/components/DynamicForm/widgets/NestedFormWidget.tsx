@@ -107,6 +107,7 @@ export const NestedFormWidget = forwardRef<HTMLDivElement, NestedFormWidgetProps
         readonly={readonly}
         layout={layout}
         labelWidth={labelWidth}
+        columnsCount={schema.ui?.columnsCount}
         showSubmitButton={false}
         renderAsForm={false}
         onSubmit={handleSubmit}

@@ -2103,6 +2103,32 @@ Control form layout at global or field level:
 }
 ```
 
+**Object Multi-Column Layout:**
+
+Any schema with `type: 'object'` can define `ui.columnsCount` to render its
+direct child fields in multiple columns. This includes the root schema and
+nested object fields rendered with `nested-form`.
+
+```typescript
+{
+  type: 'object',
+  title: 'Profile',
+  ui: {
+    columnsCount: 3
+  },
+  properties: {
+    firstName: { type: 'string', title: 'First Name' },
+    lastName: { type: 'string', title: 'Last Name' },
+    email: { type: 'string', title: 'Email' }
+  }
+}
+```
+
+`ui.columnsCount` is only meaningful on `object` schemas. Setting it on
+`string`, `number`, `boolean`, or `array` fields has no effect. Use
+`ui.colSpan` on child fields when a field needs to span multiple columns inside
+an object multi-column layout.
+
 **Layout Options:**
 
 - `vertical` - Label above input (default)
@@ -2178,6 +2204,8 @@ Additional UI customization options:
 | `hidden`        | `boolean` | Hide field                                                                         |
 | `layout`        | `string`  | Layout override                                                                    |
 | `labelWidth`    | `number`  | Label width (horizontal layout)                                                    |
+| `columnsCount`  | `number`  | Multi-column layout count for `object` schemas only                                |
+| `colSpan`       | `number`  | Number of columns a child field spans in an object multi-column layout             |
 | `linkages`      | `array`   | Field linkage configurations                                                       |
 | `flattenPath`   | `boolean` | Flatten nested path                                                                |
 | `flattenPrefix` | `boolean` | Add parent title as prefix                                                         |

@@ -7,8 +7,13 @@ import type { ExtendedJSONSchema } from '../../types/schema';
 
 // Mock DynamicForm 组件，避免复杂的依赖
 jest.mock('../../DynamicForm', () => ({
-  DynamicForm: ({ schema, disabled, readonly }: any) => (
-    <div data-testid="dynamic-form" data-disabled={disabled} data-readonly={readonly}>
+  DynamicForm: ({ schema, disabled, readonly, columnsCount }: any) => (
+    <div
+      data-testid="dynamic-form"
+      data-disabled={disabled}
+      data-readonly={readonly}
+      data-columns-count={columnsCount}
+    >
       {Object.keys(schema.properties || {}).map(key => (
         <div key={key} data-testid={`field-${key}`}>
           {key}
@@ -65,6 +70,24 @@ describe('NestedFormWidget', () => {
         </TestWrapper>
       );
       expect(screen.getByTestId('dynamic-form')).toHaveAttribute('data-readonly', 'true');
+    });
+
+    it('object schema 的 columnsCount 应该传递给子表单', () => {
+      const schemaWithColumns: ExtendedJSONSchema = {
+        ...simpleSchema,
+        ui: { columnsCount: 2 },
+      };
+
+      render(
+        <TestWrapper defaultValues={{ person: {} }}>
+          <NestedFormWidget name="person" schema={schemaWithColumns} />
+        </TestWrapper>
+      );
+
+      expect(screen.getByTestId('dynamic-form')).toHaveAttribute(
+        'data-columns-count',
+        '2'
+      );
     });
   });
 
