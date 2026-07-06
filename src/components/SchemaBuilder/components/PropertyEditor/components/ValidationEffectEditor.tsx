@@ -6,10 +6,10 @@ import {
   Tag,
   Divider,
   Callout,
-  HTMLSelect,
   InputGroup,
   NumericInput,
 } from '@blueprintjs/core';
+import { Select } from '../../../../Select';
 import { FieldPathSelector } from './FieldPathSelector';
 import type { ExtendedJSONSchema } from '../../../../DynamicForm/types/schema';
 
@@ -215,19 +215,19 @@ export const ValidationEffectEditor: React.FC<ValidationEffectEditorProps> = ({
         </FormGroup>
 
         <FormGroup label="Configuration Type" style={{ marginBottom: 8 }}>
-          <HTMLSelect
+          <Select
             value={validationType}
-            onChange={e => setValidationType(e.target.value as any)}
+            onChange={(value) => setValidationType(value as any)}
             disabled={disabled || !selectedField}
-            fill
-          >
-            <option value="required">Required (Must Fill)</option>
-            <option value="pattern">Pattern (Regex)</option>
-            <option value="minLength">Min Length</option>
-            <option value="maxLength">Max Length</option>
-            <option value="minimum">Minimum Value</option>
-            <option value="maximum">Maximum Value</option>
-          </HTMLSelect>
+            options={[
+              { label: 'Required (Must Fill)', value: 'required' },
+              { label: 'Pattern (Regex)', value: 'pattern' },
+              { label: 'Min Length', value: 'minLength' },
+              { label: 'Max Length', value: 'maxLength' },
+              { label: 'Minimum Value', value: 'minimum' },
+              { label: 'Maximum Value', value: 'maximum' },
+            ]}
+          />
         </FormGroup>
 
         {validationType !== 'required' && (

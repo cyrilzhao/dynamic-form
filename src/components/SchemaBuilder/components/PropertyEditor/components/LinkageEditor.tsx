@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import {
   FormGroup,
-  HTMLSelect,
   Button,
   Callout,
   Tag,
@@ -10,6 +9,7 @@ import {
   Tooltip,
   Icon,
 } from '@blueprintjs/core'
+import { Select } from '../../../../Select'
 import type {
   LinkageConfig,
   LinkageType,
@@ -218,18 +218,12 @@ export const LinkageEditor: React.FC<LinkageEditorProps> = ({
           </span>
         }
       >
-        <HTMLSelect
+        <Select
           value={value.type || 'visibility'}
-          onChange={(e) => handleTypeChange(e.target.value as LinkageType)}
+          onChange={(val) => handleTypeChange(val as LinkageType)}
           disabled={disabled}
-          fill
-        >
-          {linkageTypeOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </HTMLSelect>
+          options={linkageTypeOptions}
+        />
       </FormGroup>
 
       {/* 依赖字段 */}

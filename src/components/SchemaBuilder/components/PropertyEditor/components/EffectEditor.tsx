@@ -7,9 +7,9 @@ import {
   Elevation,
   Button,
   Tag,
-  HTMLSelect,
   Callout,
 } from '@blueprintjs/core';
+import { Select } from '../../../../Select';
 import type { LinkageEffect, LinkageType } from '../../../../DynamicForm/types/linkage';
 import { ObjectEditor } from '../../../../ObjectEditor';
 import { CodeEditor } from '../../../../CodeEditor';
@@ -244,15 +244,15 @@ export const EffectEditor: React.FC<EffectEditorProps> = ({
 
       {/* 配置模式选择 */}
       <FormGroup label="Configuration Mode">
-        <HTMLSelect
+        <Select
           value={configMode}
-          onChange={(e) => handleModeChange(e.target.value as ConfigMode)}
+          onChange={(value) => handleModeChange(value as ConfigMode)}
           disabled={disabled}
-          fill
-        >
-          <option value="dynamic">Dynamic (Use Function)</option>
-          <option value="static">Static (Fixed Value)</option>
-        </HTMLSelect>
+          options={[
+            { label: 'Dynamic (Use Function)', value: 'dynamic' },
+            { label: 'Static (Fixed Value)', value: 'static' },
+          ]}
+        />
       </FormGroup>
 
       {/* Dynamic 模式配置 */}
@@ -334,15 +334,15 @@ const DynamicModeConfig: React.FC<DynamicModeConfigProps> = ({
   return (
     <>
       <FormGroup label="Function Type">
-        <HTMLSelect
+        <Select
           value={functionMode}
-          onChange={(e) => handleFunctionModeChange(e.target.value as FunctionMode)}
+          onChange={(value) => handleFunctionModeChange(value as FunctionMode)}
           disabled={disabled}
-          fill
-        >
-          <option value="function-name">Function Name (from callbacks registry)</option>
-          <option value="inline-script">Inline Script</option>
-        </HTMLSelect>
+          options={[
+            { label: 'Function Name (from callbacks registry)', value: 'function-name' },
+            { label: 'Inline Script', value: 'inline-script' },
+          ]}
+        />
       </FormGroup>
 
       {functionMode === 'function-name' && (

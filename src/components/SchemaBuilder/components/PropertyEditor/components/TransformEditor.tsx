@@ -4,8 +4,8 @@ import {
   FormGroup,
   InputGroup,
   Callout,
-  HTMLSelect,
 } from '@blueprintjs/core'
+import { Select } from '../../../../Select'
 import { CodeEditor } from '../../../../CodeEditor'
 import type { UIConfig } from '../../../../DynamicForm/types/schema'
 
@@ -43,19 +43,17 @@ function TransformFnEditor({
   return (
     <div style={{ marginBottom: 12 }}>
       <FormGroup label={label} style={{ marginBottom: 4 }}>
-        <HTMLSelect
+        <Select
           value={mode}
-          onChange={(e) =>
-            handleModeChange(e.target.value as 'callback' | 'script')
+          onChange={(value) =>
+            handleModeChange(value as 'callback' | 'script')
           }
           disabled={disabled}
-          style={{ marginBottom: 6 }}
-        >
-          <option value="callback">
-            Callback name (from callbacks registry)
-          </option>
-          <option value="script">Inline JS script</option>
-        </HTMLSelect>
+          options={[
+            { label: 'Callback name (from callbacks registry)', value: 'callback' },
+            { label: 'Inline JS script', value: 'script' },
+          ]}
+        />
 
         {mode === 'callback' ? (
           <InputGroup

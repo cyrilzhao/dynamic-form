@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   FormGroup,
-  HTMLSelect,
   Button,
   InputGroup,
   Card,
@@ -12,6 +11,7 @@ import {
   MenuItem,
   Popover,
 } from '@blueprintjs/core';
+import { Select } from '../../../../Select';
 import type { ConditionExpression, ConditionOperator } from '../../../../DynamicForm/types/linkage';
 import type { ExtendedJSONSchema } from '../../../../DynamicForm/types/schema';
 import { FieldPathSelector } from './FieldPathSelector';
@@ -208,20 +208,14 @@ const RecursiveConditionEditor: React.FC<RecursiveConditionEditorProps> = ({
         </FormGroup>
 
         <FormGroup label="Operator" labelInfo="(required)" style={{ marginBottom: 8 }}>
-          <HTMLSelect
+          <Select
             value={condition.operator}
-            onChange={e =>
-              onChange({ ...condition, operator: e.target.value as ConditionOperator })
+            onChange={(value) =>
+              onChange({ ...condition, operator: value as ConditionOperator })
             }
             disabled={disabled}
-            fill
-          >
-            {operatorOptions.map(opt => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </HTMLSelect>
+            options={operatorOptions}
+          />
         </FormGroup>
 
         {needsValue && (

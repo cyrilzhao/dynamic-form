@@ -6,7 +6,6 @@ import {
   FormGroup,
   InputGroup,
   TextArea,
-  HTMLSelect,
   NumericInput,
   Switch,
   Callout,
@@ -17,6 +16,7 @@ import {
   Tooltip,
   Icon,
 } from '@blueprintjs/core'
+import { Select } from '../../../Select'
 import { get } from 'lodash'
 import { useSchemaBuilder } from '../../SchemaBuilder'
 import type { SchemaNodeType } from '../../types'
@@ -602,17 +602,16 @@ export const PropertyEditor: React.FC = () => {
                     name="type"
                     control={control}
                     render={({ field }) => (
-                      <HTMLSelect
-                        {...field}
+                      <Select
                         value={field.value ?? ''}
-                        options={typeOptions}
-                        disabled={isRoot || isArrayItems} // Root type usually shouldn't change easily or needs warning
-                        onChange={(e) => {
-                          field.onChange(e)
-                          handleFieldChange('type', e.target.value)
+                        onChange={(value) => {
+                          field.onChange(value)
+                          handleFieldChange('type', value)
                           setValue('default', undefined)
                           handleFieldChange('default', undefined)
                         }}
+                        options={typeOptions}
+                        disabled={isRoot || isArrayItems}
                       />
                     )}
                   />
@@ -927,20 +926,20 @@ export const PropertyEditor: React.FC = () => {
                           name="format"
                           control={control}
                           render={({ field }) => (
-                            <HTMLSelect
-                              {...field}
+                            <Select
                               value={field.value ?? ''}
+                              onChange={(value) => {
+                                field.onChange(value)
+                                handleFieldChange('format', value)
+                              }}
                               options={[
-                                '',
-                                'email',
-                                'uri',
-                                'date',
-                                'date-time',
-                                'time',
+                                { label: '(none)', value: '' },
+                                { label: 'email', value: 'email' },
+                                { label: 'uri', value: 'uri' },
+                                { label: 'date', value: 'date' },
+                                { label: 'date-time', value: 'date-time' },
+                                { label: 'time', value: 'time' },
                               ]}
-                              onChange={(e) =>
-                                handleFieldChange('format', e.target.value)
-                              }
                             />
                           )}
                         />
@@ -1229,9 +1228,12 @@ export const PropertyEditor: React.FC = () => {
                           name="ui.widget"
                           control={control}
                           render={({ field }) => (
-                            <HTMLSelect
-                              {...field}
+                            <Select
                               value={field.value ?? ''}
+                              onChange={(value) => {
+                                field.onChange(value)
+                                handleUIChange('widget', value)
+                              }}
                               options={[
                                 {
                                   label: `Default (${defaultWidget})`,
@@ -1239,9 +1241,6 @@ export const PropertyEditor: React.FC = () => {
                                 },
                                 ...currentWidgetOptions,
                               ]}
-                              onChange={(e) =>
-                                handleUIChange('widget', e.target.value)
-                              }
                               disabled={isArrayItems}
                             />
                           )}
@@ -1520,13 +1519,18 @@ export const PropertyEditor: React.FC = () => {
                         name="ui.layout"
                         control={control}
                         render={({ field }) => (
-                          <HTMLSelect
-                            {...field}
+                          <Select
                             value={field.value ?? ''}
-                            options={['', 'vertical', 'horizontal', 'inline']}
-                            onChange={(e) =>
-                              handleUIChange('layout', e.target.value)
-                            }
+                            onChange={(value) => {
+                              field.onChange(value)
+                              handleUIChange('layout', value)
+                            }}
+                            options={[
+                              { label: '(none)', value: '' },
+                              { label: 'vertical', value: 'vertical' },
+                              { label: 'horizontal', value: 'horizontal' },
+                              { label: 'inline', value: 'inline' },
+                            ]}
                             disabled={isArrayItems}
                           />
                         )}
@@ -1678,13 +1682,16 @@ export const PropertyEditor: React.FC = () => {
                           name="ui.arrayMode"
                           control={control}
                           render={({ field }) => (
-                            <HTMLSelect
-                              {...field}
+                            <Select
                               value={field.value ?? ''}
-                              options={['dynamic', 'static']}
-                              onChange={(e) =>
-                                handleUIChange('arrayMode', e.target.value)
-                              }
+                              onChange={(value) => {
+                                field.onChange(value)
+                                handleUIChange('arrayMode', value)
+                              }}
+                              options={[
+                                { label: 'dynamic', value: 'dynamic' },
+                                { label: 'static', value: 'static' },
+                              ]}
                             />
                           )}
                         />

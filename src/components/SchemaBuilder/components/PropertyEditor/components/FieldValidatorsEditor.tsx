@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import {
   Button,
   FormGroup,
-  HTMLSelect,
   InputGroup,
   Card,
   Tag,
@@ -10,6 +9,7 @@ import {
   Divider,
 } from '@blueprintjs/core'
 import { CodeEditor } from '../../../../CodeEditor'
+import { Select } from '../../../../Select'
 import type { ValidatorRule } from '../../../../DynamicForm/types/schema'
 
 interface FieldValidatorsEditorProps {
@@ -185,14 +185,15 @@ export const FieldValidatorsEditor: React.FC<FieldValidatorsEditorProps> = ({
         }}
       >
         <FormGroup label="Callback Mode">
-          <HTMLSelect
+          <Select
             value={callbackMode}
-            onChange={(e) => handleModeChange(e.target.value as CallbackMode)}
+            onChange={(value) => handleModeChange(value as CallbackMode)}
             disabled={disabled}
-          >
-            <option value="function-name">Function Name (from callbacks registry)</option>
-            <option value="inline-script">Inline Script</option>
-          </HTMLSelect>
+            options={[
+              { label: 'Function Name (from callbacks registry)', value: 'function-name' },
+              { label: 'Inline Script', value: 'inline-script' },
+            ]}
+          />
         </FormGroup>
 
         {callbackMode === 'function-name' && (

@@ -20,6 +20,26 @@ jest.mock('../components/PropertyEditor/components/FieldPathSelector', () => ({
   ),
 }))
 
+// Mock Select 组件以便测试
+jest.mock('../../../../Select', () => ({
+  Select: ({ value, onChange, disabled, options }: any) => {
+    const selectedOption = options.find((opt: any) => opt.value === value)
+    return (
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+      >
+        {options.map((opt: any) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    )
+  },
+}))
+
 describe('ConditionEditor', () => {
   const defaultProps = {
     schema: basicSchema,

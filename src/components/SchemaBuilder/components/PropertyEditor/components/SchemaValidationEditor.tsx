@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   Button,
   FormGroup,
-  HTMLSelect,
   Callout,
   Card,
   Tag,
@@ -12,6 +11,7 @@ import {
   Tabs,
   Tab,
 } from '@blueprintjs/core';
+import { Select } from '../../../../Select';
 import { FieldPathSelector } from './FieldPathSelector';
 import { ValidationEffectEditor } from './ValidationEffectEditor';
 import type { ExtendedJSONSchema } from '../../../../DynamicForm/types/schema';
@@ -304,15 +304,15 @@ const DependenciesEditor: React.FC<DependenciesEditorProps> = ({
       </FormGroup>
 
       <FormGroup label="Dependency Type">
-        <HTMLSelect
+        <Select
           value={dependencyType}
-          onChange={e => setDependencyType(e.target.value as 'simple' | 'schema')}
+          onChange={(value) => setDependencyType(value as 'simple' | 'schema')}
           disabled={disabled}
-          fill
-        >
-          <option value="simple">Simple (Required Fields)</option>
-          <option value="schema">Schema (Complex Rules)</option>
-        </HTMLSelect>
+          options={[
+            { label: 'Simple (Required Fields)', value: 'simple' },
+            { label: 'Schema (Complex Rules)', value: 'schema' },
+          ]}
+        />
       </FormGroup>
 
       <Button
