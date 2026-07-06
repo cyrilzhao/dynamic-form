@@ -2,8 +2,6 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   Button,
   Dialog,
-  Tree,
-  type TreeNodeInfo,
   InputGroup,
   FormGroup,
   Callout,
@@ -11,6 +9,7 @@ import {
   Classes,
   Tooltip,
 } from '@blueprintjs/core';
+import { Tree, type TreeNodeInfo } from '../../../../Tree';
 import type { ExtendedJSONSchema } from '../../../../DynamicForm/types/schema';
 
 interface FieldPathSelectorProps {
