@@ -55,7 +55,9 @@ export function mergeSchemaWithLinkage(
   validationProps.forEach((prop) => {
     if (prop in linkageSchema) {
       // 使用类型断言确保类型安全
-      (merged as any)[prop] = (linkageSchema as any)[prop];
+      (merged as Record<string, unknown>)[prop] = (
+        linkageSchema as Record<string, unknown>
+      )[prop];
     }
   });
 
