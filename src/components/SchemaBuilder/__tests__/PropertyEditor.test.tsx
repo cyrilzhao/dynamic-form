@@ -24,6 +24,23 @@ jest.mock(
   }),
 );
 
+// Mock Select 组件以便测试
+jest.mock("../../Select", () => ({
+  Select: ({ value, onChange, disabled, options }: any) => (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+    >
+      {options.map((opt: any) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+  ),
+}));
+
 // 创建 mock context wrapper
 const createWrapper = (contextValue: any) => {
   return ({ children }: { children: React.ReactNode }) => (

@@ -21,7 +21,7 @@ jest.mock('../components/PropertyEditor/components/FieldPathSelector', () => ({
 }))
 
 // Mock Select 组件以便测试
-jest.mock('../../../../Select', () => ({
+jest.mock('../../Select', () => ({
   Select: ({ value, onChange, disabled, options }: any) => {
     const selectedOption = options.find((opt: any) => opt.value === value)
     return (

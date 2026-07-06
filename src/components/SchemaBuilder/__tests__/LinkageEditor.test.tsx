@@ -7,6 +7,24 @@ import '@testing-library/jest-dom'
 import { LinkageEditor } from '../components/PropertyEditor/components/LinkageEditor'
 import { basicSchema } from './testHelpers'
 
+// Mock Select 组件以便测试
+jest.mock('../../Select', () => ({
+  Select: ({ value, onChange, disabled, options }: any) => (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+      role="combobox"
+    >
+      {options.map((opt: any) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+  ),
+}))
+
 describe('LinkageEditor', () => {
   const defaultProps = {
     schema: basicSchema,
