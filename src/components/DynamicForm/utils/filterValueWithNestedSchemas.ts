@@ -1,4 +1,4 @@
-import type { ExtendedJSONSchema } from '../types/schema';
+import type { ExtendedJSONSchema } from "../types/schema";
 
 /**
  * 使用嵌套 schema 注册表过滤数据
@@ -16,7 +16,7 @@ export function filterValueWithNestedSchemas(
   value: any,
   schema: ExtendedJSONSchema,
   nestedSchemas: Map<string, ExtendedJSONSchema>,
-  currentPath: string = ''
+  currentPath: string = "",
 ): any {
   // 处理 null 或 undefined
   if (value === null || value === undefined) {
@@ -24,7 +24,7 @@ export function filterValueWithNestedSchemas(
   }
 
   // 处理数组类型
-  if (schema.type === 'array' && Array.isArray(value)) {
+  if (schema.type === "array" && Array.isArray(value)) {
     if (!schema.items) {
       return value;
     }
@@ -36,13 +36,17 @@ export function filterValueWithNestedSchemas(
         item,
         schema.items as ExtendedJSONSchema,
         nestedSchemas,
-        itemPath
+        itemPath,
       );
     });
   }
 
   // 处理对象类型
-  if (schema.type === 'object' && typeof value === 'object' && !Array.isArray(value)) {
+  if (
+    schema.type === "object" &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+  ) {
     if (!schema.properties) {
       return value;
     }
@@ -64,10 +68,10 @@ export function filterValueWithNestedSchemas(
             value[key],
             registeredSchema,
             nestedSchemas,
-            fieldPath
+            fieldPath,
           );
         }
-      } else if (fieldSchema.type === 'object') {
+      } else if (fieldSchema.type === "object") {
         // 对象字段
         // 注意：即使字段使用了 flattenPath，传入的数据也已经被 PathTransformer 转换成嵌套结构了
         // 所以这里统一按照嵌套对象处理即可
@@ -76,16 +80,16 @@ export function filterValueWithNestedSchemas(
             value[key],
             fieldSchema,
             nestedSchemas,
-            fieldPath
+            fieldPath,
           );
         }
-      } else if (fieldSchema.type === 'array' && key in value) {
+      } else if (fieldSchema.type === "array" && key in value) {
         // 数组字段：递归处理
         filtered[key] = filterValueWithNestedSchemas(
           value[key],
           fieldSchema,
           nestedSchemas,
-          fieldPath
+          fieldPath,
         );
       } else if (key in value) {
         // 基本类型直接返回

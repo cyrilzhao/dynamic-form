@@ -1,12 +1,22 @@
-import { forwardRef } from 'react';
-import { Select } from '../../Select';
-import type { FieldWidgetProps } from '../types';
-import type { FieldOption } from '../types/schema';
+import { forwardRef } from "react";
+import { Select } from "../../Select";
+import type { FieldWidgetProps } from "../types";
+import type { FieldOption } from "../types/schema";
 
 export const SelectWidget = forwardRef<HTMLElement, FieldWidgetProps>(
   (
-    { name, placeholder, disabled, readonly, options = [], error, value, onChange, ...rest },
-    ref
+    {
+      name,
+      placeholder,
+      disabled,
+      readonly,
+      options = [],
+      error,
+      value,
+      onChange,
+      ...rest
+    },
+    ref,
   ) => {
     return (
       <Select
@@ -22,7 +32,7 @@ export const SelectWidget = forwardRef<HTMLElement, FieldWidgetProps>(
         {...rest}
       />
     );
-  }
+  },
 );
 
-SelectWidget.displayName = 'SelectWidget';
+SelectWidget.displayName = "SelectWidget";

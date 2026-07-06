@@ -1,5 +1,5 @@
-import type { ExtendedJSONSchema, LinkageConfig } from '../types/schema';
-import { resolveArrayElementLinkage } from './arrayLinkageHelper';
+import type { ExtendedJSONSchema, LinkageConfig } from "../types/schema";
+import { resolveArrayElementLinkage } from "./arrayLinkageHelper";
 
 /**
  * 解析结果
@@ -36,11 +36,13 @@ export interface ParsedLinkages {
  *
  * @param schema - JSON Schema
  */
-export function parseSchemaLinkages(schema: ExtendedJSONSchema): ParsedLinkages {
+export function parseSchemaLinkages(
+  schema: ExtendedJSONSchema,
+): ParsedLinkages {
   const linkages: Record<string, LinkageConfig[]> = {};
 
   // 递归解析 schema，收集所有联动配置
-  parseSchemaRecursive(schema, '', linkages);
+  parseSchemaRecursive(schema, "", linkages);
 
   // if (process.env.NODE_ENV !== 'production') {
   //   console.log(
@@ -71,7 +73,7 @@ export function parseSchemaLinkages(schema: ExtendedJSONSchema): ParsedLinkages 
 function parseSchemaRecursive(
   schema: ExtendedJSONSchema,
   parentPath: string,
-  linkages: Record<string, LinkageConfig[]>
+  linkages: Record<string, LinkageConfig[]>,
 ): void {
   if (!schema.properties) {
     return;
@@ -89,7 +91,9 @@ function parseSchemaRecursive(
 
   // 遍历所有字段
   Object.entries(schema.properties).forEach(([fieldName, fieldSchema]) => {
-    if (typeof fieldSchema === 'boolean') return;
+    if (typeof fieldSchema === "boolean") {
+      return;
+    }
 
     const typedSchema = fieldSchema as ExtendedJSONSchema;
 
@@ -99,14 +103,18 @@ function parseSchemaRecursive(
     // 收集当前字段的联动配置（只支持 linkages 数组）
     const linkagesArray = typedSchema.ui?.linkages;
 
-    if (linkagesArray && Array.isArray(linkagesArray) && linkagesArray.length > 0) {
+    if (
+      linkagesArray &&
+      Array.isArray(linkagesArray) &&
+      linkagesArray.length > 0
+    ) {
       linkages[currentPath] = linkagesArray;
     }
 
     // 递归解析嵌套的普通对象（非数组）中的联动配置。
     // 与数组字段不同，普通嵌套对象的字段直接属于当前 DynamicForm 的字段树，
     // 需要在父级统一收集其联动配置，而不是交由子组件独立处理。
-    if (typedSchema.type === 'object' && typedSchema.properties) {
+    if (typedSchema.type === "object" && typedSchema.properties) {
       parseSchemaRecursive(typedSchema, currentPath, linkages);
     }
 
@@ -147,7 +155,7 @@ function parseSchemaRecursive(
  */
 export function transformToAbsolutePaths(
   linkages: Record<string, LinkageConfig[]>,
-  pathPrefix: string
+  pathPrefix: string,
 ): Record<string, LinkageConfig[]> {
   if (!pathPrefix) {
     return linkages;
@@ -163,8 +171,8 @@ export function transformToAbsolutePaths(
     // 解析为具体路径（如 'departments.0.type'）。
     // 若推迟到运行时再解析，dep graph 初始化时拿到的是未解析的 JSON Pointer，
     // 导致 watch 无法正确识别依赖关系，联动不触发。
-    result[absolutePath] = linkageArray.map(linkage =>
-      resolveArrayElementLinkage(linkage, absolutePath)
+    result[absolutePath] = linkageArray.map((linkage) =>
+      resolveArrayElementLinkage(linkage, absolutePath),
     );
   });
 

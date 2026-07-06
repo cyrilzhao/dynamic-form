@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 interface FieldLabelProps {
   htmlFor: string;
@@ -6,7 +6,11 @@ interface FieldLabelProps {
   required?: boolean;
 }
 
-export const FieldLabel: React.FC<FieldLabelProps> = ({ htmlFor, label, required }) => {
+export const FieldLabel: React.FC<FieldLabelProps> = ({
+  htmlFor,
+  label,
+  required,
+}) => {
   return (
     <label htmlFor={htmlFor} className="bp5-label">
       {label}

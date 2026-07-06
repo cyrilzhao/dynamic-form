@@ -1,5 +1,5 @@
-import type { ComponentType } from 'react';
-import type { FieldWidgetProps } from './index';
+import type { ComponentType } from "react";
+import type { FieldWidgetProps } from "./index";
 
 /**
  * Widget 预设包接口
@@ -15,13 +15,13 @@ export interface WidgetPreset {
   select: ComponentType<FieldWidgetProps>;
   radio: ComponentType<FieldWidgetProps>;
   checkbox: ComponentType<FieldWidgetProps>;
-  'checkbox-group': ComponentType<FieldWidgetProps>;
-  'schema-builder': ComponentType<FieldWidgetProps>;
+  "checkbox-group": ComponentType<FieldWidgetProps>;
+  "schema-builder": ComponentType<FieldWidgetProps>;
   switch: ComponentType<FieldWidgetProps>;
-  'nested-form': ComponentType<FieldWidgetProps>;
+  "nested-form": ComponentType<FieldWidgetProps>;
   array: ComponentType<FieldWidgetProps>;
-  'key-value-array': ComponentType<FieldWidgetProps>;
-  'table-array': ComponentType<FieldWidgetProps>;
+  "key-value-array": ComponentType<FieldWidgetProps>;
+  "table-array": ComponentType<FieldWidgetProps>;
 }
 
 /**

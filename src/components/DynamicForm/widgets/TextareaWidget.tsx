@@ -1,9 +1,12 @@
-import { forwardRef } from 'react';
-import { TextArea } from '@blueprintjs/core';
-import type { FieldWidgetProps } from '../types';
+import { forwardRef } from "react";
+import { TextArea } from "@blueprintjs/core";
+import type { FieldWidgetProps } from "../types";
 
 export const TextareaWidget = forwardRef<HTMLTextAreaElement, FieldWidgetProps>(
-  ({ name, placeholder, disabled, readonly, error, rows = 4, ...rest }, ref) => {
+  (
+    { name, placeholder, disabled, readonly, error, rows = 4, ...rest },
+    ref,
+  ) => {
     return (
       <TextArea
         inputRef={ref}
@@ -12,12 +15,12 @@ export const TextareaWidget = forwardRef<HTMLTextAreaElement, FieldWidgetProps>(
         disabled={disabled}
         readOnly={readonly}
         rows={rows}
-        intent={error ? 'danger' : 'none'}
+        intent={error ? "danger" : "none"}
         fill
         {...rest}
       />
     );
-  }
+  },
 );
 
-TextareaWidget.displayName = 'TextareaWidget';
+TextareaWidget.displayName = "TextareaWidget";

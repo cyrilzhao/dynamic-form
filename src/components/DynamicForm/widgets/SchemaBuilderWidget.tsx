@@ -1,8 +1,8 @@
-import { forwardRef, useRef, useState } from 'react';
-import { Button, Dialog, DialogBody, DialogFooter } from '@blueprintjs/core';
-import { SchemaBuilder } from '../../SchemaBuilder';
-import type { SchemaBuilderRef } from '../../SchemaBuilder';
-import type { FieldWidgetProps } from '../types';
+import { forwardRef, useRef, useState } from "react";
+import { Button, Dialog, DialogBody, DialogFooter } from "@blueprintjs/core";
+import { SchemaBuilder } from "../../SchemaBuilder";
+import type { SchemaBuilderRef } from "../../SchemaBuilder";
+import type { FieldWidgetProps } from "../types";
 
 export const SchemaBuilderWidget = forwardRef<HTMLElement, FieldWidgetProps>(
   ({ value, onChange, disabled, readonly }, _ref) => {
@@ -28,13 +28,19 @@ export const SchemaBuilderWidget = forwardRef<HTMLElement, FieldWidgetProps>(
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
           title="Schema Editor"
-          style={{ width: '90vw', maxWidth: 1200, height: '80vh' }}
+          style={{ width: "90vw", maxWidth: 1200, height: "80vh" }}
         >
-          <DialogBody style={{ padding: 0, height: 'calc(80vh - 110px)', overflow: 'hidden' }}>
+          <DialogBody
+            style={{
+              padding: 0,
+              height: "calc(80vh - 110px)",
+              overflow: "hidden",
+            }}
+          >
             <SchemaBuilder
               ref={builderRef}
               defaultValue={value}
-              style={{ height: '100%' }}
+              style={{ height: "100%" }}
             />
           </DialogBody>
           <DialogFooter
@@ -48,7 +54,7 @@ export const SchemaBuilderWidget = forwardRef<HTMLElement, FieldWidgetProps>(
         </Dialog>
       </>
     );
-  }
+  },
 );
 
-SchemaBuilderWidget.displayName = 'SchemaBuilderWidget';
+SchemaBuilderWidget.displayName = "SchemaBuilderWidget";

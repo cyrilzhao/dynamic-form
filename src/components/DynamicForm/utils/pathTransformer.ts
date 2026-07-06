@@ -9,15 +9,20 @@
  * @param currentPath - 当前字段的完整路径（如 'contacts.0.companyName'）
  * @returns 解析后的绝对路径（如 'contacts.0.type'）
  */
-export function resolveRelativePath(relativePath: string, currentPath: string): string {
-  if (!relativePath.startsWith('./')) {
-    throw new Error(`不支持的相对路径格式: ${relativePath}。只允许使用 './fieldName' 引用同级字段`);
+export function resolveRelativePath(
+  relativePath: string,
+  currentPath: string,
+): string {
+  if (!relativePath.startsWith("./")) {
+    throw new Error(
+      `不支持的相对路径格式: ${relativePath}。只允许使用 './fieldName' 引用同级字段`,
+    );
   }
 
   const fieldName = relativePath.slice(2);
 
   // 使用标准的 . 分隔符查找最后一个分隔符
-  const lastSeparatorPos = currentPath.lastIndexOf('.');
+  const lastSeparatorPos = currentPath.lastIndexOf(".");
 
   if (lastSeparatorPos === -1) {
     return fieldName;
@@ -56,7 +61,7 @@ interface ArrayLevel {
  * // ]
  */
 export function extractArrayLevels(path: string): ArrayLevel[] {
-  const parts = path.split('.');
+  const parts = path.split(".");
   const levels: ArrayLevel[] = [];
   const pathParts: string[] = [];
 
@@ -66,7 +71,7 @@ export function extractArrayLevels(path: string): ArrayLevel[] {
     // 检查是否是数组索引
     if (/^\d+$/.test(part)) {
       const index = parseInt(part, 10);
-      const arrayPath = pathParts.join('.');
+      const arrayPath = pathParts.join(".");
 
       levels.push({
         arrayPath,
@@ -106,11 +111,11 @@ export function toTemplatePath(runtimePath: string): string {
     return runtimePath;
   }
 
-  const parts = runtimePath.split('.');
+  const parts = runtimePath.split(".");
   // 过滤掉数字索引，只保留字段名
-  const templateParts = parts.filter(part => !/^\d+$/.test(part));
+  const templateParts = parts.filter((part) => !/^\d+$/.test(part));
 
-  return templateParts.join('.');
+  return templateParts.join(".");
 }
 
 /**
@@ -138,7 +143,10 @@ export function toTemplatePath(runtimePath: string): string {
  * toTemplatePathForCache('departments.0.type', 'departments.0.employees.1.techStack')
  * // → 'departments.0.type'
  */
-export function toTemplatePathForCache(depPath: string, currentFieldPath: string): string {
+export function toTemplatePathForCache(
+  depPath: string,
+  currentFieldPath: string,
+): string {
   if (!depPath || !currentFieldPath) {
     return depPath;
   }
@@ -161,7 +169,7 @@ export function toTemplatePathForCache(depPath: string, currentFieldPath: string
   // 条件：依赖字段的数组层级少于当前字段，且依赖字段的路径是当前字段路径的前缀
   const isParentArrayDep =
     depLevels.length < currentLevels.length &&
-    currentFieldPath.startsWith(depPath.substring(0, depPath.lastIndexOf('.')));
+    currentFieldPath.startsWith(depPath.substring(0, depPath.lastIndexOf(".")));
 
   if (isParentArrayDep) {
     // 场景4：父数组字段依赖

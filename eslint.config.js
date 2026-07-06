@@ -28,6 +28,7 @@ export default defineConfig([
     rules: {
       'prettier/prettier': 'error',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'curly': ['error', 'all'],
     },
   },
 ])

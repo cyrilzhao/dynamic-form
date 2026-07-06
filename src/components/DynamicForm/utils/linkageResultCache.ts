@@ -1,4 +1,4 @@
-import type { LinkageResult } from '../types/linkage';
+import type { LinkageResult } from "../types/linkage";
 
 /**
  * 联动结果缓存管理器
@@ -52,7 +52,13 @@ export class LinkageResultCache {
   /**
    * 获取缓存统计信息
    */
-  getStats(): { size: number; maxSize: number; hitRate: number; hits: number; misses: number } {
+  getStats(): {
+    size: number;
+    maxSize: number;
+    hitRate: number;
+    hits: number;
+    misses: number;
+  } {
     const total = this.hits + this.misses;
     const hitRate = total > 0 ? this.hits / total : 0;
     return {

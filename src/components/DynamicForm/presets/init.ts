@@ -1,5 +1,5 @@
-import { FieldRegistry } from '../core/FieldRegistry';
-import { blueprintPreset } from './blueprint';
+import { FieldRegistry } from "../core/FieldRegistry";
+import { blueprintPreset } from "./blueprint";
 
 /**
  * 初始化默认 Widget 预设

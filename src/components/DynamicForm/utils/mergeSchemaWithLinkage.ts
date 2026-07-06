@@ -1,4 +1,4 @@
-import type { ExtendedJSONSchema } from '../types/schema';
+import type { ExtendedJSONSchema } from "../types/schema";
 
 /**
  * 合并原始 schema 和联动 schema
@@ -17,36 +17,36 @@ import type { ExtendedJSONSchema } from '../types/schema';
  */
 export function mergeSchemaWithLinkage(
   originalSchema: ExtendedJSONSchema,
-  linkageSchema: Partial<ExtendedJSONSchema>
+  linkageSchema: Partial<ExtendedJSONSchema>,
 ): ExtendedJSONSchema {
   // 校验相关的属性列表
   const validationProps = [
-    'pattern',
-    'format',
-    'minLength',
-    'maxLength',
-    'minimum',
-    'maximum',
-    'exclusiveMinimum',
-    'exclusiveMaximum',
-    'multipleOf',
-    'enum',
-    'enumNames',
-    'const',
-    'minItems',
-    'maxItems',
-    'uniqueItems',
-    'minProperties',
-    'maxProperties',
-    'required',
-    'allOf',
-    'anyOf',
-    'oneOf',
-    'not',
-    'if',
-    'then',
-    'else',
-    'dependencies',
+    "pattern",
+    "format",
+    "minLength",
+    "maxLength",
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+    "multipleOf",
+    "enum",
+    "enumNames",
+    "const",
+    "minItems",
+    "maxItems",
+    "uniqueItems",
+    "minProperties",
+    "maxProperties",
+    "required",
+    "allOf",
+    "anyOf",
+    "oneOf",
+    "not",
+    "if",
+    "then",
+    "else",
+    "dependencies",
   ];
 
   const merged: ExtendedJSONSchema = { ...originalSchema };
@@ -54,7 +54,8 @@ export function mergeSchemaWithLinkage(
   // 1. 覆盖校验属性
   validationProps.forEach((prop) => {
     if (prop in linkageSchema) {
-      merged[prop] = linkageSchema[prop];
+      // 使用类型断言确保类型安全
+      (merged as any)[prop] = (linkageSchema as any)[prop];
     }
   });
 
@@ -78,7 +79,7 @@ export function mergeSchemaWithLinkage(
   }
 
   // 4. 对于 object 类型，替换 properties
-  if (originalSchema.type === 'object' && linkageSchema.properties) {
+  if (originalSchema.type === "object" && linkageSchema.properties) {
     merged.properties = linkageSchema.properties;
   }
 

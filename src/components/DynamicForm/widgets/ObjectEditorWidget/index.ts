@@ -1,2 +1,2 @@
-export { ObjectEditorWidget } from './ObjectEditorWidget';
-export * from './types';
+export { ObjectEditorWidget } from "./ObjectEditorWidget";
+export * from "./types";

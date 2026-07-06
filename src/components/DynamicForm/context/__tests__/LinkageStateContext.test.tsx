@@ -1,90 +1,100 @@
-import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { renderHook } from '@testing-library/react';
-import '@testing-library/jest-dom';
-import { useForm } from 'react-hook-form';
+import React from "react";
+import { render, screen } from "@testing-library/react";
+import { renderHook } from "@testing-library/react";
+import "@testing-library/jest-dom";
+import { useForm } from "react-hook-form";
 import {
   LinkageStateProvider,
   useLinkageStateContext,
   useLinkageStateContextRequired,
-} from '../LinkageStateContext';
-import type { LinkageStateContextValue } from '../LinkageStateContext';
-import type { ExtendedJSONSchema } from '../../types/schema';
+} from "../LinkageStateContext";
+import type { LinkageStateContextValue } from "../LinkageStateContext";
+import type { ExtendedJSONSchema } from "../../types/schema";
 
-describe('LinkageStateContext', () => {
+describe("LinkageStateContext", () => {
   const mockSchema: ExtendedJSONSchema = {
-    type: 'object',
+    type: "object",
     properties: {
-      name: { type: 'string' },
+      name: { type: "string" },
     },
   };
 
   const createMockContextValue = (
-    form: ReturnType<typeof useForm>
+    form: ReturnType<typeof useForm>,
   ): LinkageStateContextValue => ({
     parentLinkageStates: {},
     parentLinkages: {},
     form,
     rootSchema: mockSchema,
-    pathPrefix: '',
+    pathPrefix: "",
     linkageFunctions: {},
   });
 
-  describe('LinkageStateProvider', () => {
-    it('应该正确渲染子组件', () => {
+  describe("LinkageStateProvider", () => {
+    it("应该正确渲染子组件", () => {
       const { result } = renderHook(() => useForm());
       const mockValue = createMockContextValue(result.current);
 
       render(
         <LinkageStateProvider value={mockValue}>
           <div data-testid="child">Child</div>
-        </LinkageStateProvider>
+        </LinkageStateProvider>,
       );
-      expect(screen.getByTestId('child')).toBeInTheDocument();
+      expect(screen.getByTestId("child")).toBeInTheDocument();
     });
   });
 
-  describe('useLinkageStateContext', () => {
-    it('在 Provider 外部使用时应该返回 null', () => {
+  describe("useLinkageStateContext", () => {
+    it("在 Provider 外部使用时应该返回 null", () => {
       const { result } = renderHook(() => useLinkageStateContext());
       expect(result.current).toBeNull();
     });
 
-    it('在 Provider 内部应该返回 context 值', () => {
+    it("在 Provider 内部应该返回 context 值", () => {
       const { result: formResult } = renderHook(() => useForm());
       const mockValue = createMockContextValue(formResult.current);
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <LinkageStateProvider value={mockValue}>{children}</LinkageStateProvider>
+        <LinkageStateProvider value={mockValue}>
+          {children}
+        </LinkageStateProvider>
       );
 
-      const { result } = renderHook(() => useLinkageStateContext(), { wrapper });
+      const { result } = renderHook(() => useLinkageStateContext(), {
+        wrapper,
+      });
       expect(result.current).toBe(mockValue);
     });
   });
 
-  describe('useLinkageStateContextRequired', () => {
-    it('在 Provider 外部使用时应该抛出错误', () => {
+  describe("useLinkageStateContextRequired", () => {
+    it("在 Provider 外部使用时应该抛出错误", () => {
       expect(() => {
         renderHook(() => useLinkageStateContextRequired());
-      }).toThrow('useLinkageStateContextRequired must be used within LinkageStateProvider');
+      }).toThrow(
+        "useLinkageStateContextRequired must be used within LinkageStateProvider",
+      );
     });
 
-    it('在 Provider 内部应该返回 context 值', () => {
+    it("在 Provider 内部应该返回 context 值", () => {
       const { result: formResult } = renderHook(() => useForm());
       const mockValue = createMockContextValue(formResult.current);
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <LinkageStateProvider value={mockValue}>{children}</LinkageStateProvider>
+        <LinkageStateProvider value={mockValue}>
+          {children}
+        </LinkageStateProvider>
       );
 
-      const { result } = renderHook(() => useLinkageStateContextRequired(), { wrapper });
+      const { result } = renderHook(() => useLinkageStateContextRequired(), {
+        wrapper,
+      });
       expect(result.current).toBe(mockValue);
     });
   });
 
-  describe('context 值传递', () => {
-    it('应该正确传递 parentLinkageStates', () => {
+  describe("context 值传递", () => {
+    it("应该正确传递 parentLinkageStates", () => {
       const { result: formResult } = renderHook(() => useForm());
       const mockValue: LinkageStateContextValue = {
         ...createMockContextValue(formResult.current),
@@ -94,31 +104,39 @@ describe('LinkageStateContext', () => {
       };
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <LinkageStateProvider value={mockValue}>{children}</LinkageStateProvider>
+        <LinkageStateProvider value={mockValue}>
+          {children}
+        </LinkageStateProvider>
       );
 
-      const { result } = renderHook(() => useLinkageStateContext(), { wrapper });
+      const { result } = renderHook(() => useLinkageStateContext(), {
+        wrapper,
+      });
       expect(result.current?.parentLinkageStates).toEqual({
         field1: { visible: true, disabled: false },
       });
     });
 
-    it('应该正确传递 pathPrefix', () => {
+    it("应该正确传递 pathPrefix", () => {
       const { result: formResult } = renderHook(() => useForm());
       const mockValue: LinkageStateContextValue = {
         ...createMockContextValue(formResult.current),
-        pathPrefix: 'company.details',
+        pathPrefix: "company.details",
       };
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <LinkageStateProvider value={mockValue}>{children}</LinkageStateProvider>
+        <LinkageStateProvider value={mockValue}>
+          {children}
+        </LinkageStateProvider>
       );
 
-      const { result } = renderHook(() => useLinkageStateContext(), { wrapper });
-      expect(result.current?.pathPrefix).toBe('company.details');
+      const { result } = renderHook(() => useLinkageStateContext(), {
+        wrapper,
+      });
+      expect(result.current?.pathPrefix).toBe("company.details");
     });
 
-    it('应该正确传递 linkageFunctions', () => {
+    it("应该正确传递 linkageFunctions", () => {
       const { result: formResult } = renderHook(() => useForm());
       const mockLinkageFunction = jest.fn();
       const mockValue: LinkageStateContextValue = {
@@ -129,11 +147,17 @@ describe('LinkageStateContext', () => {
       };
 
       const wrapper = ({ children }: { children: React.ReactNode }) => (
-        <LinkageStateProvider value={mockValue}>{children}</LinkageStateProvider>
+        <LinkageStateProvider value={mockValue}>
+          {children}
+        </LinkageStateProvider>
       );
 
-      const { result } = renderHook(() => useLinkageStateContext(), { wrapper });
-      expect(result.current?.linkageFunctions.customFunc).toBe(mockLinkageFunction);
+      const { result } = renderHook(() => useLinkageStateContext(), {
+        wrapper,
+      });
+      expect(result.current?.linkageFunctions.customFunc).toBe(
+        mockLinkageFunction,
+      );
     });
   });
 });

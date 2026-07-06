@@ -1,9 +1,22 @@
-import React, { forwardRef, useCallback } from 'react';
-import { NumericInput } from '@blueprintjs/core';
-import type { FieldWidgetProps } from '../types';
+import React, { forwardRef, useCallback } from "react";
+import { NumericInput } from "@blueprintjs/core";
+import type { FieldWidgetProps } from "../types";
 
 export const NumberWidget = forwardRef<HTMLInputElement, FieldWidgetProps>(
-  ({ name, placeholder, disabled, readonly, error, onChange, onBlur, value, ...rest }, ref) => {
+  (
+    {
+      name,
+      placeholder,
+      disabled,
+      readonly,
+      error,
+      onChange,
+      onBlur,
+      value,
+      ...rest
+    },
+    ref,
+  ) => {
     const handleValueChange = useCallback(
       (valueAsNumber: number, _valueAsString: string) => {
         // 确保输出的是数字类型，而不是字符串
@@ -11,7 +24,7 @@ export const NumberWidget = forwardRef<HTMLInputElement, FieldWidgetProps>(
           onChange(isNaN(valueAsNumber) ? undefined : valueAsNumber);
         }
       },
-      [onChange]
+      [onChange],
     );
 
     const handleBlur = useCallback(
@@ -31,7 +44,7 @@ export const NumberWidget = forwardRef<HTMLInputElement, FieldWidgetProps>(
           onBlur(e);
         }
       },
-      [onChange, onBlur]
+      [onChange, onBlur],
     );
 
     return (
@@ -41,7 +54,7 @@ export const NumberWidget = forwardRef<HTMLInputElement, FieldWidgetProps>(
         placeholder={placeholder}
         disabled={disabled}
         readOnly={readonly}
-        intent={error ? 'danger' : 'none'}
+        intent={error ? "danger" : "none"}
         fill
         value={value as string | number}
         onValueChange={handleValueChange}
@@ -49,7 +62,7 @@ export const NumberWidget = forwardRef<HTMLInputElement, FieldWidgetProps>(
         {...rest}
       />
     );
-  }
+  },
 );
 
-NumberWidget.displayName = 'NumberWidget';
+NumberWidget.displayName = "NumberWidget";

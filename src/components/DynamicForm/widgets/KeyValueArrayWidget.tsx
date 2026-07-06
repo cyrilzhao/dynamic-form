@@ -1,12 +1,12 @@
-import React, { forwardRef, useCallback, useMemo } from 'react';
-import { useFormContext, useFieldArray, Controller } from 'react-hook-form';
-import { Button, InputGroup } from '@blueprintjs/core';
-import { Trash2, Plus } from 'lucide-react';
-import type { FieldWidgetProps } from '../types';
-import type { ExtendedJSONSchema } from '../types/schema';
-import { FieldRegistry } from '../core/FieldRegistry';
-import { SchemaParser } from '../core/SchemaParser';
-import './KeyValueArrayWidget.scss';
+import React, { forwardRef, useCallback, useMemo } from "react";
+import { useFormContext, useFieldArray, Controller } from "react-hook-form";
+import { Button, InputGroup } from "@blueprintjs/core";
+import { Trash2, Plus } from "lucide-react";
+import type { FieldWidgetProps } from "../types";
+import type { ExtendedJSONSchema } from "../types/schema";
+import { FieldRegistry } from "../core/FieldRegistry";
+import { SchemaParser } from "../core/SchemaParser";
+import "./KeyValueArrayWidget.scss";
 
 /**
  * 根据 schema 确定使用的 widget
@@ -17,18 +17,24 @@ function determineWidget(schema: ExtendedJSONSchema): string {
   }
 
   switch (schema.type) {
-    case 'string':
-      if (schema.format === 'email') return 'email';
-      if (schema.format === 'uri') return 'url';
-      if (schema.enum) return 'select';
-      return 'text';
-    case 'number':
-    case 'integer':
-      return 'number';
-    case 'boolean':
-      return 'switch';
+    case "string":
+      if (schema.format === "email") {
+        return "email";
+      }
+      if (schema.format === "uri") {
+        return "url";
+      }
+      if (schema.enum) {
+        return "select";
+      }
+      return "text";
+    case "number":
+    case "integer":
+      return "number";
+    case "boolean":
+      return "switch";
     default:
-      return 'text';
+      return "text";
   }
 }
 
@@ -41,21 +47,21 @@ function getDefaultValue(schema: ExtendedJSONSchema): any {
   }
 
   switch (schema.type) {
-    case 'string':
-      return '';
-    case 'number':
-    case 'integer':
+    case "string":
+      return "";
+    case "number":
+    case "integer":
       return 0;
-    case 'boolean':
+    case "boolean":
       return false;
     default:
-      return '';
+      return "";
   }
 }
 
 export interface KeyValueArrayWidgetProps extends FieldWidgetProps {
   schema: ExtendedJSONSchema & {
-    type: 'array';
+    type: "array";
     items: ExtendedJSONSchema;
   };
   value?: any[];
@@ -180,25 +186,28 @@ export interface KeyValueArrayWidgetProps extends FieldWidgetProps {
  * }
  * ```
  */
-export const KeyValueArrayWidget = forwardRef<HTMLDivElement, KeyValueArrayWidgetProps>(
+export const KeyValueArrayWidget = forwardRef<
+  HTMLDivElement,
+  KeyValueArrayWidgetProps
+>(
   (
     {
       name,
       schema,
       disabled,
       readonly,
-      keyField = 'key',
-      valueField = 'value',
-      keyLabel = 'Key',
-      valueLabel = 'Value',
+      keyField = "key",
+      valueField = "value",
+      keyLabel = "Key",
+      valueLabel = "Value",
       keyPlaceholder,
       valuePlaceholder,
-      addButtonText = 'Add',
+      addButtonText = "Add",
       emptyText,
       keyRequired,
       valueRequired,
     },
-    ref
+    ref,
   ) => {
     const { control } = useFormContext();
     const { fields, append, remove } = useFieldArray({
@@ -212,31 +221,42 @@ export const KeyValueArrayWidget = forwardRef<HTMLDivElement, KeyValueArrayWidge
     const finalValueField = widgetProps.valueField || valueField;
     const finalKeyLabel = widgetProps.keyLabel || keyLabel;
     const finalValueLabel = widgetProps.valueLabel || valueLabel;
-    const finalKeyPlaceholder = widgetProps.keyPlaceholder || keyPlaceholder || finalKeyLabel;
-    const finalValuePlaceholder = widgetProps.valuePlaceholder || valuePlaceholder || finalValueLabel;
+    const finalKeyPlaceholder =
+      widgetProps.keyPlaceholder || keyPlaceholder || finalKeyLabel;
+    const finalValuePlaceholder =
+      widgetProps.valuePlaceholder || valuePlaceholder || finalValueLabel;
     const finalAddButtonText = widgetProps.addButtonText || addButtonText;
     const finalEmptyText = widgetProps.emptyText || emptyText;
 
     // 从 schema.items.required 推断字段是否必填
     const itemsRequired = schema.items?.required || [];
     const finalKeyRequired =
-      widgetProps.keyRequired ?? keyRequired ?? itemsRequired.includes(finalKeyField);
+      widgetProps.keyRequired ??
+      keyRequired ??
+      itemsRequired.includes(finalKeyField);
     const finalValueRequired =
-      widgetProps.valueRequired ?? valueRequired ?? itemsRequired.includes(finalValueField);
+      widgetProps.valueRequired ??
+      valueRequired ??
+      itemsRequired.includes(finalValueField);
 
     // 获取 key 和 value 字段的 schema
-    const itemProperties = (schema.items as ExtendedJSONSchema)?.properties || {};
-    const keySchema = itemProperties[finalKeyField] as ExtendedJSONSchema | undefined;
-    const valueSchema = itemProperties[finalValueField] as ExtendedJSONSchema | undefined;
+    const itemProperties =
+      (schema.items as ExtendedJSONSchema)?.properties || {};
+    const keySchema = itemProperties[finalKeyField] as
+      | ExtendedJSONSchema
+      | undefined;
+    const valueSchema = itemProperties[finalValueField] as
+      | ExtendedJSONSchema
+      | undefined;
 
     // 根据 schema 确定使用的 widget
     const keyWidgetName = useMemo(
-      () => (keySchema ? determineWidget(keySchema) : 'text'),
-      [keySchema]
+      () => (keySchema ? determineWidget(keySchema) : "text"),
+      [keySchema],
     );
     const valueWidgetName = useMemo(
-      () => (valueSchema ? determineWidget(valueSchema) : 'text'),
-      [valueSchema]
+      () => (valueSchema ? determineWidget(valueSchema) : "text"),
+      [valueSchema],
     );
 
     // 获取 widget 组件
@@ -245,12 +265,18 @@ export const KeyValueArrayWidget = forwardRef<HTMLDivElement, KeyValueArrayWidge
 
     // 生成验证规则
     const keyValidationRules = useMemo(
-      () => (keySchema ? SchemaParser.getValidationRules(keySchema, finalKeyRequired) : {}),
-      [keySchema, finalKeyRequired]
+      () =>
+        keySchema
+          ? SchemaParser.getValidationRules(keySchema, finalKeyRequired)
+          : {},
+      [keySchema, finalKeyRequired],
     );
     const valueValidationRules = useMemo(
-      () => (valueSchema ? SchemaParser.getValidationRules(valueSchema, finalValueRequired) : {}),
-      [valueSchema, finalValueRequired]
+      () =>
+        valueSchema
+          ? SchemaParser.getValidationRules(valueSchema, finalValueRequired)
+          : {},
+      [valueSchema, finalValueRequired],
     );
 
     // 判断是否可以增删
@@ -263,8 +289,8 @@ export const KeyValueArrayWidget = forwardRef<HTMLDivElement, KeyValueArrayWidge
     // 添加新项
     const handleAdd = useCallback(() => {
       const newItem = {
-        [finalKeyField]: keySchema ? getDefaultValue(keySchema) : '',
-        [finalValueField]: valueSchema ? getDefaultValue(valueSchema) : '',
+        [finalKeyField]: keySchema ? getDefaultValue(keySchema) : "",
+        [finalValueField]: valueSchema ? getDefaultValue(valueSchema) : "",
       };
       append(newItem);
     }, [finalKeyField, finalValueField, keySchema, valueSchema, append]);
@@ -274,7 +300,7 @@ export const KeyValueArrayWidget = forwardRef<HTMLDivElement, KeyValueArrayWidge
       (index: number) => {
         remove(index);
       },
-      [remove]
+      [remove],
     );
 
     // 判断是否可以删除
@@ -282,12 +308,14 @@ export const KeyValueArrayWidget = forwardRef<HTMLDivElement, KeyValueArrayWidge
       (index: number) => {
         return canAddRemove && fields.length > minItems;
       },
-      [canAddRemove, fields.length, minItems]
+      [canAddRemove, fields.length, minItems],
     );
 
     // 判断是否可以添加
     const canAdd = useMemo(() => {
-      return canAddRemove && (maxItems === undefined || fields.length < maxItems);
+      return (
+        canAddRemove && (maxItems === undefined || fields.length < maxItems)
+      );
     }, [canAddRemove, maxItems, fields.length]);
 
     return (
@@ -325,10 +353,12 @@ export const KeyValueArrayWidget = forwardRef<HTMLDivElement, KeyValueArrayWidge
                           disabled={disabled}
                           readonly={readonly}
                           error={fieldState.error?.message}
-                          options={keySchema?.enum?.map((value: any, i: number) => ({
-                            label: keySchema?.enumNames?.[i] || String(value),
-                            value,
-                          }))}
+                          options={keySchema?.enum?.map(
+                            (value: any, i: number) => ({
+                              label: keySchema?.enumNames?.[i] || String(value),
+                              value,
+                            }),
+                          )}
                           {...(keySchema?.ui?.widgetProps || {})}
                         />
                       ) : (
@@ -337,7 +367,7 @@ export const KeyValueArrayWidget = forwardRef<HTMLDivElement, KeyValueArrayWidge
                           placeholder={finalKeyPlaceholder}
                           disabled={disabled}
                           readOnly={readonly}
-                          intent={fieldState.error ? 'danger' : 'none'}
+                          intent={fieldState.error ? "danger" : "none"}
                         />
                       )
                     }
@@ -363,10 +393,13 @@ export const KeyValueArrayWidget = forwardRef<HTMLDivElement, KeyValueArrayWidge
                           disabled={disabled}
                           readonly={readonly}
                           error={fieldState.error?.message}
-                          options={valueSchema?.enum?.map((value: any, i: number) => ({
-                            label: valueSchema?.enumNames?.[i] || String(value),
-                            value,
-                          }))}
+                          options={valueSchema?.enum?.map(
+                            (value: any, i: number) => ({
+                              label:
+                                valueSchema?.enumNames?.[i] || String(value),
+                              value,
+                            }),
+                          )}
                           {...(valueSchema?.ui?.widgetProps || {})}
                         />
                       ) : (
@@ -375,7 +408,7 @@ export const KeyValueArrayWidget = forwardRef<HTMLDivElement, KeyValueArrayWidge
                           placeholder={finalValuePlaceholder}
                           disabled={disabled}
                           readOnly={readonly}
-                          intent={fieldState.error ? 'danger' : 'none'}
+                          intent={fieldState.error ? "danger" : "none"}
                         />
                       )
                     }
@@ -403,14 +436,14 @@ export const KeyValueArrayWidget = forwardRef<HTMLDivElement, KeyValueArrayWidge
             icon={<Plus size={14} />}
             onClick={handleAdd}
             disabled={!canAdd}
-            style={{ marginTop: fields.length > 0 ? '10px' : '0' }}
+            style={{ marginTop: fields.length > 0 ? "10px" : "0" }}
           >
             {finalAddButtonText}
           </Button>
         )}
       </div>
     );
-  }
+  },
 );
 
-KeyValueArrayWidget.displayName = 'KeyValueArrayWidget';
+KeyValueArrayWidget.displayName = "KeyValueArrayWidget";

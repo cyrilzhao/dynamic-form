@@ -1,4 +1,4 @@
-import type { WidgetRegistry, PartialWidgetPreset } from '../types/widgets';
+import type { WidgetRegistry, PartialWidgetPreset } from "../types/widgets";
 
 export class FieldRegistry {
   private static widgets: Map<string, React.ComponentType<any>> = new Map();
@@ -40,7 +40,9 @@ export class FieldRegistry {
   static registerBatch(widgets: WidgetRegistry) {
     // 兼容性保护：某些预设的某个子模块可能为 null/undefined，
     // 直接调用 Object.entries 会抛 TypeError，提前返回避免整个预设加载失败
-    if (!widgets) return;
+    if (!widgets) {
+      return;
+    }
     Object.entries(widgets).forEach(([type, component]) => {
       this.register(type, component);
     });

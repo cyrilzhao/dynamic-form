@@ -3,7 +3,7 @@ import type {
   FieldConfig,
   ValidationRules,
   FieldOption,
-} from '../types/schema';
+} from "../types/schema";
 
 /**
  * Schema 解析配置
@@ -12,7 +12,7 @@ interface ParseOptions {
   parentPath?: string;
   prefixLabel?: string;
   inheritedUI?: {
-    layout?: 'vertical' | 'horizontal' | 'inline';
+    layout?: "vertical" | "horizontal" | "inline";
     labelWidth?: number | string;
   };
 }
@@ -31,7 +31,7 @@ export class SchemaParser {
    * 检查 schema 中是否使用了路径扁平化
    */
   static hasFlattenPath(schema: ExtendedJSONSchema): boolean {
-    if (schema.type !== 'object' || !schema.properties) {
+    if (schema.type !== "object" || !schema.properties) {
       return false;
     }
 
@@ -39,17 +39,19 @@ export class SchemaParser {
 
     for (const key of Object.keys(properties)) {
       const property = properties[key];
-      if (!property || typeof property === 'boolean') continue;
+      if (!property || typeof property === "boolean") {
+        continue;
+      }
 
       const fieldSchema = property as ExtendedJSONSchema;
 
       // 如果当前字段使用了 flattenPath
-      if (fieldSchema.type === 'object' && fieldSchema.ui?.flattenPath) {
+      if (fieldSchema.type === "object" && fieldSchema.ui?.flattenPath) {
         return true;
       }
 
       // 递归检查子字段
-      if (fieldSchema.type === 'object' && this.hasFlattenPath(fieldSchema)) {
+      if (fieldSchema.type === "object" && this.hasFlattenPath(fieldSchema)) {
         return true;
       }
     }
@@ -65,11 +67,14 @@ export class SchemaParser {
    * - flattenPath 字段会渲染 NestedFormWidget，但使用透明容器
    * - 数据保持标准的嵌套格式，无需路径转换
    */
-  static parse(schema: ExtendedJSONSchema, options: ParseOptions = {}): FieldConfig[] {
-    const { parentPath = '', prefixLabel = '', inheritedUI } = options;
+  static parse(
+    schema: ExtendedJSONSchema,
+    options: ParseOptions = {},
+  ): FieldConfig[] {
+    const { parentPath = "", prefixLabel = "", inheritedUI } = options;
     const fields: FieldConfig[] = [];
 
-    if (schema.type !== 'object' || !schema.properties) {
+    if (schema.type !== "object" || !schema.properties) {
       return fields;
     }
 
@@ -79,7 +84,9 @@ export class SchemaParser {
 
     for (const key of order) {
       const property = properties[key];
-      if (!property || typeof property === 'boolean') continue;
+      if (!property || typeof property === "boolean") {
+        continue;
+      }
 
       const fieldSchema = property as ExtendedJSONSchema;
 
@@ -106,7 +113,7 @@ export class SchemaParser {
         fieldSchema,
         required.includes(key),
         newPrefixLabel,
-        newInheritedUI
+        newInheritedUI,
       );
 
       if (!fieldConfig.hidden) {
@@ -125,12 +132,15 @@ export class SchemaParser {
     schema: ExtendedJSONSchema,
     required: boolean,
     prefixLabel: string,
-    inheritedUI: ParseOptions['inheritedUI']
+    inheritedUI: ParseOptions["inheritedUI"],
   ): FieldConfig {
     const ui = schema.ui || {};
 
     // 如果有前缀标签，添加到字段标签前
-    const label = prefixLabel && schema.title ? `${prefixLabel} - ${schema.title}` : schema.title;
+    const label =
+      prefixLabel && schema.title
+        ? `${prefixLabel} - ${schema.title}`
+        : schema.title;
 
     // 合并继承的 UI 配置到 schema 中
     const finalSchema: ExtendedJSONSchema = {
@@ -174,35 +184,47 @@ export class SchemaParser {
 
     const type = schema.type;
 
-    if (type === 'string') {
-      if (schema.format === 'email') return 'email';
-      if (schema.format === 'date') return 'date';
-      if (schema.format === 'date-time') return 'datetime';
-      if (schema.format === 'time') return 'time';
-      if (schema.enum) return 'select';
-      if (schema.maxLength && schema.maxLength > 100) return 'textarea';
-      return 'text';
+    if (type === "string") {
+      if (schema.format === "email") {
+        return "email";
+      }
+      if (schema.format === "date") {
+        return "date";
+      }
+      if (schema.format === "date-time") {
+        return "datetime";
+      }
+      if (schema.format === "time") {
+        return "time";
+      }
+      if (schema.enum) {
+        return "select";
+      }
+      if (schema.maxLength && schema.maxLength > 100) {
+        return "textarea";
+      }
+      return "text";
     }
 
-    if (type === 'number' || type === 'integer') {
-      return 'number';
+    if (type === "number" || type === "integer") {
+      return "number";
     }
 
-    if (type === 'boolean') {
-      return 'checkbox';
+    if (type === "boolean") {
+      return "checkbox";
     }
 
-    if (type === 'array') {
+    if (type === "array") {
       // 所有数组类型统一使用 ArrayFieldWidget 处理
       // ArrayFieldWidget 内部会根据 items.enum 自动判断渲染模式（static/dynamic）
-      return 'array';
+      return "array";
     }
 
-    if (type === 'object') {
-      return 'nested-form';
+    if (type === "object") {
+      return "nested-form";
     }
 
-    return 'text';
+    return "text";
   }
 
   /**
@@ -210,7 +232,7 @@ export class SchemaParser {
    */
   static getValidationRules(
     schema: ExtendedJSONSchema,
-    required: boolean = false
+    required: boolean = false,
   ): ValidationRules {
     const rules: ValidationRules = {};
     const errorMessages = schema.ui?.errorMessages || {};
@@ -222,13 +244,13 @@ export class SchemaParser {
       rules.validate.required = (value: any) => {
         // 严格检查：只有 null、undefined 和空字符串才算空值
         if (value === null || value === undefined) {
-          return errorMessages.required || 'This field is required';
+          return errorMessages.required || "This field is required";
         }
-        if (typeof value === 'string' && value.trim() === '') {
-          return errorMessages.required || 'This field is required';
+        if (typeof value === "string" && value.trim() === "") {
+          return errorMessages.required || "This field is required";
         }
         if (Array.isArray(value) && value.length === 0) {
-          return errorMessages.required || 'This field is required';
+          return errorMessages.required || "This field is required";
         }
         return true;
       };
@@ -240,12 +262,15 @@ export class SchemaParser {
       rules.validate = rules.validate || {};
       rules.validate.minLength = (value: any) => {
         // 空值不进行 minLength 校验，由 required 规则处理
-        if (value === null || value === undefined || value === '') {
+        if (value === null || value === undefined || value === "") {
           return true;
         }
         const strValue = String(value);
         if (strValue.length < schema.minLength!) {
-          return errorMessages.minLength || `Minimum length is ${schema.minLength} characters`;
+          return (
+            errorMessages.minLength ||
+            `Minimum length is ${schema.minLength} characters`
+          );
         }
         return true;
       };
@@ -254,7 +279,9 @@ export class SchemaParser {
     if (schema.maxLength) {
       rules.maxLength = {
         value: schema.maxLength,
-        message: errorMessages.maxLength || `Maximum length is ${schema.maxLength} characters`,
+        message:
+          errorMessages.maxLength ||
+          `Maximum length is ${schema.maxLength} characters`,
       };
     }
 
@@ -275,7 +302,7 @@ export class SchemaParser {
     if (schema.pattern) {
       rules.pattern = {
         value: new RegExp(schema.pattern),
-        message: errorMessages.pattern || 'Invalid format',
+        message: errorMessages.pattern || "Invalid format",
       };
     }
 
@@ -287,15 +314,19 @@ export class SchemaParser {
         rules.validate = rules.validate || {};
         rules.validate[formatName] = (value: string) => {
           // 空值由 required 规则处理，严格检查 null/undefined/空字符串
-          if (value === null || value === undefined || value === '') return true;
+          if (value === null || value === undefined || value === "") {
+            return true;
+          }
           const isValid = this.customFormats[formatName](value);
-          return isValid || errorMessages.format || `Invalid ${formatName} format`;
+          return (
+            isValid || errorMessages.format || `Invalid ${formatName} format`
+          );
         };
-      } else if (schema.format === 'email') {
+      } else if (schema.format === "email") {
         // 内置邮箱格式验证
         rules.pattern = {
           value: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
-          message: errorMessages.format || 'Please enter a valid email address',
+          message: errorMessages.format || "Please enter a valid email address",
         };
       }
     }
@@ -306,7 +337,9 @@ export class SchemaParser {
   /**
    * 获取选项列表
    */
-  private static getOptions(schema: ExtendedJSONSchema): FieldOption[] | undefined {
+  private static getOptions(
+    schema: ExtendedJSONSchema,
+  ): FieldOption[] | undefined {
     // 如果有 enum，使用 enum 生成选项
     if (schema.enum) {
       const enumNames = schema.enumNames || schema.enum;
@@ -319,10 +352,13 @@ export class SchemaParser {
     // 特殊处理：boolean 类型使用 radio/checkbox widget 时，如果没有配置 enum，自动生成默认选项
     // 用户可以通过配置 enum 和 enumNames 来自定义选项文本，例如：
     // { type: 'boolean', enum: [true, false], enumNames: ['Enable', 'Disable'], ui: { widget: 'radio' } }
-    if (schema.type === 'boolean' && (schema.ui?.widget === 'radio' || schema.ui?.widget === 'checkbox')) {
+    if (
+      schema.type === "boolean" &&
+      (schema.ui?.widget === "radio" || schema.ui?.widget === "checkbox")
+    ) {
       return [
-        { label: 'Yes', value: true },
-        { label: 'No', value: false },
+        { label: "Yes", value: true },
+        { label: "No", value: false },
       ];
     }
 

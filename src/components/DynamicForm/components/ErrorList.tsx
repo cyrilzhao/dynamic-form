@@ -1,6 +1,6 @@
-import React from 'react';
-import type { FieldErrors } from 'react-hook-form';
-import { Callout } from '@blueprintjs/core';
+import React from "react";
+import type { FieldErrors } from "react-hook-form";
+import { Callout } from "@blueprintjs/core";
 
 interface ErrorListProps {
   errors: FieldErrors;
@@ -18,15 +18,17 @@ export const ErrorList: React.FC<ErrorListProps> = ({ errors }) => {
   }
 
   return (
-    <Callout intent="danger" style={{ marginBottom: '20px' }}>
+    <Callout intent="danger" style={{ marginBottom: "20px" }}>
       <h4 className="bp5-heading">Please fix the following errors</h4>
-      <ul style={{ margin: '10px 0 0 0', paddingLeft: '20px' }}>
+      <ul style={{ margin: "10px 0 0 0", paddingLeft: "20px" }}>
         {errorEntries.map(([fieldName, error]) => {
           const message = error?.message as string | undefined;
-          if (!message) return null;
+          if (!message) {
+            return null;
+          }
 
           return (
-            <li key={fieldName} style={{ marginBottom: '5px' }}>
+            <li key={fieldName} style={{ marginBottom: "5px" }}>
               <strong>{fieldName}</strong>: {message}
             </li>
           );

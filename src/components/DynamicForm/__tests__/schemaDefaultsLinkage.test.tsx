@@ -1,10 +1,16 @@
-import React from 'react';
-import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
-import '@testing-library/jest-dom';
-import { DynamicForm } from '../DynamicForm';
-import { FieldRegistry, blueprintPreset } from '..';
-import type { ExtendedJSONSchema } from '../types/schema';
-import type { DynamicFormRef } from '../types';
+import React from "react";
+import {
+  render,
+  screen,
+  waitFor,
+  fireEvent,
+  act,
+} from "@testing-library/react";
+import "@testing-library/jest-dom";
+import { DynamicForm } from "../DynamicForm";
+import { FieldRegistry, blueprintPreset } from "..";
+import type { ExtendedJSONSchema } from "../types/schema";
+import type { DynamicFormRef } from "../types";
 
 beforeAll(() => {
   FieldRegistry.setDefaultPreset(blueprintPreset);
@@ -18,28 +24,32 @@ beforeAll(() => {
  * 2. 这些默认值会参与联动计算
  * 3. 联动规则会根据默认值正确计算字段的显示/隐藏状态
  */
-describe('Schema 默认值与联动计算集成测试', () => {
-  it('schema 默认值应该触发联动计算（visibility）', async () => {
+describe("Schema 默认值与联动计算集成测试", () => {
+  it("schema 默认值应该触发联动计算（visibility）", async () => {
     const formRef = React.createRef<DynamicFormRef>();
 
     const schema: ExtendedJSONSchema = {
-      type: 'object',
+      type: "object",
       properties: {
         userType: {
-          type: 'string',
-          title: 'User Type',
-          enum: ['personal', 'enterprise'],
-          default: 'enterprise', // 默认值为 enterprise
+          type: "string",
+          title: "User Type",
+          enum: ["personal", "enterprise"],
+          default: "enterprise", // 默认值为 enterprise
         },
         companyName: {
-          type: 'string',
-          title: 'Company Name',
+          type: "string",
+          title: "Company Name",
           ui: {
             linkages: [
               {
-                type: 'visibility',
-                dependencies: ['userType'],
-                when: { field: 'userType', operator: '==', value: 'enterprise' },
+                type: "visibility",
+                dependencies: ["userType"],
+                when: {
+                  field: "userType",
+                  operator: "==",
+                  value: "enterprise",
+                },
                 fulfill: { state: { visible: true } },
                 otherwise: { state: { visible: false } },
               },
@@ -59,31 +69,35 @@ describe('Schema 默认值与联动计算集成测试', () => {
     // 由于 userType 的默认值是 'enterprise'
     // companyName 字段应该可见
     await waitFor(() => {
-      expect(screen.getByText('Company Name')).toBeInTheDocument();
+      expect(screen.getByText("Company Name")).toBeInTheDocument();
     });
   });
 
-  it('schema 默认值为触发隐藏条件时，字段应该隐藏', async () => {
+  it("schema 默认值为触发隐藏条件时，字段应该隐藏", async () => {
     const formRef = React.createRef<DynamicFormRef>();
 
     const schema: ExtendedJSONSchema = {
-      type: 'object',
+      type: "object",
       properties: {
         userType: {
-          type: 'string',
-          title: 'User Type',
-          enum: ['personal', 'enterprise'],
-          default: 'personal', // 默认值为 personal
+          type: "string",
+          title: "User Type",
+          enum: ["personal", "enterprise"],
+          default: "personal", // 默认值为 personal
         },
         companyName: {
-          type: 'string',
-          title: 'Company Name',
+          type: "string",
+          title: "Company Name",
           ui: {
             linkages: [
               {
-                type: 'visibility',
-                dependencies: ['userType'],
-                when: { field: 'userType', operator: '==', value: 'enterprise' },
+                type: "visibility",
+                dependencies: ["userType"],
+                when: {
+                  field: "userType",
+                  operator: "==",
+                  value: "enterprise",
+                },
                 fulfill: { state: { visible: true } },
                 otherwise: { state: { visible: false } },
               },
@@ -104,35 +118,39 @@ describe('Schema 默认值与联动计算集成测试', () => {
     // companyName 字段应该隐藏
     await waitFor(
       () => {
-        expect(screen.queryByText('Company Name')).not.toBeInTheDocument();
+        expect(screen.queryByText("Company Name")).not.toBeInTheDocument();
       },
-      { timeout: 3000 }
+      { timeout: 3000 },
     );
   });
 
-  it('嵌套对象中的 schema 默认值应该触发联动计算', async () => {
+  it("嵌套对象中的 schema 默认值应该触发联动计算", async () => {
     const formRef = React.createRef<DynamicFormRef>();
 
     const schema: ExtendedJSONSchema = {
-      type: 'object',
+      type: "object",
       properties: {
         settings: {
-          type: 'object',
+          type: "object",
           properties: {
             enableAdvanced: {
-              type: 'boolean',
-              title: 'Enable Advanced',
+              type: "boolean",
+              title: "Enable Advanced",
               default: true, // 默认启用高级设置
             },
             advancedOption: {
-              type: 'string',
-              title: 'Advanced Option',
+              type: "string",
+              title: "Advanced Option",
               ui: {
                 linkages: [
                   {
-                    type: 'visibility',
-                    dependencies: ['settings.enableAdvanced'],
-                    when: { field: 'settings.enableAdvanced', operator: '==', value: true },
+                    type: "visibility",
+                    dependencies: ["settings.enableAdvanced"],
+                    when: {
+                      field: "settings.enableAdvanced",
+                      operator: "==",
+                      value: true,
+                    },
                     fulfill: { state: { visible: true } },
                     otherwise: { state: { visible: false } },
                   },
@@ -154,31 +172,35 @@ describe('Schema 默认值与联动计算集成测试', () => {
     // 由于 enableAdvanced 的默认值是 true
     // advancedOption 字段应该可见
     await waitFor(() => {
-      expect(screen.getByText('Advanced Option')).toBeInTheDocument();
+      expect(screen.getByText("Advanced Option")).toBeInTheDocument();
     });
   });
 
-  it('用户提供的 defaultValues 应该覆盖 schema 默认值并触发联动', async () => {
+  it("用户提供的 defaultValues 应该覆盖 schema 默认值并触发联动", async () => {
     const formRef = React.createRef<DynamicFormRef>();
 
     const schema: ExtendedJSONSchema = {
-      type: 'object',
+      type: "object",
       properties: {
         userType: {
-          type: 'string',
-          title: 'User Type',
-          enum: ['personal', 'enterprise'],
-          default: 'enterprise', // schema 默认值为 enterprise
+          type: "string",
+          title: "User Type",
+          enum: ["personal", "enterprise"],
+          default: "enterprise", // schema 默认值为 enterprise
         },
         companyName: {
-          type: 'string',
-          title: 'Company Name',
+          type: "string",
+          title: "Company Name",
           ui: {
             linkages: [
               {
-                type: 'visibility',
-                dependencies: ['userType'],
-                when: { field: 'userType', operator: '==', value: 'enterprise' },
+                type: "visibility",
+                dependencies: ["userType"],
+                when: {
+                  field: "userType",
+                  operator: "==",
+                  value: "enterprise",
+                },
                 fulfill: { state: { visible: true } },
                 otherwise: { state: { visible: false } },
               },
@@ -194,19 +216,19 @@ describe('Schema 默认值与联动计算集成测试', () => {
         <DynamicForm
           ref={formRef}
           schema={schema}
-          defaultValues={{ userType: 'personal' }}
+          defaultValues={{ userType: "personal" }}
           onSubmit={jest.fn()}
-        />
+        />,
       );
     });
 
     // 等待初始渲染完成
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     // 验证表单值被正确设置
-    expect(formRef.current?.getValues()?.userType).toBe('personal');
+    expect(formRef.current?.getValues()?.userType).toBe("personal");
 
     // 如果联动没有自动执行，手动触发一次刷新
     await act(async () => {
@@ -215,34 +237,38 @@ describe('Schema 默认值与联动计算集成测试', () => {
 
     // 等待联动计算完成
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     });
 
     // 由于 userType 是 'personal'（不是 'enterprise'），companyName 应该隐藏
-    expect(screen.queryByText('Company Name')).not.toBeInTheDocument();
+    expect(screen.queryByText("Company Name")).not.toBeInTheDocument();
   });
 
-  it('多个联动依赖同一个有默认值的字段时都应该正确计算', async () => {
+  it("多个联动依赖同一个有默认值的字段时都应该正确计算", async () => {
     const formRef = React.createRef<DynamicFormRef>();
 
     const schema: ExtendedJSONSchema = {
-      type: 'object',
+      type: "object",
       properties: {
         paymentMethod: {
-          type: 'string',
-          title: 'Payment Method',
-          enum: ['credit_card', 'bank_transfer', 'cash'],
-          default: 'credit_card', // 默认信用卡支付
+          type: "string",
+          title: "Payment Method",
+          enum: ["credit_card", "bank_transfer", "cash"],
+          default: "credit_card", // 默认信用卡支付
         },
         cardNumber: {
-          type: 'string',
-          title: 'Card Number',
+          type: "string",
+          title: "Card Number",
           ui: {
             linkages: [
               {
-                type: 'visibility',
-                dependencies: ['paymentMethod'],
-                when: { field: 'paymentMethod', operator: '==', value: 'credit_card' },
+                type: "visibility",
+                dependencies: ["paymentMethod"],
+                when: {
+                  field: "paymentMethod",
+                  operator: "==",
+                  value: "credit_card",
+                },
                 fulfill: { state: { visible: true } },
                 otherwise: { state: { visible: false } },
               },
@@ -250,14 +276,18 @@ describe('Schema 默认值与联动计算集成测试', () => {
           },
         },
         bankAccount: {
-          type: 'string',
-          title: 'Bank Account',
+          type: "string",
+          title: "Bank Account",
           ui: {
             linkages: [
               {
-                type: 'visibility',
-                dependencies: ['paymentMethod'],
-                when: { field: 'paymentMethod', operator: '==', value: 'bank_transfer' },
+                type: "visibility",
+                dependencies: ["paymentMethod"],
+                when: {
+                  field: "paymentMethod",
+                  operator: "==",
+                  value: "bank_transfer",
+                },
                 fulfill: { state: { visible: true } },
                 otherwise: { state: { visible: false } },
               },
@@ -277,34 +307,34 @@ describe('Schema 默认值与联动计算集成测试', () => {
     await waitFor(
       () => {
         // 默认 credit_card，所以 Card Number 可见
-        expect(screen.getByText('Card Number')).toBeInTheDocument();
+        expect(screen.getByText("Card Number")).toBeInTheDocument();
         // Bank Account 应该隐藏
-        expect(screen.queryByText('Bank Account')).not.toBeInTheDocument();
+        expect(screen.queryByText("Bank Account")).not.toBeInTheDocument();
       },
-      { timeout: 3000 }
+      { timeout: 3000 },
     );
   });
 
-  it('schema 默认值为 false 时应该正确触发联动', async () => {
+  it("schema 默认值为 false 时应该正确触发联动", async () => {
     const formRef = React.createRef<DynamicFormRef>();
 
     const schema: ExtendedJSONSchema = {
-      type: 'object',
+      type: "object",
       properties: {
         isVIP: {
-          type: 'boolean',
-          title: 'Is VIP',
+          type: "boolean",
+          title: "Is VIP",
           default: false, // 默认非 VIP
         },
         vipBenefits: {
-          type: 'string',
-          title: 'VIP Benefits',
+          type: "string",
+          title: "VIP Benefits",
           ui: {
             linkages: [
               {
-                type: 'visibility',
-                dependencies: ['isVIP'],
-                when: { field: 'isVIP', operator: '==', value: true },
+                type: "visibility",
+                dependencies: ["isVIP"],
+                when: { field: "isVIP", operator: "==", value: true },
                 fulfill: { state: { visible: true } },
                 otherwise: { state: { visible: false } },
               },
@@ -324,32 +354,32 @@ describe('Schema 默认值与联动计算集成测试', () => {
     // 由于 isVIP 默认为 false，VIP Benefits 应该隐藏
     await waitFor(
       () => {
-        expect(screen.queryByText('VIP Benefits')).not.toBeInTheDocument();
+        expect(screen.queryByText("VIP Benefits")).not.toBeInTheDocument();
       },
-      { timeout: 3000 }
+      { timeout: 3000 },
     );
   });
 
-  it('schema 默认值为数字 0 时应该正确触发联动', async () => {
+  it("schema 默认值为数字 0 时应该正确触发联动", async () => {
     const formRef = React.createRef<DynamicFormRef>();
 
     const schema: ExtendedJSONSchema = {
-      type: 'object',
+      type: "object",
       properties: {
         quantity: {
-          type: 'integer',
-          title: 'Quantity',
+          type: "integer",
+          title: "Quantity",
           default: 0, // 默认数量为 0
         },
         discountInfo: {
-          type: 'string',
-          title: 'Discount Info',
+          type: "string",
+          title: "Discount Info",
           ui: {
             linkages: [
               {
-                type: 'visibility',
-                dependencies: ['quantity'],
-                when: { field: 'quantity', operator: '>', value: 0 },
+                type: "visibility",
+                dependencies: ["quantity"],
+                when: { field: "quantity", operator: ">", value: 0 },
                 fulfill: { state: { visible: true } },
                 otherwise: { state: { visible: false } },
               },
@@ -369,9 +399,9 @@ describe('Schema 默认值与联动计算集成测试', () => {
     // 由于 quantity 默认为 0，不大于 0，Discount Info 应该隐藏
     await waitFor(
       () => {
-        expect(screen.queryByText('Discount Info')).not.toBeInTheDocument();
+        expect(screen.queryByText("Discount Info")).not.toBeInTheDocument();
       },
-      { timeout: 3000 }
+      { timeout: 3000 },
     );
   });
 });
@@ -382,37 +412,41 @@ describe('Schema 默认值与联动计算集成测试', () => {
  * 验证：当通过 schema 类型联动加载新的 schema 时，
  * 新 schema 中的 default 值应该被提取并应用到表单
  */
-describe('动态 schema 联动的默认值测试', () => {
+describe("动态 schema 联动的默认值测试", () => {
   // 模拟的动态 schema，包含 default 值
   const httpRequestSchema: ExtendedJSONSchema = {
-    type: 'object',
+    type: "object",
     properties: {
       method: {
-        type: 'string',
-        title: 'HTTP Method',
-        enum: ['GET', 'POST', 'PUT', 'DELETE'],
-        default: 'GET',
+        type: "string",
+        title: "HTTP Method",
+        enum: ["GET", "POST", "PUT", "DELETE"],
+        default: "GET",
       },
       timeout: {
-        type: 'number',
-        title: 'Timeout',
+        type: "number",
+        title: "Timeout",
         default: 30000,
       },
       // 包含内部联动的字段
       showAdvanced: {
-        type: 'boolean',
-        title: 'Show Advanced',
+        type: "boolean",
+        title: "Show Advanced",
         default: true,
       },
       advancedOptions: {
-        type: 'string',
-        title: 'Advanced Options',
+        type: "string",
+        title: "Advanced Options",
         ui: {
           linkages: [
             {
-              type: 'visibility',
-              dependencies: ['content.showAdvanced'],
-              when: { field: 'content.showAdvanced', operator: '==', value: true },
+              type: "visibility",
+              dependencies: ["content.showAdvanced"],
+              when: {
+                field: "content.showAdvanced",
+                operator: "==",
+                value: true,
+              },
               fulfill: { state: { visible: true } },
               otherwise: { state: { visible: false } },
             },
@@ -422,7 +456,7 @@ describe('动态 schema 联动的默认值测试', () => {
     },
   };
 
-  it.skip('动态加载的 schema 中的 default 值应该被应用到表单', async () => {
+  it.skip("动态加载的 schema 中的 default 值应该被应用到表单", async () => {
     // TODO: 待实现功能 - 动态 schema 联动时自动应用新 schema 的默认值
     const formRef = React.createRef<DynamicFormRef>();
 
@@ -430,24 +464,28 @@ describe('动态 schema 联动的默认值测试', () => {
     const loadSchema = jest.fn().mockResolvedValue(httpRequestSchema);
 
     const schema: ExtendedJSONSchema = {
-      type: 'object',
+      type: "object",
       properties: {
         actionType: {
-          type: 'string',
-          title: 'Action Type',
-          enum: ['httpRequest', 'sendEmail'],
+          type: "string",
+          title: "Action Type",
+          enum: ["httpRequest", "sendEmail"],
         },
         content: {
-          type: 'object',
-          title: 'Content',
+          type: "object",
+          title: "Content",
           properties: {},
           ui: {
             linkages: [
               {
-                type: 'schema',
-                dependencies: ['actionType'],
-                when: { field: 'actionType', operator: '==', value: 'httpRequest' },
-                fulfill: { function: 'loadSchema' },
+                type: "schema",
+                dependencies: ["actionType"],
+                when: {
+                  field: "actionType",
+                  operator: "==",
+                  value: "httpRequest",
+                },
+                fulfill: { function: "loadSchema" },
               },
             ],
           },
@@ -461,64 +499,68 @@ describe('动态 schema 联动的默认值测试', () => {
         schema={schema}
         onSubmit={jest.fn()}
         linkageFunctions={{ loadSchema }}
-      />
+      />,
     );
 
     // 初始状态：content 应该为空或不存在
     await waitFor(
       () => {
-        expect(screen.queryByText('HTTP Method')).not.toBeInTheDocument();
+        expect(screen.queryByText("HTTP Method")).not.toBeInTheDocument();
       },
-      { timeout: 3000 }
+      { timeout: 3000 },
     );
 
     // 选择 httpRequest 触发 schema 联动（SelectWidget 渲染自定义 button，用 setValue 代替 UI 操作）
     await act(async () => {
-      formRef.current?.setValue('actionType', 'httpRequest');
+      formRef.current?.setValue("actionType", "httpRequest");
     });
 
     // 等待动态 schema 加载完成
     await waitFor(
       () => {
         // 新 schema 的字段应该显示
-        expect(screen.getByText('HTTP Method')).toBeInTheDocument();
-        expect(screen.getByText('Timeout')).toBeInTheDocument();
+        expect(screen.getByText("HTTP Method")).toBeInTheDocument();
+        expect(screen.getByText("Timeout")).toBeInTheDocument();
       },
-      { timeout: 3000 }
+      { timeout: 3000 },
     );
 
     // 验证 default 值被正确应用
     await waitFor(() => {
       const values = formRef.current?.getValues();
       // 检查动态 schema 的 default 值
-      expect(values?.content?.method).toBe('GET');
+      expect(values?.content?.method).toBe("GET");
       expect(values?.content?.timeout).toBe(30000);
       expect(values?.content?.showAdvanced).toBe(true);
     });
   });
 
-  it.skip('动态加载的 schema 中的联动配置应该正确计算', async () => {
+  it.skip("动态加载的 schema 中的联动配置应该正确计算", async () => {
     // TODO: 待实现功能 - 动态 schema 联动时自动应用新 schema 的默认值和联动配置
     const formRef = React.createRef<DynamicFormRef>();
 
     // 模拟的 schema，其中 showAdvanced 默认为 false
     const schemaWithHiddenAdvanced: ExtendedJSONSchema = {
-      type: 'object',
+      type: "object",
       properties: {
         showAdvanced: {
-          type: 'boolean',
-          title: 'Show Advanced',
+          type: "boolean",
+          title: "Show Advanced",
           default: false, // 默认不显示高级选项
         },
         advancedOptions: {
-          type: 'string',
-          title: 'Advanced Options',
+          type: "string",
+          title: "Advanced Options",
           ui: {
             linkages: [
               {
-                type: 'visibility',
-                dependencies: ['content.showAdvanced'],
-                when: { field: 'content.showAdvanced', operator: '==', value: true },
+                type: "visibility",
+                dependencies: ["content.showAdvanced"],
+                when: {
+                  field: "content.showAdvanced",
+                  operator: "==",
+                  value: true,
+                },
                 fulfill: { state: { visible: true } },
                 otherwise: { state: { visible: false } },
               },
@@ -531,24 +573,28 @@ describe('动态 schema 联动的默认值测试', () => {
     const loadSchema = jest.fn().mockResolvedValue(schemaWithHiddenAdvanced);
 
     const schema: ExtendedJSONSchema = {
-      type: 'object',
+      type: "object",
       properties: {
         actionType: {
-          type: 'string',
-          title: 'Action Type',
-          enum: ['httpRequest', 'sendEmail'],
+          type: "string",
+          title: "Action Type",
+          enum: ["httpRequest", "sendEmail"],
         },
         content: {
-          type: 'object',
-          title: 'Content',
+          type: "object",
+          title: "Content",
           properties: {},
           ui: {
             linkages: [
               {
-                type: 'schema',
-                dependencies: ['actionType'],
-                when: { field: 'actionType', operator: '==', value: 'httpRequest' },
-                fulfill: { function: 'loadSchema' },
+                type: "schema",
+                dependencies: ["actionType"],
+                when: {
+                  field: "actionType",
+                  operator: "==",
+                  value: "httpRequest",
+                },
+                fulfill: { function: "loadSchema" },
               },
             ],
           },
@@ -562,12 +608,12 @@ describe('动态 schema 联动的默认值测试', () => {
         schema={schema}
         onSubmit={jest.fn()}
         linkageFunctions={{ loadSchema }}
-      />
+      />,
     );
 
     // 选择 httpRequest 触发 schema 联动（SelectWidget 渲染自定义 button，用 setValue 代替 UI 操作）
     await act(async () => {
-      formRef.current?.setValue('actionType', 'httpRequest');
+      formRef.current?.setValue("actionType", "httpRequest");
     });
 
     // 手动触发联动以加载动态 schema
@@ -579,17 +625,17 @@ describe('动态 schema 联动的默认值测试', () => {
     await waitFor(
       () => {
         // showAdvanced 字段应该显示
-        expect(screen.getByText('Show Advanced')).toBeInTheDocument();
+        expect(screen.getByText("Show Advanced")).toBeInTheDocument();
       },
-      { timeout: 3000 }
+      { timeout: 3000 },
     );
 
     // 由于 showAdvanced 默认为 false，advancedOptions 应该隐藏
     await waitFor(
       () => {
-        expect(screen.queryByText('Advanced Options')).not.toBeInTheDocument();
+        expect(screen.queryByText("Advanced Options")).not.toBeInTheDocument();
       },
-      { timeout: 3000 }
+      { timeout: 3000 },
     );
 
     // 验证默认值被正确应用
@@ -600,26 +646,26 @@ describe('动态 schema 联动的默认值测试', () => {
   });
 });
 
-describe('useImperativeHandle.refreshLinkage 闭包陈旧修复', () => {
-  it('linkageFunctions 更新后，通过 ref 调用的 refreshLinkage 应使用最新函数', async () => {
+describe("useImperativeHandle.refreshLinkage 闭包陈旧修复", () => {
+  it("linkageFunctions 更新后，通过 ref 调用的 refreshLinkage 应使用最新函数", async () => {
     const formRef = React.createRef<DynamicFormRef>();
 
     const schema: ExtendedJSONSchema = {
-      type: 'object',
+      type: "object",
       properties: {
         country: {
-          type: 'string',
-          title: 'Country',
+          type: "string",
+          title: "Country",
         },
         province: {
-          type: 'string',
-          title: 'Province',
+          type: "string",
+          title: "Province",
           ui: {
             linkages: [
               {
-                type: 'options',
-                dependencies: ['#/properties/country'],
-                fulfill: { function: 'loadOptions' },
+                type: "options",
+                dependencies: ["#/properties/country"],
+                fulfill: { function: "loadOptions" },
               },
             ],
           },
@@ -629,10 +675,10 @@ describe('useImperativeHandle.refreshLinkage 闭包陈旧修复', () => {
 
     const initialFn = jest
       .fn()
-      .mockReturnValue([{ label: 'Old Option', value: 'old' }]);
+      .mockReturnValue([{ label: "Old Option", value: "old" }]);
     const updatedFn = jest
       .fn()
-      .mockReturnValue([{ label: 'New Option', value: 'new' }]);
+      .mockReturnValue([{ label: "New Option", value: "new" }]);
 
     const { rerender } = render(
       <DynamicForm
@@ -640,7 +686,7 @@ describe('useImperativeHandle.refreshLinkage 闭包陈旧修复', () => {
         schema={schema}
         linkageFunctions={{ loadOptions: initialFn }}
         onSubmit={jest.fn()}
-      />
+      />,
     );
 
     // 初始刷新，验证旧函数被调用
@@ -658,7 +704,7 @@ describe('useImperativeHandle.refreshLinkage 闭包陈旧修复', () => {
         schema={schema}
         linkageFunctions={{ loadOptions: updatedFn }}
         onSubmit={jest.fn()}
-      />
+      />,
     );
 
     // 再次通过 ref 调用 refreshLinkage

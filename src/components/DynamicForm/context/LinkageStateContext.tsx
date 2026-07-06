@@ -1,7 +1,11 @@
-import React, { createContext, useContext } from 'react';
-import type { UseFormReturn } from 'react-hook-form';
-import type { LinkageResult, LinkageFunction, LinkageConfig } from '../types/linkage';
-import type { ExtendedJSONSchema } from '../types/schema';
+import React, { createContext, useContext } from "react";
+import type { UseFormReturn } from "react-hook-form";
+import type {
+  LinkageResult,
+  LinkageFunction,
+  LinkageConfig,
+} from "../types/linkage";
+import type { ExtendedJSONSchema } from "../types/schema";
 
 /**
  * 联动状态 Context 值类型
@@ -25,7 +29,9 @@ export interface LinkageStateContextValue {
  * 联动状态 Context
  * 用于在父子 DynamicForm 之间传递联动计算能力
  */
-const LinkageStateContext = createContext<LinkageStateContextValue | null>(null);
+const LinkageStateContext = createContext<LinkageStateContextValue | null>(
+  null,
+);
 
 /**
  * LinkageStateContext Provider 组件
@@ -34,7 +40,11 @@ export const LinkageStateProvider: React.FC<{
   value: LinkageStateContextValue;
   children: React.ReactNode;
 }> = ({ value, children }) => {
-  return <LinkageStateContext.Provider value={value}>{children}</LinkageStateContext.Provider>;
+  return (
+    <LinkageStateContext.Provider value={value}>
+      {children}
+    </LinkageStateContext.Provider>
+  );
 };
 
 /**
@@ -52,7 +62,9 @@ export function useLinkageStateContext(): LinkageStateContextValue | null {
 export function useLinkageStateContextRequired(): LinkageStateContextValue {
   const context = useContext(LinkageStateContext);
   if (!context) {
-    throw new Error('useLinkageStateContextRequired must be used within LinkageStateProvider');
+    throw new Error(
+      "useLinkageStateContextRequired must be used within LinkageStateProvider",
+    );
   }
   return context;
 }

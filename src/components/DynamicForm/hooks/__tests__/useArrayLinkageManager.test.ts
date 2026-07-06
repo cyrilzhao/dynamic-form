@@ -1,14 +1,14 @@
-import { renderHook, act, waitFor } from '@testing-library/react';
-import { useForm } from 'react-hook-form';
-import { useArrayLinkageManager } from '../useArrayLinkageManager';
-import type { LinkageConfig } from '../../types/linkage';
-import type { ExtendedJSONSchema } from '../../types/schema';
+import { renderHook, act, waitFor } from "@testing-library/react";
+import { useForm } from "react-hook-form";
+import { useArrayLinkageManager } from "../useArrayLinkageManager";
+import type { LinkageConfig } from "../../types/linkage";
+import type { ExtendedJSONSchema } from "../../types/schema";
 
-describe('useArrayLinkageManager', () => {
-  describe('基础功能', () => {
-    it('应该在没有联动配置时返回空状态', async () => {
+describe("useArrayLinkageManager", () => {
+  describe("基础功能", () => {
+    it("应该在没有联动配置时返回空状态", async () => {
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { name: 'test' } });
+        const form = useForm({ defaultValues: { name: "test" } });
         return useArrayLinkageManager({
           form,
           baseLinkages: {},
@@ -20,13 +20,13 @@ describe('useArrayLinkageManager', () => {
       });
     });
 
-    it('应该处理非数组字段的联动', async () => {
+    it("应该处理非数组字段的联动", async () => {
       const baseLinkages: Record<string, LinkageConfig[]> = {
         companyName: [
           {
-            type: 'visibility',
-            dependencies: ['userType'],
-            when: { field: 'userType', operator: '==', value: 'enterprise' },
+            type: "visibility",
+            dependencies: ["userType"],
+            when: { field: "userType", operator: "==", value: "enterprise" },
             fulfill: { state: { visible: true } },
             otherwise: { state: { visible: false } },
           },
@@ -34,16 +34,16 @@ describe('useArrayLinkageManager', () => {
       };
 
       const schema: ExtendedJSONSchema = {
-        type: 'object',
+        type: "object",
         properties: {
-          userType: { type: 'string' },
-          companyName: { type: 'string' },
+          userType: { type: "string" },
+          companyName: { type: "string" },
         },
       };
 
       const { result } = renderHook(() => {
         const form = useForm({
-          defaultValues: { userType: 'enterprise', companyName: '' },
+          defaultValues: { userType: "enterprise", companyName: "" },
         });
         return useArrayLinkageManager({ form, baseLinkages, schema });
       });
@@ -59,14 +59,14 @@ describe('useArrayLinkageManager', () => {
     });
   });
 
-  describe('数组元素联动', () => {
-    it('应该为数组元素生成动态联动配置', async () => {
+  describe("数组元素联动", () => {
+    it("应该为数组元素生成动态联动配置", async () => {
       const baseLinkages: Record<string, LinkageConfig[]> = {
-        'contacts.companyName': [
+        "contacts.companyName": [
           {
-            type: 'visibility',
-            dependencies: ['./type'],
-            when: { field: './type', operator: '==', value: 'business' },
+            type: "visibility",
+            dependencies: ["./type"],
+            when: { field: "./type", operator: "==", value: "business" },
             fulfill: { state: { visible: true } },
             otherwise: { state: { visible: false } },
           },
@@ -74,15 +74,15 @@ describe('useArrayLinkageManager', () => {
       };
 
       const schema: ExtendedJSONSchema = {
-        type: 'object',
+        type: "object",
         properties: {
           contacts: {
-            type: 'array',
+            type: "array",
             items: {
-              type: 'object',
+              type: "object",
               properties: {
-                type: { type: 'string' },
-                companyName: { type: 'string' },
+                type: { type: "string" },
+                companyName: { type: "string" },
               },
             },
           },
@@ -94,8 +94,8 @@ describe('useArrayLinkageManager', () => {
         const form = useForm({
           defaultValues: {
             contacts: [
-              { type: 'business', companyName: '' },
-              { type: 'personal', companyName: '' },
+              { type: "business", companyName: "" },
+              { type: "personal", companyName: "" },
             ],
           },
         });
@@ -110,19 +110,27 @@ describe('useArrayLinkageManager', () => {
 
       await waitFor(() => {
         // 第一个元素应该显示（type === 'business'）
-        expect(result.current.linkageStates['contacts.0.companyName']?.visible).toBe(true);
+        expect(
+          result.current.linkageStates["contacts.0.companyName"]?.visible,
+        ).toBe(true);
         // 第二个元素应该隐藏（type === 'personal'）
-        expect(result.current.linkageStates['contacts.1.companyName']?.visible).toBe(false);
+        expect(
+          result.current.linkageStates["contacts.1.companyName"]?.visible,
+        ).toBe(false);
       });
     });
 
-    it('应该处理已实例化的数组元素路径', async () => {
+    it("应该处理已实例化的数组元素路径", async () => {
       const baseLinkages: Record<string, LinkageConfig[]> = {
-        'contacts.0.companyName': [
+        "contacts.0.companyName": [
           {
-            type: 'visibility',
-            dependencies: ['contacts.0.type'],
-            when: { field: 'contacts.0.type', operator: '==', value: 'business' },
+            type: "visibility",
+            dependencies: ["contacts.0.type"],
+            when: {
+              field: "contacts.0.type",
+              operator: "==",
+              value: "business",
+            },
             fulfill: { state: { visible: true } },
             otherwise: { state: { visible: false } },
           },
@@ -130,15 +138,15 @@ describe('useArrayLinkageManager', () => {
       };
 
       const schema: ExtendedJSONSchema = {
-        type: 'object',
+        type: "object",
         properties: {
           contacts: {
-            type: 'array',
+            type: "array",
             items: {
-              type: 'object',
+              type: "object",
               properties: {
-                type: { type: 'string' },
-                companyName: { type: 'string' },
+                type: { type: "string" },
+                companyName: { type: "string" },
               },
             },
           },
@@ -149,7 +157,7 @@ describe('useArrayLinkageManager', () => {
       const { result } = renderHook(() => {
         const form = useForm({
           defaultValues: {
-            contacts: [{ type: 'business', companyName: '' }],
+            contacts: [{ type: "business", companyName: "" }],
           },
         });
         formRef = form;
@@ -162,32 +170,34 @@ describe('useArrayLinkageManager', () => {
       });
 
       await waitFor(() => {
-        expect(result.current.linkageStates['contacts.0.companyName']?.visible).toBe(true);
+        expect(
+          result.current.linkageStates["contacts.0.companyName"]?.visible,
+        ).toBe(true);
       });
     });
 
-    it('应该处理非数组值的情况', async () => {
+    it("应该处理非数组值的情况", async () => {
       const baseLinkages: Record<string, LinkageConfig[]> = {
-        'contacts.companyName': [
+        "contacts.companyName": [
           {
-            type: 'visibility',
-            dependencies: ['./type'],
-            when: { field: './type', operator: '==', value: 'business' },
+            type: "visibility",
+            dependencies: ["./type"],
+            when: { field: "./type", operator: "==", value: "business" },
             fulfill: { state: { visible: true } },
           },
         ],
       };
 
       const schema: ExtendedJSONSchema = {
-        type: 'object',
+        type: "object",
         properties: {
           contacts: {
-            type: 'array',
+            type: "array",
             items: {
-              type: 'object',
+              type: "object",
               properties: {
-                type: { type: 'string' },
-                companyName: { type: 'string' },
+                type: { type: "string" },
+                companyName: { type: "string" },
               },
             },
           },
@@ -205,18 +215,20 @@ describe('useArrayLinkageManager', () => {
 
       await waitFor(() => {
         // 不应该生成任何数组元素的联动
-        expect(result.current.linkageStates['contacts.0.companyName']).toBeUndefined();
+        expect(
+          result.current.linkageStates["contacts.0.companyName"],
+        ).toBeUndefined();
       });
     });
 
-    it('应该处理 schema 中找不到数组的路径', async () => {
+    it("应该处理 schema 中找不到数组的路径", async () => {
       // 这个测试覆盖第 77-78 行：当 findArrayInPath 返回 null 时
       const baseLinkages: Record<string, LinkageConfig[]> = {
-        'nonArrayField.subField': [
+        "nonArrayField.subField": [
           {
-            type: 'visibility',
-            dependencies: ['trigger'],
-            when: { field: 'trigger', operator: '==', value: 'show' },
+            type: "visibility",
+            dependencies: ["trigger"],
+            when: { field: "trigger", operator: "==", value: "show" },
             fulfill: { state: { visible: true } },
             otherwise: { state: { visible: false } },
           },
@@ -224,13 +236,13 @@ describe('useArrayLinkageManager', () => {
       };
 
       const schema: ExtendedJSONSchema = {
-        type: 'object',
+        type: "object",
         properties: {
-          trigger: { type: 'string' },
+          trigger: { type: "string" },
           nonArrayField: {
-            type: 'object',
+            type: "object",
             properties: {
-              subField: { type: 'string' },
+              subField: { type: "string" },
             },
           },
         },
@@ -240,8 +252,8 @@ describe('useArrayLinkageManager', () => {
       const { result } = renderHook(() => {
         const form = useForm({
           defaultValues: {
-            trigger: 'show',
-            nonArrayField: { subField: '' },
+            trigger: "show",
+            nonArrayField: { subField: "" },
           },
         });
         formRef = form;
@@ -250,37 +262,39 @@ describe('useArrayLinkageManager', () => {
 
       // 触发表单变化以激活 watch 回调
       await act(async () => {
-        formRef.setValue('trigger', 'show');
+        formRef.setValue("trigger", "show");
       });
 
       await waitFor(() => {
         // 非数组字段的联动应该被直接添加
-        expect(result.current.linkageStates['nonArrayField.subField']?.visible).toBe(true);
+        expect(
+          result.current.linkageStates["nonArrayField.subField"]?.visible,
+        ).toBe(true);
       });
     });
 
-    it('应该处理数组值为 undefined 的情况', async () => {
+    it("应该处理数组值为 undefined 的情况", async () => {
       // 这个测试覆盖第 87 行：当数组值不是数组时
       const baseLinkages: Record<string, LinkageConfig[]> = {
-        'items.name': [
+        "items.name": [
           {
-            type: 'visibility',
-            dependencies: ['./type'],
+            type: "visibility",
+            dependencies: ["./type"],
             fulfill: { state: { visible: true } },
           },
         ],
       };
 
       const schema: ExtendedJSONSchema = {
-        type: 'object',
+        type: "object",
         properties: {
           items: {
-            type: 'array',
+            type: "array",
             items: {
-              type: 'object',
+              type: "object",
               properties: {
-                type: { type: 'string' },
-                name: { type: 'string' },
+                type: { type: "string" },
+                name: { type: "string" },
               },
             },
           },
@@ -300,23 +314,27 @@ describe('useArrayLinkageManager', () => {
 
       // 触发表单变化
       await act(async () => {
-        formRef.setValue('items', 'not-an-array');
+        formRef.setValue("items", "not-an-array");
       });
 
       await waitFor(() => {
         // 不应该生成数组元素的联动
-        expect(result.current.linkageStates['items.0.name']).toBeUndefined();
+        expect(result.current.linkageStates["items.0.name"]).toBeUndefined();
       });
     });
   });
 
-  describe('循环依赖检测', () => {
-    it('应该检测并警告循环依赖', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+  describe("循环依赖检测", () => {
+    it("应该检测并警告循环依赖", async () => {
+      const consoleSpy = jest.spyOn(console, "error").mockImplementation();
 
       const baseLinkages: Record<string, LinkageConfig[]> = {
-        fieldA: [{ type: 'value', dependencies: ['fieldB'], fulfill: { value: 1 } }],
-        fieldB: [{ type: 'value', dependencies: ['fieldA'], fulfill: { value: 2 } }],
+        fieldA: [
+          { type: "value", dependencies: ["fieldB"], fulfill: { value: 1 } },
+        ],
+        fieldB: [
+          { type: "value", dependencies: ["fieldA"], fulfill: { value: 2 } },
+        ],
       };
 
       renderHook(() => {
@@ -326,21 +344,21 @@ describe('useArrayLinkageManager', () => {
 
       await waitFor(() => {
         expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining('检测到循环依赖'),
-          expect.any(String)
+          expect.stringContaining("检测到循环依赖"),
+          expect.any(String),
         );
       });
 
       consoleSpy.mockRestore();
     });
 
-    it('应该调用 onCycleDetected 回调', async () => {
+    it("应该调用 onCycleDetected 回调", async () => {
       const onCycleDetected = jest.fn();
-      jest.spyOn(console, 'error').mockImplementation();
+      jest.spyOn(console, "error").mockImplementation();
 
       const baseLinkages: Record<string, LinkageConfig[]> = {
-        a: [{ type: 'value', dependencies: ['b'], fulfill: { value: 1 } }],
-        b: [{ type: 'value', dependencies: ['a'], fulfill: { value: 2 } }],
+        a: [{ type: "value", dependencies: ["b"], fulfill: { value: 1 } }],
+        b: [{ type: "value", dependencies: ["a"], fulfill: { value: 2 } }],
       };
 
       renderHook(() => {
@@ -353,38 +371,43 @@ describe('useArrayLinkageManager', () => {
       });
     });
 
-    it('应该在 throwOnCycle 为 true 时抛出错误', async () => {
-      jest.spyOn(console, 'error').mockImplementation();
+    it("应该在 throwOnCycle 为 true 时抛出错误", async () => {
+      jest.spyOn(console, "error").mockImplementation();
 
       const baseLinkages: Record<string, LinkageConfig[]> = {
-        x: [{ type: 'value', dependencies: ['y'], fulfill: { value: 1 } }],
-        y: [{ type: 'value', dependencies: ['x'], fulfill: { value: 2 } }],
+        x: [{ type: "value", dependencies: ["y"], fulfill: { value: 1 } }],
+        y: [{ type: "value", dependencies: ["x"], fulfill: { value: 2 } }],
       };
 
       expect(() => {
         renderHook(() => {
           const form = useForm({ defaultValues: { x: 0, y: 0 } });
-          return useArrayLinkageManager({ form, baseLinkages, throwOnCycle: true });
+          return useArrayLinkageManager({
+            form,
+            baseLinkages,
+            throwOnCycle: true,
+          });
         });
-      }).toThrow('循环依赖');
+      }).toThrow("循环依赖");
     });
   });
 
-  describe('refresh 功能', () => {
-    it('应该提供 refresh 方法重新计算联动', async () => {
+  describe("refresh 功能", () => {
+    it("应该提供 refresh 方法重新计算联动", async () => {
       const baseLinkages: Record<string, LinkageConfig[]> = {
         output: [
           {
-            type: 'value',
-            dependencies: ['input'],
-            fulfill: { function: 'calculate' },
+            type: "value",
+            dependencies: ["input"],
+            fulfill: { function: "calculate" },
           },
         ],
       };
 
       let multiplier = 2;
       const linkageFunctions = {
-        calculate: (formData: Record<string, any>) => formData.input * multiplier,
+        calculate: (formData: Record<string, any>) =>
+          formData.input * multiplier,
       };
 
       const { result } = renderHook(() => {
@@ -413,13 +436,13 @@ describe('useArrayLinkageManager', () => {
     });
   });
 
-  describe('无 schema 情况', () => {
-    it('应该在没有 schema 时返回空动态联动', async () => {
+  describe("无 schema 情况", () => {
+    it("应该在没有 schema 时返回空动态联动", async () => {
       const baseLinkages: Record<string, LinkageConfig[]> = {
-        'contacts.companyName': [
+        "contacts.companyName": [
           {
-            type: 'visibility',
-            dependencies: ['./type'],
+            type: "visibility",
+            dependencies: ["./type"],
             fulfill: { state: { visible: true } },
           },
         ],
@@ -427,7 +450,7 @@ describe('useArrayLinkageManager', () => {
 
       const { result } = renderHook(() => {
         const form = useForm({
-          defaultValues: { contacts: [{ type: 'business' }] },
+          defaultValues: { contacts: [{ type: "business" }] },
         });
         // 不传 schema
         return useArrayLinkageManager({ form, baseLinkages });
@@ -435,7 +458,9 @@ describe('useArrayLinkageManager', () => {
 
       await waitFor(() => {
         // 没有 schema 时不会生成动态联动
-        expect(result.current.linkageStates['contacts.0.companyName']).toBeUndefined();
+        expect(
+          result.current.linkageStates["contacts.0.companyName"],
+        ).toBeUndefined();
       });
     });
   });

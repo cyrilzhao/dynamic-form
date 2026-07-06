@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 interface FieldHelpProps {
   text: string;
@@ -6,7 +6,10 @@ interface FieldHelpProps {
 
 export const FieldHelp: React.FC<FieldHelpProps> = ({ text }) => {
   return (
-    <div className="field-help bp5-text-muted" style={{ marginTop: '5px', fontSize: '12px' }}>
+    <div
+      className="field-help bp5-text-muted"
+      style={{ marginTop: "5px", fontSize: "12px" }}
+    >
       {text}
     </div>
   );

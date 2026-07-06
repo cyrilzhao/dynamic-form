@@ -25,7 +25,9 @@ export class LinkageTaskQueue {
    */
   enqueue(fieldName: string, affectedFields: string[]): void {
     const timestamp = Date.now();
-    const existingIndex = this.queue.findIndex(t => t.fieldName === fieldName);
+    const existingIndex = this.queue.findIndex(
+      (t) => t.fieldName === fieldName,
+    );
 
     if (existingIndex >= 0) {
       // 队列中已有该字段的任务，更新 timestamp 和 affectedFields

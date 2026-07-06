@@ -1,5 +1,11 @@
-import React, { createContext, useContext, useRef, useCallback, useMemo } from 'react';
-import type { ExtendedJSONSchema } from '../types/schema';
+import React, {
+  createContext,
+  useContext,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
+import type { ExtendedJSONSchema } from "../types/schema";
 
 /**
  * NestedSchemaContext 用于收集所有嵌套表单的当前 schema
@@ -23,13 +29,18 @@ interface NestedSchemaRegistry {
 
 const NestedSchemaContext = createContext<NestedSchemaRegistry | null>(null);
 
-export const NestedSchemaProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const NestedSchemaProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   // 使用 Map 存储字段路径 -> schema 的映射
   const schemasRef = useRef<Map<string, ExtendedJSONSchema>>(new Map());
 
-  const register = useCallback((fieldPath: string, schema: ExtendedJSONSchema) => {
-    schemasRef.current.set(fieldPath, schema);
-  }, []);
+  const register = useCallback(
+    (fieldPath: string, schema: ExtendedJSONSchema) => {
+      schemasRef.current.set(fieldPath, schema);
+    },
+    [],
+  );
 
   const unregister = useCallback((fieldPath: string) => {
     schemasRef.current.delete(fieldPath);
@@ -51,16 +62,22 @@ export const NestedSchemaProvider: React.FC<{ children: React.ReactNode }> = ({ 
       getSchema,
       getAllSchemas,
     }),
-    [register, unregister, getSchema, getAllSchemas]
+    [register, unregister, getSchema, getAllSchemas],
   );
 
-  return <NestedSchemaContext.Provider value={value}>{children}</NestedSchemaContext.Provider>;
+  return (
+    <NestedSchemaContext.Provider value={value}>
+      {children}
+    </NestedSchemaContext.Provider>
+  );
 };
 
 export const useNestedSchemaRegistry = () => {
   const context = useContext(NestedSchemaContext);
   if (!context) {
-    throw new Error('useNestedSchemaRegistry must be used within NestedSchemaProvider');
+    throw new Error(
+      "useNestedSchemaRegistry must be used within NestedSchemaProvider",
+    );
   }
   return context;
 };

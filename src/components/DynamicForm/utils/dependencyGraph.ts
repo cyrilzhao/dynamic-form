@@ -4,10 +4,10 @@
 export class CircularDependencyError extends Error {
   constructor(
     public readonly cycle: string[],
-    message?: string
+    message?: string,
   ) {
-    super(message || `检测到循环依赖: ${cycle.join(' -> ')}`);
-    this.name = 'CircularDependencyError';
+    super(message || `检测到循环依赖: ${cycle.join(" -> ")}`);
+    this.name = "CircularDependencyError";
   }
 }
 
@@ -80,12 +80,14 @@ export class DependencyGraph {
     const visited = new Set<string>();
 
     const dfs = (field: string) => {
-      if (visited.has(field)) return;
+      if (visited.has(field)) {
+        return;
+      }
       visited.add(field);
 
       const dependents = this.graph.get(field);
       if (dependents) {
-        dependents.forEach(dependent => {
+        dependents.forEach((dependent) => {
           if (!visited.has(dependent)) {
             affected.push(dependent);
           }
@@ -102,7 +104,7 @@ export class DependencyGraph {
     // 精确匹配永远找不到。加 source + '.' 前缀检查，确保数组内任何字段变化都能触发
     // 依赖该数组的联动。source + '.' 中的 '.' 防止误匹配 'permissions2' 等无关路径。
     for (const source of this.graph.keys()) {
-      if (changedField.startsWith(source + '.')) {
+      if (changedField.startsWith(source + ".")) {
         dfs(source);
       }
     }
@@ -131,7 +133,9 @@ export class DependencyGraph {
       if (neighbors) {
         for (const neighbor of neighbors) {
           if (!visited.has(neighbor)) {
-            if (dfs(neighbor)) return true;
+            if (dfs(neighbor)) {
+              return true;
+            }
           } else if (recStack.has(neighbor)) {
             // 找到循环，记录循环起点
             cycleStart = neighbor;
@@ -174,7 +178,7 @@ export class DependencyGraph {
       return {
         isValid: false,
         cycle,
-        error: `检测到循环依赖: ${cycle.join(' -> ')}`,
+        error: `检测到循环依赖: ${cycle.join(" -> ")}`,
       };
     }
     return { isValid: true, cycle: null };
@@ -212,7 +216,7 @@ export class DependencyGraph {
     options: {
       throwOnCycle?: boolean;
       onCycleDetected?: (cycle: string[]) => void;
-    } = {}
+    } = {},
   ): string[] {
     const { throwOnCycle = false, onCycleDetected } = options;
     const inDegree = new Map<string, number>();
@@ -220,16 +224,16 @@ export class DependencyGraph {
 
     // 初始化入度和邻接表（只考虑给定的字段）
     const fieldSet = new Set(fields);
-    fields.forEach(field => {
+    fields.forEach((field) => {
       inDegree.set(field, 0);
       adjList.set(field, new Set());
     });
 
     // 构建邻接表和计算入度
-    fields.forEach(field => {
+    fields.forEach((field) => {
       const dependents = this.graph.get(field);
       if (dependents) {
-        dependents.forEach(dependent => {
+        dependents.forEach((dependent) => {
           // 只考虑在给定字段列表中的依赖关系
           if (fieldSet.has(dependent)) {
             adjList.get(field)!.add(dependent);
@@ -258,7 +262,7 @@ export class DependencyGraph {
       // adjList 在初始化时已为所有 fields 创建了 Set，所以这里一定存在
       // neighbors 中的节点都在 fieldSet 中（第 223 行检查），因此 inDegree 一定存在
       const neighbors = adjList.get(current)!;
-      neighbors.forEach(neighbor => {
+      neighbors.forEach((neighbor) => {
         const newDegree = inDegree.get(neighbor)! - 1;
         inDegree.set(neighbor, newDegree);
         if (newDegree === 0) {
@@ -270,7 +274,7 @@ export class DependencyGraph {
     // 检测循环依赖：如果结果数量少于输入数量，说明存在循环
     if (result.length < fields.length) {
       // 找出循环中的节点
-      const cycleNodes = fields.filter(f => !result.includes(f));
+      const cycleNodes = fields.filter((f) => !result.includes(f));
       const cyclePath = this.findCyclePath(cycleNodes, adjList);
 
       if (onCycleDetected) {
@@ -282,7 +286,7 @@ export class DependencyGraph {
       }
 
       // 返回已排序的节点，循环节点按原顺序追加到末尾
-      console.warn('拓扑排序检测到循环依赖:', cyclePath.join(' -> '));
+      console.warn("拓扑排序检测到循环依赖:", cyclePath.join(" -> "));
       return [...result, ...cycleNodes];
     }
 
@@ -294,9 +298,11 @@ export class DependencyGraph {
    */
   private findCyclePath(
     cycleNodes: string[],
-    adjList: Map<string, Set<string>>
+    adjList: Map<string, Set<string>>,
   ): string[] {
-    if (cycleNodes.length === 0) return [];
+    if (cycleNodes.length === 0) {
+      return [];
+    }
 
     const visited = new Set<string>();
     const recStack = new Set<string>();
@@ -316,7 +322,9 @@ export class DependencyGraph {
         for (const neighbor of neighbors) {
           if (cycleNodes.includes(neighbor)) {
             if (!visited.has(neighbor)) {
-              if (dfs(neighbor)) return true;
+              if (dfs(neighbor)) {
+                return true;
+              }
             } else if (recStack.has(neighbor)) {
               cycleStart = neighbor;
               return true;
@@ -371,10 +379,10 @@ export class DependencyGraph {
     // 仅统计 fields 内部的依赖关系，忽略来自 fields 外部字段的依赖。
     // 原因：外部字段在此次联动批次中不参与计算，其变化不影响本批次内字段的执行顺序；
     // 若计入外部依赖，某些字段的入度永远不会降为 0，会被误判为循环依赖。
-    fields.forEach(field => {
+    fields.forEach((field) => {
       const deps = this.reverseGraph.get(field) || new Set();
       // 只统计在 fields 中的依赖
-      const relevantDeps = Array.from(deps).filter(dep => remaining.has(dep));
+      const relevantDeps = Array.from(deps).filter((dep) => remaining.has(dep));
       inDegree.set(field, relevantDeps.length);
     });
 
@@ -384,7 +392,7 @@ export class DependencyGraph {
 
       // 找出当前层级的字段（入度为 0 的字段）
       // 入度为 0 意味着：该字段不依赖任何剩余字段
-      remaining.forEach(field => {
+      remaining.forEach((field) => {
         if (inDegree.get(field) === 0) {
           currentLayer.push(field);
         }
@@ -392,7 +400,10 @@ export class DependencyGraph {
 
       if (currentLayer.length === 0) {
         // 存在循环依赖，将剩余字段放入最后一层
-        console.warn('[getTopologicalLayers] 检测到循环依赖，剩余字段:', Array.from(remaining));
+        console.warn(
+          "[getTopologicalLayers] 检测到循环依赖，剩余字段:",
+          Array.from(remaining),
+        );
         layers.push(Array.from(remaining));
         break;
       }
@@ -400,13 +411,13 @@ export class DependencyGraph {
       layers.push(currentLayer);
 
       // 移除当前层级的字段，并更新剩余字段的入度
-      currentLayer.forEach(field => {
+      currentLayer.forEach((field) => {
         remaining.delete(field);
 
         // 更新依赖该字段的其他字段的入度
         const dependents = this.graph.get(field);
         if (dependents) {
-          dependents.forEach(dependent => {
+          dependents.forEach((dependent) => {
             // dependent 在 remaining 中意味着它在 fields 中，因此 inDegree 一定存在
             if (remaining.has(dependent)) {
               const currentInDegree = inDegree.get(dependent)!;

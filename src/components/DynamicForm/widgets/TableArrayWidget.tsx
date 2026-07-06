@@ -1,18 +1,29 @@
-import React, { forwardRef, useCallback, useMemo, useRef, useState } from 'react';
-import { useFormContext, useFieldArray, Controller } from 'react-hook-form';
-import { Button, Popover, PopoverInteractionKind, Tooltip } from '@blueprintjs/core';
-import { Virtuoso } from 'react-virtuoso';
-import type { FieldWidgetProps } from '../types';
-import type { ExtendedJSONSchema } from '../types/schema';
-import { FieldRegistry } from '../core/FieldRegistry';
-import { SchemaParser } from '../core/SchemaParser';
-import './TableArrayWidget.scss';
+import React, {
+  forwardRef,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useFormContext, useFieldArray, Controller } from "react-hook-form";
+import {
+  Button,
+  Popover,
+  PopoverInteractionKind,
+  Tooltip,
+} from "@blueprintjs/core";
+import { Virtuoso } from "react-virtuoso";
+import type { FieldWidgetProps } from "../types";
+import type { ExtendedJSONSchema } from "../types/schema";
+import { FieldRegistry } from "../core/FieldRegistry";
+import { SchemaParser } from "../core/SchemaParser";
+import "./TableArrayWidget.scss";
 
 export interface TableArrayWidgetProps extends FieldWidgetProps {
   schema: ExtendedJSONSchema & {
-    type: 'array';
+    type: "array";
     items: ExtendedJSONSchema & {
-      type: 'object';
+      type: "object";
       properties: Record<string, ExtendedJSONSchema>;
     };
     minItems?: number;
@@ -62,14 +73,17 @@ function generateColumns({
   itemSchema,
   columnOrder,
 }: {
-  itemSchema: ExtendedJSONSchema & { type: 'object'; properties: Record<string, ExtendedJSONSchema> };
+  itemSchema: ExtendedJSONSchema & {
+    type: "object";
+    properties: Record<string, ExtendedJSONSchema>;
+  };
   columnOrder?: string[];
 }): ColumnDef[] {
   const properties = itemSchema.properties;
   const keys = columnOrder || Object.keys(properties);
   const requiredFields = itemSchema.required || [];
 
-  return keys.map(key => {
+  return keys.map((key) => {
     const propSchema = properties[key];
     const isRequired = requiredFields.includes(key);
     return {
@@ -91,33 +105,42 @@ function determineWidget(schema: ExtendedJSONSchema): string {
   }
 
   switch (schema.type) {
-    case 'string':
-      if (schema.format === 'email') return 'email';
-      if (schema.format === 'uri') return 'url';
-      return 'text';
-    case 'number':
-    case 'integer':
-      return 'number';
-    case 'boolean':
-      return 'checkbox';
+    case "string":
+      if (schema.format === "email") {
+        return "email";
+      }
+      if (schema.format === "uri") {
+        return "url";
+      }
+      return "text";
+    case "number":
+    case "integer":
+      return "number";
+    case "boolean":
+      return "checkbox";
     default:
-      return 'text';
+      return "text";
   }
 }
 
 /**
  * 生成默认行数据
  */
-function generateDefaultRow(itemSchema: ExtendedJSONSchema & { type: 'object'; properties: Record<string, ExtendedJSONSchema> }): any {
+function generateDefaultRow(
+  itemSchema: ExtendedJSONSchema & {
+    type: "object";
+    properties: Record<string, ExtendedJSONSchema>;
+  },
+): any {
   const defaultRow: any = {};
   Object.entries(itemSchema.properties).forEach(([key, propSchema]) => {
     if (propSchema.default !== undefined) {
       defaultRow[key] = propSchema.default;
-    } else if (propSchema.type === 'string') {
-      defaultRow[key] = '';
-    } else if (propSchema.type === 'number' || propSchema.type === 'integer') {
+    } else if (propSchema.type === "string") {
+      defaultRow[key] = "";
+    } else if (propSchema.type === "number" || propSchema.type === "integer") {
       defaultRow[key] = 0;
-    } else if (propSchema.type === 'boolean') {
+    } else if (propSchema.type === "boolean") {
       defaultRow[key] = false;
     }
   });
@@ -139,9 +162,11 @@ const DeleteConfirmPopover: React.FC<DeleteConfirmPopoverProps> = ({
   itemIndex,
 }) => {
   return (
-    <div style={{ padding: '10px', maxWidth: '250px' }}>
-      <div style={{ marginBottom: '10px', fontSize: '14px' }}>Delete row {itemIndex + 1}?</div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+    <div style={{ padding: "10px", maxWidth: "250px" }}>
+      <div style={{ marginBottom: "10px", fontSize: "14px" }}>
+        Delete row {itemIndex + 1}?
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
         <Button small onClick={onCancel}>
           Cancel
         </Button>
@@ -158,7 +183,10 @@ const DeleteConfirmPopover: React.FC<DeleteConfirmPopoverProps> = ({
  *
  * 用于以表格形式渲染和编辑对象数组，支持虚拟滚动优化。
  */
-export const TableArrayWidget = forwardRef<HTMLDivElement, TableArrayWidgetProps>(
+export const TableArrayWidget = forwardRef<
+  HTMLDivElement,
+  TableArrayWidgetProps
+>(
   (
     {
       name,
@@ -168,10 +196,10 @@ export const TableArrayWidget = forwardRef<HTMLDivElement, TableArrayWidgetProps
       enableVirtualScroll = false,
       virtualScrollHeight = 400,
       columns,
-      addButtonText = 'Add Row',
-      emptyText = 'No data',
+      addButtonText = "Add Row",
+      emptyText = "No data",
     },
-    ref
+    ref,
   ) => {
     const { control } = useFormContext();
     const { fields, append, remove } = useFieldArray({
@@ -181,27 +209,31 @@ export const TableArrayWidget = forwardRef<HTMLDivElement, TableArrayWidgetProps
 
     // 从 schema.ui.widgetProps 中获取配置
     const widgetProps = schema.ui?.widgetProps || {};
-    const finalEnableVirtualScroll = widgetProps.enableVirtualScroll ?? enableVirtualScroll;
-    const finalVirtualScrollHeight = widgetProps.virtualScrollHeight ?? virtualScrollHeight;
+    const finalEnableVirtualScroll =
+      widgetProps.enableVirtualScroll ?? enableVirtualScroll;
+    const finalVirtualScrollHeight =
+      widgetProps.virtualScrollHeight ?? virtualScrollHeight;
     const finalColumns = widgetProps.columns ?? columns;
     const finalAddButtonText = widgetProps.addButtonText ?? addButtonText;
     const finalEmptyText = widgetProps.emptyText ?? emptyText;
 
     // 获取数组项的 schema
     const itemSchema = schema.items as ExtendedJSONSchema & {
-      type: 'object';
+      type: "object";
       properties: Record<string, ExtendedJSONSchema>;
     };
 
-    if (!itemSchema || itemSchema.type !== 'object' || !itemSchema.properties) {
-      console.error(`TableArrayWidget: schema.items must be an object type with properties`);
+    if (!itemSchema || itemSchema.type !== "object" || !itemSchema.properties) {
+      console.error(
+        `TableArrayWidget: schema.items must be an object type with properties`,
+      );
       return null;
     }
 
     // 生成列定义
     const columnDefs = useMemo(
       () => generateColumns({ itemSchema, columnOrder: finalColumns }),
-      [itemSchema, finalColumns]
+      [itemSchema, finalColumns],
     );
 
     // 获取最小/最大项数限制
@@ -225,7 +257,7 @@ export const TableArrayWidget = forwardRef<HTMLDivElement, TableArrayWidgetProps
       (index: number) => {
         remove(index);
       },
-      [remove]
+      [remove],
     );
 
     // 判断是否可以删除
@@ -233,12 +265,14 @@ export const TableArrayWidget = forwardRef<HTMLDivElement, TableArrayWidgetProps
       (index: number) => {
         return canAddRemove && fields.length > minItems;
       },
-      [canAddRemove, fields.length, minItems]
+      [canAddRemove, fields.length, minItems],
     );
 
     // 判断是否可以添加
     const canAdd = useMemo(() => {
-      return canAddRemove && (maxItems === undefined || fields.length < maxItems);
+      return (
+        canAddRemove && (maxItems === undefined || fields.length < maxItems)
+      );
     }, [canAddRemove, maxItems, fields.length]);
 
     // 渲染表格行
@@ -254,7 +288,7 @@ export const TableArrayWidget = forwardRef<HTMLDivElement, TableArrayWidgetProps
           readonly={readonly}
         />
       ),
-      [name, columnDefs, canRemove, handleRemove, disabled, readonly]
+      [name, columnDefs, canRemove, handleRemove, disabled, readonly],
     );
 
     return (
@@ -269,12 +303,14 @@ export const TableArrayWidget = forwardRef<HTMLDivElement, TableArrayWidgetProps
               <div className="table-header">
                 <div className="table-row">
                   <div className="table-cell index-cell">#</div>
-                  {columnDefs.map(col => (
+                  {columnDefs.map((col) => (
                     <div key={col.key} className="table-cell">
                       {col.title}
                     </div>
                   ))}
-                  {canAddRemove && <div className="table-cell action-cell">Actions</div>}
+                  {canAddRemove && (
+                    <div className="table-cell action-cell">Actions</div>
+                  )}
                 </div>
               </div>
 
@@ -302,17 +338,17 @@ export const TableArrayWidget = forwardRef<HTMLDivElement, TableArrayWidgetProps
             intent="primary"
             onClick={handleAdd}
             disabled={!canAdd}
-            style={{ marginTop: '10px' }}
+            style={{ marginTop: "10px" }}
           >
             {finalAddButtonText}
           </Button>
         )}
       </div>
     );
-  }
+  },
 );
 
-TableArrayWidget.displayName = 'TableArrayWidget';
+TableArrayWidget.displayName = "TableArrayWidget";
 
 /**
  * TableRow 组件属性
@@ -351,11 +387,15 @@ const TableRow = React.memo<TableRowProps>(
         <div className="table-cell index-cell">{index + 1}</div>
 
         {/* 数据列 */}
-        {columnDefs.map(col => {
+        {columnDefs.map((col) => {
           const WidgetComponent = FieldRegistry.getWidget(col.widget);
           if (!WidgetComponent) {
             console.error(`Widget "${col.widget}" not found in registry`);
-            return <div key={col.key} className="table-cell">-</div>;
+            return (
+              <div key={col.key} className="table-cell">
+                -
+              </div>
+            );
           }
 
           return (
@@ -377,7 +417,13 @@ const TableRow = React.memo<TableRowProps>(
                       {...(col.schema.ui?.widgetProps || {})}
                     />
                     {fieldState.error && (
-                      <div style={{ color: '#DB3737', fontSize: '11px', marginTop: '2px' }}>
+                      <div
+                        style={{
+                          color: "#DB3737",
+                          fontSize: "11px",
+                          marginTop: "2px",
+                        }}
+                      >
                         {fieldState.error.message}
                       </div>
                     )}
@@ -400,20 +446,28 @@ const TableRow = React.memo<TableRowProps>(
                 />
               }
               isOpen={isDeletePopoverOpen}
-              onInteraction={nextOpenState => {
-                if (disabled) return;
+              onInteraction={(nextOpenState) => {
+                if (disabled) {
+                  return;
+                }
                 setIsDeletePopoverOpen(nextOpenState);
               }}
               interactionKind={PopoverInteractionKind.CLICK}
               placement="top"
             >
-              <Button icon="trash" minimal small intent="danger" disabled={disabled} />
+              <Button
+                icon="trash"
+                minimal
+                small
+                intent="danger"
+                disabled={disabled}
+              />
             </Popover>
           </div>
         )}
       </div>
     );
-  }
+  },
 );
 
-TableRow.displayName = 'TableRow';
+TableRow.displayName = "TableRow";

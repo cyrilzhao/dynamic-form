@@ -1,6 +1,6 @@
-import type { LinkageConfig } from '../types/linkage'
-import type { ExtendedJSONSchema } from '../types/schema'
-import { resolveRelativePath } from './pathTransformer'
+import type { LinkageConfig } from "../types/linkage";
+import type { ExtendedJSONSchema } from "../types/schema";
+import { resolveRelativePath } from "./pathTransformer";
 
 /**
  * 数组联动辅助工具
@@ -18,7 +18,7 @@ import { resolveRelativePath } from './pathTransformer'
  * // => ['contacts', '0', 'name']
  */
 function splitPath(path: string): string[] {
-  return path.split('.')
+  return path.split(".");
 }
 
 /**
@@ -28,8 +28,8 @@ function splitPath(path: string): string[] {
  * isArrayElementPath('contacts.name') // false
  */
 export function isArrayElementPath(path: string): boolean {
-  const parts = splitPath(path)
-  return parts.some((part) => /^\d+$/.test(part))
+  const parts = splitPath(path);
+  return parts.some((part) => /^\d+$/.test(part));
 }
 
 /**
@@ -41,22 +41,22 @@ export function isArrayElementPath(path: string): boolean {
  * extractArrayInfo('contacts.0.name') // { arrayPath: 'contacts', index: 0, fieldPath: 'name' }
  */
 export function extractArrayInfo(path: string): {
-  arrayPath: string
-  index: number
-  fieldPath: string
+  arrayPath: string;
+  index: number;
+  fieldPath: string;
 } | null {
-  const parts = splitPath(path)
-  const indexPos = parts.findIndex((part) => /^\d+$/.test(part))
+  const parts = splitPath(path);
+  const indexPos = parts.findIndex((part) => /^\d+$/.test(part));
 
   if (indexPos === -1) {
-    return null
+    return null;
   }
 
-  const arrayPath = parts.slice(0, indexPos).join('.')
-  const index = parseInt(parts[indexPos], 10)
-  const fieldPath = parts.slice(indexPos + 1).join('.')
+  const arrayPath = parts.slice(0, indexPos).join(".");
+  const index = parseInt(parts[indexPos], 10);
+  const fieldPath = parts.slice(indexPos + 1).join(".");
 
-  return { arrayPath, index, fieldPath }
+  return { arrayPath, index, fieldPath };
 }
 
 /**
@@ -65,19 +65,19 @@ export function extractArrayInfo(path: string): {
  * @returns 逻辑路径（如 'contacts.type'）
  */
 export function parseJsonPointer(pointer: string): string {
-  if (!pointer.startsWith('#/')) {
-    throw new Error(`无效的 JSON Pointer: ${pointer}`)
+  if (!pointer.startsWith("#/")) {
+    throw new Error(`无效的 JSON Pointer: ${pointer}`);
   }
 
   // 移除 '#/' 前缀
-  const segments = pointer.slice(2).split('/')
+  const segments = pointer.slice(2).split("/");
 
   // 过滤掉 'properties' 和 'items' 标记
   const logicalSegments = segments.filter(
-    (s) => s !== 'properties' && s !== 'items'
-  )
+    (s) => s !== "properties" && s !== "items",
+  );
 
-  return logicalSegments.join('.')
+  return logicalSegments.join(".");
 }
 
 /**
@@ -87,8 +87,8 @@ export function parseJsonPointer(pointer: string): string {
  * 在路径长度相等时返回 'other' 类型，不会产生 'same-level'
  */
 interface PathRelationship {
-  type: 'child-to-parent' | 'parent-to-child' | 'other'
-  commonPrefix?: string[]
+  type: "child-to-parent" | "parent-to-child" | "other";
+  commonPrefix?: string[];
 }
 
 /**
@@ -96,36 +96,36 @@ interface PathRelationship {
  */
 function analyzePathRelationship(
   depLogicalPath: string,
-  currentPath: string
+  currentPath: string,
 ): PathRelationship {
-  const depSegments = splitPath(depLogicalPath)
-  const currentSegments = splitPath(currentPath)
+  const depSegments = splitPath(depLogicalPath);
+  const currentSegments = splitPath(currentPath);
 
   // 找到共同前缀
-  const commonPrefix: string[] = []
+  const commonPrefix: string[] = [];
   for (
     let i = 0;
     i < Math.min(depSegments.length, currentSegments.length);
     i++
   ) {
     if (depSegments[i] === currentSegments[i]) {
-      commonPrefix.push(depSegments[i])
+      commonPrefix.push(depSegments[i]);
     } else {
-      break
+      break;
     }
   }
 
   // 判断是否是子数组到父数组的关系
   if (currentSegments.length > depSegments.length && commonPrefix.length > 0) {
-    return { type: 'child-to-parent', commonPrefix }
+    return { type: "child-to-parent", commonPrefix };
   }
 
   // 判断是否是父数组到子数组的关系
   if (depSegments.length > currentSegments.length && commonPrefix.length > 0) {
-    return { type: 'parent-to-child', commonPrefix }
+    return { type: "parent-to-child", commonPrefix };
   }
 
-  return { type: 'other', commonPrefix }
+  return { type: "other", commonPrefix };
 }
 
 /**
@@ -141,18 +141,18 @@ function analyzePathRelationship(
 function resolveChildToParent(
   depLogicalPath: string,
   currentPath: string,
-  _relationship: PathRelationship
+  _relationship: PathRelationship,
 ): string {
-  const depSegments = splitPath(depLogicalPath)
-  const currentSegments = splitPath(currentPath)
+  const depSegments = splitPath(depLogicalPath);
+  const currentSegments = splitPath(currentPath);
 
   // 找到父数组的索引位置（第一个数字索引）
   const parentArrayIndexPos = currentSegments.findIndex((seg) =>
-    /^\d+$/.test(seg)
-  )
+    /^\d+$/.test(seg),
+  );
 
   if (parentArrayIndexPos === -1) {
-    return depLogicalPath
+    return depLogicalPath;
   }
 
   // 插入索引到依赖路径中
@@ -160,9 +160,9 @@ function resolveChildToParent(
     ...depSegments.slice(0, depSegments.length - 1),
     currentSegments[parentArrayIndexPos],
     depSegments[depSegments.length - 1],
-  ].join('.')
+  ].join(".");
 
-  return result
+  return result;
 }
 
 /**
@@ -178,28 +178,28 @@ function resolveChildToParent(
 function resolveParentToChild(
   depLogicalPath: string,
   currentPath: string,
-  _relationship: PathRelationship
+  _relationship: PathRelationship,
 ): string {
-  const depSegments = splitPath(depLogicalPath)
-  const currentSegments = splitPath(currentPath)
+  const depSegments = splitPath(depLogicalPath);
+  const currentSegments = splitPath(currentPath);
 
   // 找到当前元素的索引
-  const arrayIndexPos = currentSegments.findIndex((seg) => /^\d+$/.test(seg))
+  const arrayIndexPos = currentSegments.findIndex((seg) => /^\d+$/.test(seg));
 
   if (arrayIndexPos === -1) {
-    return depLogicalPath
+    return depLogicalPath;
   }
 
-  const arrayIndex = currentSegments[arrayIndexPos]
+  const arrayIndex = currentSegments[arrayIndexPos];
 
   // 在依赖路径中插入索引
   const result = [
     ...depSegments.slice(0, depSegments.length - 1),
     arrayIndex,
     depSegments[depSegments.length - 1],
-  ].join('.')
+  ].join(".");
 
-  return result
+  return result;
 }
 
 /**
@@ -207,34 +207,34 @@ function resolveParentToChild(
  */
 function resolveJsonPointerDependency(
   pointer: string,
-  currentPath: string
+  currentPath: string,
 ): string {
   // 1. 解析 JSON Pointer 为逻辑路径
-  const logicalPath = parseJsonPointer(pointer)
+  const logicalPath = parseJsonPointer(pointer);
 
   // 2. 检查是否需要索引匹配
-  const needsIndexMatching = pointer.includes('/items/')
+  const needsIndexMatching = pointer.includes("/items/");
 
   if (!needsIndexMatching) {
     // 顶层字段，直接返回
-    return logicalPath
+    return logicalPath;
   }
 
   // 3. 分析依赖路径和当前路径的关系
-  const relationship = analyzePathRelationship(logicalPath, currentPath)
+  const relationship = analyzePathRelationship(logicalPath, currentPath);
 
   switch (relationship.type) {
-    case 'child-to-parent':
+    case "child-to-parent":
       // 子数组元素依赖父数组元素字段
-      return resolveChildToParent(logicalPath, currentPath, relationship)
+      return resolveChildToParent(logicalPath, currentPath, relationship);
 
-    case 'parent-to-child':
+    case "parent-to-child":
       // 父数组元素依赖子数组
-      return resolveParentToChild(logicalPath, currentPath, relationship)
+      return resolveParentToChild(logicalPath, currentPath, relationship);
 
     default:
       // 'other' 类型：路径没有共同前缀或长度相等，直接返回逻辑路径
-      return logicalPath
+      return logicalPath;
   }
 }
 
@@ -250,23 +250,23 @@ export function resolveDependencyPath({
   currentPath,
   schema: _schema,
 }: {
-  depPath: string
-  currentPath: string
-  schema?: any
+  depPath: string;
+  currentPath: string;
+  schema?: any;
 }): string {
   // 1. 相对路径：同级字段
-  if (depPath.startsWith('./')) {
-    return resolveRelativePath(depPath, currentPath)
+  if (depPath.startsWith("./")) {
+    return resolveRelativePath(depPath, currentPath);
   }
 
   // 2. JSON Pointer：绝对路径
-  if (depPath.startsWith('#/')) {
-    return resolveJsonPointerDependency(depPath, currentPath)
+  if (depPath.startsWith("#/")) {
+    return resolveJsonPointerDependency(depPath, currentPath);
   }
 
   // 3. 已经是运行时的绝对路径（如 contacts.0.type），直接返回
   // 这种情况发生在联动配置已经被实例化后再次调用 resolveArrayElementLinkage 时
-  return depPath
+  return depPath;
 }
 
 /**
@@ -278,9 +278,9 @@ export function resolveDependencyPath({
 export function resolveArrayElementLinkage(
   linkage: LinkageConfig,
   currentPath: string,
-  _schema?: any
+  _schema?: any,
 ): LinkageConfig {
-  const resolved = { ...linkage }
+  const resolved = { ...linkage };
 
   // 解析 dependencies 中的路径
   // dependencies 在 LinkageConfig 类型中为必填，但实际使用时可能省略（如纯 schema 联动），
@@ -289,54 +289,56 @@ export function resolveArrayElementLinkage(
     resolved.dependencies = resolved.dependencies.map((depPath) => {
       // 指向顶层字段的 JSON Pointer（无 /items/ 层级）保持原样，不转为运行时路径。
       // 原因：顶层字段在所有数组元素中是共享的，其路径不含索引，无需实例化
-      if (depPath.startsWith('#/') && !depPath.includes('/items/')) return depPath
-      return resolveDependencyPath({ depPath, currentPath })
-    })
+      if (depPath.startsWith("#/") && !depPath.includes("/items/")) {
+        return depPath;
+      }
+      return resolveDependencyPath({ depPath, currentPath });
+    });
   }
 
   // 解析 when 条件中的路径
-  if (resolved.when && typeof resolved.when === 'object') {
-    resolved.when = resolveConditionPaths(resolved.when, currentPath)
+  if (resolved.when && typeof resolved.when === "object") {
+    resolved.when = resolveConditionPaths(resolved.when, currentPath);
   }
 
-  return resolved
+  return resolved;
 }
 
 /**
  * 递归解析条件表达式中的路径
  */
-function resolveConditionPaths(
-  condition: any,
-  currentPath: string
-): any {
-  const resolved = { ...condition }
+function resolveConditionPaths(condition: any, currentPath: string): any {
+  const resolved = { ...condition };
 
   // 解析 field 字段
   if (resolved.field) {
     // 同 dependencies 的处理逻辑：指向顶层字段的绝对 JSON Pointer 保持不变
-    if (resolved.field.startsWith('#/') && !resolved.field.includes('/items/')) {
+    if (
+      resolved.field.startsWith("#/") &&
+      !resolved.field.includes("/items/")
+    ) {
       // 保留顶层字段的绝对路径，运行时按原值匹配
     } else {
       resolved.field = resolveDependencyPath({
         depPath: resolved.field,
         currentPath,
-      })
+      });
     }
   }
 
   // 递归处理 and/or
   if (resolved.and) {
     resolved.and = resolved.and.map((c: any) =>
-      resolveConditionPaths(c, currentPath)
-    )
+      resolveConditionPaths(c, currentPath),
+    );
   }
   if (resolved.or) {
     resolved.or = resolved.or.map((c: any) =>
-      resolveConditionPaths(c, currentPath)
-    )
+      resolveConditionPaths(c, currentPath),
+    );
   }
 
-  return resolved
+  return resolved;
 }
 
 /**
@@ -354,10 +356,10 @@ function resolveConditionPaths(
  */
 export function findArrayInPath(
   fieldPath: string,
-  schema: ExtendedJSONSchema
+  schema: ExtendedJSONSchema,
 ): { arrayPath: string; fieldPathInArray: string } | null {
   // 递归遍历 schema，找到路径中的数组字段
-  return findArrayInPathRecursive(fieldPath, schema, '')
+  return findArrayInPathRecursive(fieldPath, schema, "");
 }
 
 /**
@@ -368,45 +370,49 @@ export function findArrayInPath(
 function findArrayInPathRecursive(
   targetPath: string,
   schema: ExtendedJSONSchema,
-  currentLogicalPath: string
+  currentLogicalPath: string,
 ): { arrayPath: string; fieldPathInArray: string } | null {
   if (!schema.properties) {
-    return null
+    return null;
   }
 
   for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
-    if (typeof fieldSchema === 'boolean') continue
+    if (typeof fieldSchema === "boolean") {
+      continue;
+    }
 
-    const typedSchema = fieldSchema as ExtendedJSONSchema
+    const typedSchema = fieldSchema as ExtendedJSONSchema;
 
     // 使用标准的 . 分隔符计算当前字段的逻辑路径
     const newLogicalPath = currentLogicalPath
       ? `${currentLogicalPath}.${fieldName}`
-      : fieldName
+      : fieldName;
 
     // 检查目标路径是否以当前逻辑路径开头
     if (!targetPath.startsWith(newLogicalPath)) {
-      continue
+      continue;
     }
 
     // 如果是数组类型，检查是否匹配
-    if (typedSchema.type === 'array') {
-      const arrayPathWithDot = newLogicalPath + '.'
+    if (typedSchema.type === "array") {
+      const arrayPathWithDot = newLogicalPath + ".";
 
       if (targetPath.startsWith(arrayPathWithDot)) {
-        const fieldPathInArray = targetPath.slice(arrayPathWithDot.length)
-        return { arrayPath: newLogicalPath, fieldPathInArray }
+        const fieldPathInArray = targetPath.slice(arrayPathWithDot.length);
+        return { arrayPath: newLogicalPath, fieldPathInArray };
       }
     }
 
     // 递归处理嵌套对象
-    if (typedSchema.type === 'object' && typedSchema.properties) {
+    if (typedSchema.type === "object" && typedSchema.properties) {
       const result = findArrayInPathRecursive(
         targetPath,
         typedSchema,
-        newLogicalPath
-      )
-      if (result) return result
+        newLogicalPath,
+      );
+      if (result) {
+        return result;
+      }
     }
 
     // 注意：当 targetPath 以数组字段路径开头时，第 380 行会匹配并返回结果。
@@ -416,5 +422,5 @@ function findArrayInPathRecursive(
     // 保留这段代码是为了处理未来可能的边界情况。
   }
 
-  return null
+  return null;
 }

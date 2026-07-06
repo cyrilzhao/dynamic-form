@@ -1,24 +1,30 @@
 /**
  * 联动类型
  */
-export type LinkageType = 'visibility' | 'disabled' | 'readonly' | 'value' | 'options' | 'schema';
+export type LinkageType =
+  | "visibility"
+  | "disabled"
+  | "readonly"
+  | "value"
+  | "options"
+  | "schema";
 
 /**
  * 条件操作符
  */
 export type ConditionOperator =
-  | '=='
-  | '!='
-  | '>'
-  | '<'
-  | '>='
-  | '<='
-  | 'in'
-  | 'notIn'
-  | 'includes'
-  | 'notIncludes'
-  | 'isEmpty'
-  | 'isNotEmpty';
+  | "=="
+  | "!="
+  | ">"
+  | "<"
+  | ">="
+  | "<="
+  | "in"
+  | "notIn"
+  | "includes"
+  | "notIncludes"
+  | "isEmpty"
+  | "isNotEmpty";
 
 // 单条件表达式
 interface SingleCondition {
@@ -57,7 +63,7 @@ export interface LinkageEffect {
   // 支持两种方式：
   // 1. 函数名（从 callbacks 中查找）
   // 2. 内联脚本对象
-  function?: string | { type: 'script'; code: string };
+  function?: string | { type: "script"; code: string };
 }
 
 /**
@@ -107,5 +113,5 @@ export interface LinkageFunctionContext {
  */
 export type LinkageFunction = (
   formData: Record<string, any>,
-  context?: LinkageFunctionContext
+  context?: LinkageFunctionContext,
 ) => any | Promise<any>;

@@ -1,7 +1,7 @@
-import { renderHook, act, waitFor } from '@testing-library/react';
-import { useForm } from 'react-hook-form';
-import { useLinkageManager } from '../useLinkageManager';
-import type { LinkageConfig } from '../../types/linkage';
+import { renderHook, act, waitFor } from "@testing-library/react";
+import { useForm } from "react-hook-form";
+import { useLinkageManager } from "../useLinkageManager";
+import type { LinkageConfig } from "../../types/linkage";
 
 // Helper to create a mock form
 function createMockForm(defaultValues: Record<string, any> = {}) {
@@ -9,11 +9,11 @@ function createMockForm(defaultValues: Record<string, any> = {}) {
   return result.current;
 }
 
-describe('useLinkageManager', () => {
-  describe('基础功能', () => {
-    it('应该在没有联动配置时返回空状态', async () => {
+describe("useLinkageManager", () => {
+  describe("基础功能", () => {
+    it("应该在没有联动配置时返回空状态", async () => {
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { name: 'test' } });
+        const form = useForm({ defaultValues: { name: "test" } });
         return useLinkageManager({
           form,
           linkages: {},
@@ -29,16 +29,16 @@ describe('useLinkageManager', () => {
       });
     });
 
-    it('应该正确初始化联动状态', async () => {
+    it("应该正确初始化联动状态", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         companyName: [
           {
-            type: 'visibility',
-            dependencies: ['userType'],
+            type: "visibility",
+            dependencies: ["userType"],
             when: {
-              field: 'userType',
-              operator: '==',
-              value: 'enterprise',
+              field: "userType",
+              operator: "==",
+              value: "enterprise",
             },
             fulfill: { state: { visible: true } },
             otherwise: { state: { visible: false } },
@@ -47,7 +47,9 @@ describe('useLinkageManager', () => {
       };
 
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { userType: 'enterprise', companyName: '' } });
+        const form = useForm({
+          defaultValues: { userType: "enterprise", companyName: "" },
+        });
         return useLinkageManager({
           form,
           linkages,
@@ -65,16 +67,16 @@ describe('useLinkageManager', () => {
       });
     });
 
-    it('应该在条件不满足时使用 otherwise 效果', async () => {
+    it("应该在条件不满足时使用 otherwise 效果", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         companyName: [
           {
-            type: 'visibility',
-            dependencies: ['userType'],
+            type: "visibility",
+            dependencies: ["userType"],
             when: {
-              field: 'userType',
-              operator: '==',
-              value: 'enterprise',
+              field: "userType",
+              operator: "==",
+              value: "enterprise",
             },
             fulfill: { state: { visible: true } },
             otherwise: { state: { visible: false } },
@@ -83,7 +85,9 @@ describe('useLinkageManager', () => {
       };
 
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { userType: 'individual', companyName: '' } });
+        const form = useForm({
+          defaultValues: { userType: "individual", companyName: "" },
+        });
         return useLinkageManager({
           form,
           linkages,
@@ -101,17 +105,17 @@ describe('useLinkageManager', () => {
     });
   });
 
-  describe('值联动', () => {
-    it('应该支持直接指定值的联动', async () => {
+  describe("值联动", () => {
+    it("应该支持直接指定值的联动", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         discount: [
           {
-            type: 'value',
-            dependencies: ['memberLevel'],
+            type: "value",
+            dependencies: ["memberLevel"],
             when: {
-              field: 'memberLevel',
-              operator: '==',
-              value: 'vip',
+              field: "memberLevel",
+              operator: "==",
+              value: "vip",
             },
             fulfill: { value: 0.2 },
             otherwise: { value: 0 },
@@ -120,7 +124,9 @@ describe('useLinkageManager', () => {
       };
 
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { memberLevel: 'vip', discount: 0 } });
+        const form = useForm({
+          defaultValues: { memberLevel: "vip", discount: 0 },
+        });
         return useLinkageManager({
           form,
           linkages,
@@ -136,13 +142,13 @@ describe('useLinkageManager', () => {
       });
     });
 
-    it('应该支持函数计算值联动', async () => {
+    it("应该支持函数计算值联动", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         total: [
           {
-            type: 'value',
-            dependencies: ['price', 'quantity'],
-            fulfill: { function: 'calculateTotal' },
+            type: "value",
+            dependencies: ["price", "quantity"],
+            fulfill: { function: "calculateTotal" },
           },
         ],
       };
@@ -154,7 +160,9 @@ describe('useLinkageManager', () => {
       };
 
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { price: 100, quantity: 2, total: 0 } });
+        const form = useForm({
+          defaultValues: { price: 100, quantity: 2, total: 0 },
+        });
         return useLinkageManager({
           form,
           linkages,
@@ -171,20 +179,20 @@ describe('useLinkageManager', () => {
       });
     });
 
-    it('应该支持异步函数计算值联动', async () => {
+    it("应该支持异步函数计算值联动", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         asyncValue: [
           {
-            type: 'value',
-            dependencies: ['input'],
-            fulfill: { function: 'asyncCalculate' },
+            type: "value",
+            dependencies: ["input"],
+            fulfill: { function: "asyncCalculate" },
           },
         ],
       };
 
       const linkageFunctions = {
         asyncCalculate: async (formData: Record<string, any>) => {
-          await new Promise(resolve => setTimeout(resolve, 10));
+          await new Promise((resolve) => setTimeout(resolve, 10));
           return formData.input * 2;
         },
       };
@@ -208,28 +216,28 @@ describe('useLinkageManager', () => {
     });
   });
 
-  describe('选项联动', () => {
-    it('应该支持直接指定选项的联动', async () => {
+  describe("选项联动", () => {
+    it("应该支持直接指定选项的联动", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         city: [
           {
-            type: 'options',
-            dependencies: ['country'],
+            type: "options",
+            dependencies: ["country"],
             when: {
-              field: 'country',
-              operator: '==',
-              value: 'China',
+              field: "country",
+              operator: "==",
+              value: "China",
             },
             fulfill: {
               options: [
-                { label: 'Beijing', value: 'beijing' },
-                { label: 'Shanghai', value: 'shanghai' },
+                { label: "Beijing", value: "beijing" },
+                { label: "Shanghai", value: "shanghai" },
               ],
             },
             otherwise: {
               options: [
-                { label: 'New York', value: 'ny' },
-                { label: 'Los Angeles', value: 'la' },
+                { label: "New York", value: "ny" },
+                { label: "Los Angeles", value: "la" },
               ],
             },
           },
@@ -237,7 +245,7 @@ describe('useLinkageManager', () => {
       };
 
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { country: 'China', city: '' } });
+        const form = useForm({ defaultValues: { country: "China", city: "" } });
         return useLinkageManager({
           form,
           linkages,
@@ -250,21 +258,23 @@ describe('useLinkageManager', () => {
       });
       await waitFor(() => {
         expect(result.current.linkageStates.city?.options).toHaveLength(2);
-        expect(result.current.linkageStates.city?.options?.[0].value).toBe('beijing');
+        expect(result.current.linkageStates.city?.options?.[0].value).toBe(
+          "beijing",
+        );
       });
     });
   });
 
-  describe('禁用联动', () => {
-    it('应该支持禁用状态联动', async () => {
+  describe("禁用联动", () => {
+    it("应该支持禁用状态联动", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         submitButton: [
           {
-            type: 'disabled',
-            dependencies: ['agreed'],
+            type: "disabled",
+            dependencies: ["agreed"],
             when: {
-              field: 'agreed',
-              operator: '==',
+              field: "agreed",
+              operator: "==",
               value: false,
             },
             fulfill: { state: { disabled: true } },
@@ -274,7 +284,9 @@ describe('useLinkageManager', () => {
       };
 
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { agreed: false, submitButton: null } });
+        const form = useForm({
+          defaultValues: { agreed: false, submitButton: null },
+        });
         return useLinkageManager({
           form,
           linkages,
@@ -291,16 +303,16 @@ describe('useLinkageManager', () => {
     });
   });
 
-  describe('只读联动', () => {
-    it('应该支持只读状态联动', async () => {
+  describe("只读联动", () => {
+    it("应该支持只读状态联动", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         email: [
           {
-            type: 'readonly',
-            dependencies: ['isVerified'],
+            type: "readonly",
+            dependencies: ["isVerified"],
             when: {
-              field: 'isVerified',
-              operator: '==',
+              field: "isVerified",
+              operator: "==",
               value: true,
             },
             fulfill: { state: { readonly: true } },
@@ -310,7 +322,9 @@ describe('useLinkageManager', () => {
       };
 
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { isVerified: true, email: 'test@example.com' } });
+        const form = useForm({
+          defaultValues: { isVerified: true, email: "test@example.com" },
+        });
         return useLinkageManager({
           form,
           linkages,
@@ -327,29 +341,31 @@ describe('useLinkageManager', () => {
     });
   });
 
-  describe('Schema 联动', () => {
-    it('应该支持 schema 联动', async () => {
+  describe("Schema 联动", () => {
+    it("应该支持 schema 联动", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         dynamicField: [
           {
-            type: 'schema',
-            dependencies: ['fieldType'],
-            fulfill: { function: 'getSchema' },
+            type: "schema",
+            dependencies: ["fieldType"],
+            fulfill: { function: "getSchema" },
           },
         ],
       };
 
       const linkageFunctions = {
         getSchema: (formData: Record<string, any>) => {
-          if (formData.fieldType === 'number') {
-            return { type: 'number', minimum: 0 };
+          if (formData.fieldType === "number") {
+            return { type: "number", minimum: 0 };
           }
-          return { type: 'string' };
+          return { type: "string" };
         },
       };
 
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { fieldType: 'number', dynamicField: null } });
+        const form = useForm({
+          defaultValues: { fieldType: "number", dynamicField: null },
+        });
         return useLinkageManager({
           form,
           linkages,
@@ -363,28 +379,28 @@ describe('useLinkageManager', () => {
       });
       await waitFor(() => {
         expect(result.current.linkageStates.dynamicField?.schema).toEqual({
-          type: 'number',
+          type: "number",
           minimum: 0,
         });
       });
     });
   });
 
-  describe('多联动合并', () => {
-    it('应该正确合并多个 visibility 联动（AND 逻辑）', async () => {
+  describe("多联动合并", () => {
+    it("应该正确合并多个 visibility 联动（AND 逻辑）", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         specialField: [
           {
-            type: 'visibility',
-            dependencies: ['conditionA'],
-            when: { field: 'conditionA', operator: '==', value: true },
+            type: "visibility",
+            dependencies: ["conditionA"],
+            when: { field: "conditionA", operator: "==", value: true },
             fulfill: { state: { visible: true } },
             otherwise: { state: { visible: false } },
           },
           {
-            type: 'visibility',
-            dependencies: ['conditionB'],
-            when: { field: 'conditionB', operator: '==', value: true },
+            type: "visibility",
+            dependencies: ["conditionB"],
+            when: { field: "conditionB", operator: "==", value: true },
             fulfill: { state: { visible: true } },
             otherwise: { state: { visible: false } },
           },
@@ -394,7 +410,11 @@ describe('useLinkageManager', () => {
       // 两个条件都为 true
       const { result: result1 } = renderHook(() => {
         const form = useForm({
-          defaultValues: { conditionA: true, conditionB: true, specialField: null },
+          defaultValues: {
+            conditionA: true,
+            conditionB: true,
+            specialField: null,
+          },
         });
         return useLinkageManager({ form, linkages });
       });
@@ -410,7 +430,11 @@ describe('useLinkageManager', () => {
       // 一个条件为 false
       const { result: result2 } = renderHook(() => {
         const form = useForm({
-          defaultValues: { conditionA: true, conditionB: false, specialField: null },
+          defaultValues: {
+            conditionA: true,
+            conditionB: false,
+            specialField: null,
+          },
         });
         return useLinkageManager({ form, linkages });
       });
@@ -424,20 +448,20 @@ describe('useLinkageManager', () => {
       });
     });
 
-    it('应该正确合并多个 disabled 联动（OR 逻辑）', async () => {
+    it("应该正确合并多个 disabled 联动（OR 逻辑）", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         targetField: [
           {
-            type: 'disabled',
-            dependencies: ['disableA'],
-            when: { field: 'disableA', operator: '==', value: true },
+            type: "disabled",
+            dependencies: ["disableA"],
+            when: { field: "disableA", operator: "==", value: true },
             fulfill: { state: { disabled: true } },
             otherwise: { state: { disabled: false } },
           },
           {
-            type: 'disabled',
-            dependencies: ['disableB'],
-            when: { field: 'disableB', operator: '==', value: true },
+            type: "disabled",
+            dependencies: ["disableB"],
+            when: { field: "disableB", operator: "==", value: true },
             fulfill: { state: { disabled: true } },
             otherwise: { state: { disabled: false } },
           },
@@ -462,14 +486,14 @@ describe('useLinkageManager', () => {
     });
   });
 
-  describe('条件函数', () => {
-    it('应该支持使用函数名作为条件', async () => {
+  describe("条件函数", () => {
+    it("应该支持使用函数名作为条件", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         result: [
           {
-            type: 'visibility',
-            dependencies: ['value'],
-            when: 'checkCondition',
+            type: "visibility",
+            dependencies: ["value"],
+            when: "checkCondition",
             fulfill: { state: { visible: true } },
             otherwise: { state: { visible: false } },
           },
@@ -494,20 +518,20 @@ describe('useLinkageManager', () => {
       });
     });
 
-    it('应该在条件函数不存在时返回 false', async () => {
+    it("应该在条件函数不存在时返回 false", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         result: [
           {
-            type: 'visibility',
-            dependencies: ['value'],
-            when: 'nonExistentFunction',
+            type: "visibility",
+            dependencies: ["value"],
+            when: "nonExistentFunction",
             fulfill: { state: { visible: true } },
             otherwise: { state: { visible: false } },
           },
         ],
       };
 
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      const consoleSpy = jest.spyOn(console, "warn").mockImplementation();
 
       const { result } = renderHook(() => {
         const form = useForm({ defaultValues: { value: 15, result: null } });
@@ -526,21 +550,22 @@ describe('useLinkageManager', () => {
     });
   });
 
-  describe('refresh 功能', () => {
-    it('应该提供 refresh 方法重新计算联动', async () => {
+  describe("refresh 功能", () => {
+    it("应该提供 refresh 方法重新计算联动", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         output: [
           {
-            type: 'value',
-            dependencies: ['input'],
-            fulfill: { function: 'calculate' },
+            type: "value",
+            dependencies: ["input"],
+            fulfill: { function: "calculate" },
           },
         ],
       };
 
       let multiplier = 2;
       const linkageFunctions = {
-        calculate: (formData: Record<string, any>) => formData.input * multiplier,
+        calculate: (formData: Record<string, any>) =>
+          formData.input * multiplier,
       };
 
       const { result } = renderHook(() => {
@@ -568,15 +593,15 @@ describe('useLinkageManager', () => {
     });
   });
 
-  describe('缓存功能', () => {
-    it('应该在启用缓存时使用缓存结果', async () => {
+  describe("缓存功能", () => {
+    it("应该在启用缓存时使用缓存结果", async () => {
       let callCount = 0;
       const linkages: Record<string, LinkageConfig[]> = {
         cached: [
           {
-            type: 'value',
-            dependencies: ['input'],
-            fulfill: { function: 'expensiveCalculation' },
+            type: "value",
+            dependencies: ["input"],
+            fulfill: { function: "expensiveCalculation" },
             enableCache: true,
           },
         ],
@@ -617,23 +642,23 @@ describe('useLinkageManager', () => {
     });
   });
 
-  describe('循环依赖检测', () => {
-    it('应该检测并警告循环依赖', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+  describe("循环依赖检测", () => {
+    it("应该检测并警告循环依赖", async () => {
+      const consoleSpy = jest.spyOn(console, "error").mockImplementation();
 
       const linkages: Record<string, LinkageConfig[]> = {
         fieldA: [
           {
-            type: 'value',
-            dependencies: ['fieldB'],
-            fulfill: { function: 'calcA' },
+            type: "value",
+            dependencies: ["fieldB"],
+            fulfill: { function: "calcA" },
           },
         ],
         fieldB: [
           {
-            type: 'value',
-            dependencies: ['fieldA'],
-            fulfill: { function: 'calcB' },
+            type: "value",
+            dependencies: ["fieldA"],
+            fulfill: { function: "calcB" },
           },
         ],
       };
@@ -650,8 +675,8 @@ describe('useLinkageManager', () => {
 
       await waitFor(() => {
         expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining('检测到循环依赖'),
-          expect.any(String)
+          expect.stringContaining("检测到循环依赖"),
+          expect.any(String),
         );
       });
 
@@ -659,15 +684,15 @@ describe('useLinkageManager', () => {
     });
   });
 
-  describe('数组上下文', () => {
-    it('应该正确提取数组上下文信息', async () => {
+  describe("数组上下文", () => {
+    it("应该正确提取数组上下文信息", async () => {
       let capturedContext: any = null;
       const linkages: Record<string, LinkageConfig[]> = {
-        'contacts.0.showCompany': [
+        "contacts.0.showCompany": [
           {
-            type: 'visibility',
-            dependencies: ['contacts.0.type'],
-            fulfill: { function: 'checkType' },
+            type: "visibility",
+            dependencies: ["contacts.0.type"],
+            fulfill: { function: "checkType" },
           },
         ],
       };
@@ -675,14 +700,14 @@ describe('useLinkageManager', () => {
       const linkageFunctions = {
         checkType: (formData: Record<string, any>, context: any) => {
           capturedContext = context;
-          return formData.contacts?.[0]?.type === 'business';
+          return formData.contacts?.[0]?.type === "business";
         },
       };
 
       const { result } = renderHook(() => {
         const form = useForm({
           defaultValues: {
-            contacts: [{ type: 'business', showCompany: false }],
+            contacts: [{ type: "business", showCompany: false }],
           },
         });
         return useLinkageManager({ form, linkages, linkageFunctions });
@@ -694,21 +719,21 @@ describe('useLinkageManager', () => {
       });
       await waitFor(() => {
         expect(capturedContext).not.toBeNull();
-        expect(capturedContext.fieldPath).toBe('contacts.0.showCompany');
-        expect(capturedContext.arrayPath).toBe('contacts');
+        expect(capturedContext.fieldPath).toBe("contacts.0.showCompany");
+        expect(capturedContext.arrayPath).toBe("contacts");
         expect(capturedContext.arrayIndex).toBe(0);
       });
     });
   });
 
-  describe('无 when 条件', () => {
-    it('应该在没有 when 条件时默认使用 fulfill', async () => {
+  describe("无 when 条件", () => {
+    it("应该在没有 when 条件时默认使用 fulfill", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         alwaysCalculated: [
           {
-            type: 'value',
-            dependencies: ['input'],
-            fulfill: { function: 'calculate' },
+            type: "value",
+            dependencies: ["input"],
+            fulfill: { function: "calculate" },
           },
         ],
       };
@@ -718,7 +743,9 @@ describe('useLinkageManager', () => {
       };
 
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { input: 10, alwaysCalculated: 0 } });
+        const form = useForm({
+          defaultValues: { input: 10, alwaysCalculated: 0 },
+        });
         return useLinkageManager({ form, linkages, linkageFunctions });
       });
 
@@ -732,21 +759,23 @@ describe('useLinkageManager', () => {
     });
   });
 
-  describe('无 effect 情况', () => {
-    it('应该在没有 effect 时返回空结果', async () => {
+  describe("无 effect 情况", () => {
+    it("应该在没有 effect 时返回空结果", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         noEffect: [
           {
-            type: 'visibility',
-            dependencies: ['trigger'],
-            when: { field: 'trigger', operator: '==', value: 'special' },
+            type: "visibility",
+            dependencies: ["trigger"],
+            when: { field: "trigger", operator: "==", value: "special" },
             // 没有 fulfill 和 otherwise
           },
         ],
       };
 
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { trigger: 'normal', noEffect: null } });
+        const form = useForm({
+          defaultValues: { trigger: "normal", noEffect: null },
+        });
         return useLinkageManager({ form, linkages });
       });
 
@@ -761,32 +790,32 @@ describe('useLinkageManager', () => {
     });
   });
 
-  describe('函数类型联动', () => {
-    it('应该支持 options 类型的函数联动', async () => {
+  describe("函数类型联动", () => {
+    it("应该支持 options 类型的函数联动", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         city: [
           {
-            type: 'options',
-            dependencies: ['country'],
-            fulfill: { function: 'getCityOptions' },
+            type: "options",
+            dependencies: ["country"],
+            fulfill: { function: "getCityOptions" },
           },
         ],
       };
 
       const linkageFunctions = {
         getCityOptions: (formData: Record<string, any>) => {
-          if (formData.country === 'China') {
+          if (formData.country === "China") {
             return [
-              { label: 'Beijing', value: 'beijing' },
-              { label: 'Shanghai', value: 'shanghai' },
+              { label: "Beijing", value: "beijing" },
+              { label: "Shanghai", value: "shanghai" },
             ];
           }
-          return [{ label: 'New York', value: 'ny' }];
+          return [{ label: "New York", value: "ny" }];
         },
       };
 
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { country: 'China', city: '' } });
+        const form = useForm({ defaultValues: { country: "China", city: "" } });
         return useLinkageManager({ form, linkages, linkageFunctions });
       });
 
@@ -796,31 +825,33 @@ describe('useLinkageManager', () => {
       });
       await waitFor(() => {
         expect(result.current.linkageStates.city?.options).toHaveLength(2);
-        expect(result.current.linkageStates.city?.options?.[0].value).toBe('beijing');
+        expect(result.current.linkageStates.city?.options?.[0].value).toBe(
+          "beijing",
+        );
       });
     });
 
-    it('应该支持静态 options 联动（不使用 function）', async () => {
+    it("应该支持静态 options 联动（不使用 function）", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         category: [
           {
-            type: 'options',
-            dependencies: ['type'],
+            type: "options",
+            dependencies: ["type"],
             when: {
-              field: 'type',
-              operator: '==',
-              value: 'electronics',
+              field: "type",
+              operator: "==",
+              value: "electronics",
             },
             fulfill: {
               options: [
-                { label: 'Laptop', value: 'laptop' },
-                { label: 'Phone', value: 'phone' },
+                { label: "Laptop", value: "laptop" },
+                { label: "Phone", value: "phone" },
               ],
             },
             otherwise: {
               options: [
-                { label: 'Fiction', value: 'fiction' },
-                { label: 'Non-Fiction', value: 'nonfiction' },
+                { label: "Fiction", value: "fiction" },
+                { label: "Non-Fiction", value: "nonfiction" },
               ],
             },
           },
@@ -828,7 +859,9 @@ describe('useLinkageManager', () => {
       };
 
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { type: 'electronics', category: '' } });
+        const form = useForm({
+          defaultValues: { type: "electronics", category: "" },
+        });
         return useLinkageManager({ form, linkages, linkageFunctions: {} });
       });
 
@@ -838,36 +871,44 @@ describe('useLinkageManager', () => {
 
       await waitFor(() => {
         expect(result.current.linkageStates.category?.options).toHaveLength(2);
-        expect(result.current.linkageStates.category?.options?.[0].value).toBe('laptop');
+        expect(result.current.linkageStates.category?.options?.[0].value).toBe(
+          "laptop",
+        );
       });
     });
 
-    it('应该在 options 变化后自动清理无效值', async () => {
+    it("应该在 options 变化后自动清理无效值", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         city: [
           {
-            type: 'options',
-            dependencies: ['country'],
-            fulfill: { function: 'getCityOptions' },
+            type: "options",
+            dependencies: ["country"],
+            fulfill: { function: "getCityOptions" },
           },
         ],
       };
 
       const linkageFunctions = {
         getCityOptions: (formData: Record<string, any>) => {
-          if (formData.country === 'China') {
+          if (formData.country === "China") {
             return [
-              { label: 'Beijing', value: 'beijing' },
-              { label: 'Shanghai', value: 'shanghai' },
+              { label: "Beijing", value: "beijing" },
+              { label: "Shanghai", value: "shanghai" },
             ];
           }
-          return [{ label: 'New York', value: 'ny' }];
+          return [{ label: "New York", value: "ny" }];
         },
       };
 
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { country: 'China', city: 'beijing' } });
-        const linkageManager = useLinkageManager({ form, linkages, linkageFunctions });
+        const form = useForm({
+          defaultValues: { country: "China", city: "beijing" },
+        });
+        const linkageManager = useLinkageManager({
+          form,
+          linkages,
+          linkageFunctions,
+        });
         return { form, ...linkageManager };
       });
 
@@ -876,26 +917,26 @@ describe('useLinkageManager', () => {
       });
 
       // 初始状态：city = 'beijing' 在 China 的 options 中，有效
-      expect(result.current.form.getValues('city')).toBe('beijing');
+      expect(result.current.form.getValues("city")).toBe("beijing");
 
       // 切换 country 到 'USA'，触发 options 变化
       await act(async () => {
-        result.current.form.setValue('country', 'USA');
+        result.current.form.setValue("country", "USA");
       });
 
       // 等待联动处理完成，city 应被自动清空（因为 'beijing' 不在新 options 中）
       await waitFor(() => {
-        expect(result.current.form.getValues('city')).toBeUndefined();
+        expect(result.current.form.getValues("city")).toBeUndefined();
       });
     });
 
-    it('应该支持 disabled 类型的函数联动', async () => {
+    it("应该支持 disabled 类型的函数联动", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         submitBtn: [
           {
-            type: 'disabled',
-            dependencies: ['agreed'],
-            fulfill: { function: 'checkDisabled' },
+            type: "disabled",
+            dependencies: ["agreed"],
+            fulfill: { function: "checkDisabled" },
           },
         ],
       };
@@ -905,7 +946,9 @@ describe('useLinkageManager', () => {
       };
 
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { agreed: false, submitBtn: null } });
+        const form = useForm({
+          defaultValues: { agreed: false, submitBtn: null },
+        });
         return useLinkageManager({ form, linkages, linkageFunctions });
       });
 
@@ -918,23 +961,26 @@ describe('useLinkageManager', () => {
       });
     });
 
-    it('应该支持 readonly 类型的函数联动', async () => {
+    it("应该支持 readonly 类型的函数联动", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         email: [
           {
-            type: 'readonly',
-            dependencies: ['verified'],
-            fulfill: { function: 'checkReadonly' },
+            type: "readonly",
+            dependencies: ["verified"],
+            fulfill: { function: "checkReadonly" },
           },
         ],
       };
 
       const linkageFunctions = {
-        checkReadonly: (formData: Record<string, any>) => formData.verified === true,
+        checkReadonly: (formData: Record<string, any>) =>
+          formData.verified === true,
       };
 
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { verified: true, email: 'test@example.com' } });
+        const form = useForm({
+          defaultValues: { verified: true, email: "test@example.com" },
+        });
         return useLinkageManager({ form, linkages, linkageFunctions });
       });
 
@@ -948,25 +994,28 @@ describe('useLinkageManager', () => {
     });
   });
 
-  describe('队列处理', () => {
-    it('应该在表单值变化时触发联动更新', async () => {
+  describe("队列处理", () => {
+    it("应该在表单值变化时触发联动更新", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         total: [
           {
-            type: 'value',
-            dependencies: ['price', 'quantity'],
-            fulfill: { function: 'calculateTotal' },
+            type: "value",
+            dependencies: ["price", "quantity"],
+            fulfill: { function: "calculateTotal" },
           },
         ],
       };
 
       const linkageFunctions = {
-        calculateTotal: (formData: Record<string, any>) => formData.price * formData.quantity,
+        calculateTotal: (formData: Record<string, any>) =>
+          formData.price * formData.quantity,
       };
 
       let formRef: any;
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { price: 10, quantity: 2, total: 0 } });
+        const form = useForm({
+          defaultValues: { price: 10, quantity: 2, total: 0 },
+        });
         formRef = form;
         return useLinkageManager({ form, linkages, linkageFunctions });
       });
@@ -981,7 +1030,7 @@ describe('useLinkageManager', () => {
 
       // 修改表单值触发联动更新
       await act(async () => {
-        formRef.setValue('price', 20);
+        formRef.setValue("price", 20);
       });
 
       // 手动初始化联动
@@ -993,12 +1042,12 @@ describe('useLinkageManager', () => {
       });
     });
 
-    it('应该处理没有受影响字段的情况', async () => {
+    it("应该处理没有受影响字段的情况", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         output: [
           {
-            type: 'value',
-            dependencies: ['input'],
+            type: "value",
+            dependencies: ["input"],
             fulfill: { value: 100 },
           },
         ],
@@ -1006,7 +1055,9 @@ describe('useLinkageManager', () => {
 
       let formRef: any;
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { input: 1, output: 0, unrelated: 'test' } });
+        const form = useForm({
+          defaultValues: { input: 1, output: 0, unrelated: "test" },
+        });
         formRef = form;
         return useLinkageManager({ form, linkages });
       });
@@ -1021,7 +1072,7 @@ describe('useLinkageManager', () => {
 
       // 修改不相关的字段，不应该触发联动
       await act(async () => {
-        formRef.setValue('unrelated', 'changed');
+        formRef.setValue("unrelated", "changed");
       });
 
       // 状态应该保持不变
@@ -1031,15 +1082,15 @@ describe('useLinkageManager', () => {
     });
   });
 
-  describe('异步竞态条件', () => {
-    it('应该处理快速连续的异步请求', async () => {
+  describe("异步竞态条件", () => {
+    it("应该处理快速连续的异步请求", async () => {
       let callCount = 0;
       const linkages: Record<string, LinkageConfig[]> = {
         result: [
           {
-            type: 'value',
-            dependencies: ['input'],
-            fulfill: { function: 'asyncCalculate' },
+            type: "value",
+            dependencies: ["input"],
+            fulfill: { function: "asyncCalculate" },
           },
         ],
       };
@@ -1049,7 +1100,9 @@ describe('useLinkageManager', () => {
           callCount++;
           const currentCall = callCount;
           // 模拟不同的延迟
-          await new Promise(resolve => setTimeout(resolve, currentCall === 1 ? 50 : 10));
+          await new Promise((resolve) =>
+            setTimeout(resolve, currentCall === 1 ? 50 : 10),
+          );
           return formData.input * 2;
         },
       };
@@ -1071,7 +1124,7 @@ describe('useLinkageManager', () => {
 
       // 快速连续修改值
       await act(async () => {
-        formRef.setValue('input', 10);
+        formRef.setValue("input", 10);
       });
 
       // 手动初始化联动
@@ -1079,7 +1132,7 @@ describe('useLinkageManager', () => {
         await result.current.refreshLinkage();
       });
       await act(async () => {
-        formRef.setValue('input', 15);
+        formRef.setValue("input", 15);
       });
 
       // 最终结果应该是最后一次的值
@@ -1087,198 +1140,30 @@ describe('useLinkageManager', () => {
         () => {
           expect(result.current.linkageStates.result?.value).toBe(30);
         },
-        { timeout: 200 }
+        { timeout: 200 },
       );
     });
 
-    it('应该在异步函数执行期间处理过期的结果', async () => {
+    it("应该在异步函数执行期间处理过期的结果", async () => {
       // 这个测试验证快速连续触发时，旧的异步结果会被丢弃
       const linkages: Record<string, LinkageConfig[]> = {
         output: [
           {
-            type: 'value',
-            dependencies: ['trigger'],
-            fulfill: { function: 'slowAsync' },
+            type: "value",
+            dependencies: ["trigger"],
+            fulfill: { function: "slowAsync" },
           },
         ],
       };
 
-      let callOrder: number[] = [];
+      const callOrder: number[] = [];
       const linkageFunctions = {
         slowAsync: async (formData: Record<string, any>) => {
           const value = formData.trigger;
           callOrder.push(value);
           // 第一次调用延迟更长
-          await new Promise(resolve => setTimeout(resolve, value === 1 ? 100 : 20));
-          return value * 10;
-        },
-      };
-
-      let formRef: any;
-      const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { trigger: 1, output: 0 } });
-        formRef = form;
-        return useLinkageManager({ form, linkages, linkageFunctions });
-      });
-
-      // 手动初始化联动
-      await act(async () => {
-        await result.current.refreshLinkage();
-      });
-
-      // 等待初始化完成
-      await waitFor(
-        () => {
-          expect(result.current.linkageStates.output?.value).toBe(10);
-        },
-        { timeout: 200 }
-      );
-
-      // 验证函数被调用
-      expect(callOrder).toContain(1);
-    });
-  });
-
-  describe('联动函数错误处理', () => {
-    it('应该处理联动函数抛出的错误', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      const linkages: Record<string, LinkageConfig[]> = {
-        result: [
-          {
-            type: 'value',
-            dependencies: ['input'],
-            fulfill: { function: 'errorFunction' },
-          },
-        ],
-      };
-
-      const linkageFunctions = {
-        errorFunction: () => {
-          throw new Error('Test error');
-        },
-      };
-
-      const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { input: 5, result: 0 } });
-        return useLinkageManager({ form, linkages, linkageFunctions });
-      });
-
-      // 手动初始化联动
-      await act(async () => {
-        await result.current.refreshLinkage();
-      });
-      await waitFor(() => {
-        // 错误应该被捕获，状态可能为空或 null
-        expect(result.current.linkageStates.result).toBeDefined();
-      });
-
-      consoleSpy.mockRestore();
-    });
-  });
-
-  describe('StaleResultError 竞态条件处理', () => {
-    it('应该在异步结果过期时抛出 StaleResultError 并正确处理', async () => {
-      // 这个测试专门验证 StaleResultError 的构造和抛出（覆盖第 23-24, 595 行）
-      // 策略：使用延迟不同的异步函数，让后触发的请求先完成
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      let callCount = 0;
-      const linkages: Record<string, LinkageConfig[]> = {
-        asyncField: [
-          {
-            type: 'value',
-            dependencies: ['trigger'],
-            fulfill: { function: 'controlledAsync' },
-          },
-        ],
-      };
-
-      const linkageFunctions = {
-        controlledAsync: async (formData: Record<string, any>) => {
-          callCount++;
-          const value = formData.trigger;
-          const currentCall = callCount;
-          // 初始化阶段快速返回
-          if (currentCall === 1) {
-            return value * 10;
-          }
-          // 第二次调用（用户触发）延迟较长
-          if (currentCall === 2) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            return value * 10;
-          }
-          // 第三次调用（用户触发）延迟较短，会先完成
-          await new Promise(resolve => setTimeout(resolve, 10));
-          return value * 10;
-        },
-      };
-
-      let formRef: any;
-      const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { trigger: 1, asyncField: 0 } });
-        formRef = form;
-        return useLinkageManager({ form, linkages, linkageFunctions });
-      });
-
-      // 手动初始化联动
-      await act(async () => {
-        await result.current.refreshLinkage();
-      });
-
-      // 等待初始化完成
-      await waitFor(
-        () => {
-          expect(result.current.linkageStates.asyncField?.value).toBe(10);
-        },
-        { timeout: 200 }
-      );
-
-      // 第一次用户触发的变更（会延迟 100ms）
-      await act(async () => {
-        formRef.setValue('trigger', 2);
-      });
-
-      // 立即触发第二次变更（会延迟 10ms，先完成）
-      await act(async () => {
-        formRef.setValue('trigger', 3);
-      });
-
-      // 等待所有异步操作完成
-      // 第三次调用（trigger=3）应该先完成并设置值为 30
-      // 第二次调用（trigger=2）后完成时会触发 StaleResultError，结果被丢弃
-      await waitFor(
-        () => {
-          expect(result.current.linkageStates.asyncField?.value).toBe(30);
-        },
-        { timeout: 300 }
-      );
-
-      consoleSpy.mockRestore();
-    });
-
-    it('应该在快速连续触发时丢弃过期的异步结果', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
-
-      let callCount = 0;
-      const linkages: Record<string, LinkageConfig[]> = {
-        output: [
-          {
-            type: 'value',
-            dependencies: ['trigger'],
-            fulfill: { function: 'delayedAsync' },
-          },
-        ],
-      };
-
-      const linkageFunctions = {
-        delayedAsync: async (formData: Record<string, any>) => {
-          callCount++;
-          const currentCall = callCount;
-          const value = formData.trigger;
-          // 第一次调用延迟更长，后续调用快速返回
-          await new Promise(resolve =>
-            setTimeout(resolve, currentCall === 1 ? 50 : 10)
+          await new Promise((resolve) =>
+            setTimeout(resolve, value === 1 ? 100 : 20),
           );
           return value * 10;
         },
@@ -1301,12 +1186,182 @@ describe('useLinkageManager', () => {
         () => {
           expect(result.current.linkageStates.output?.value).toBe(10);
         },
-        { timeout: 200 }
+        { timeout: 200 },
+      );
+
+      // 验证函数被调用
+      expect(callOrder).toContain(1);
+    });
+  });
+
+  describe("联动函数错误处理", () => {
+    it("应该处理联动函数抛出的错误", async () => {
+      const consoleSpy = jest.spyOn(console, "error").mockImplementation();
+
+      const linkages: Record<string, LinkageConfig[]> = {
+        result: [
+          {
+            type: "value",
+            dependencies: ["input"],
+            fulfill: { function: "errorFunction" },
+          },
+        ],
+      };
+
+      const linkageFunctions = {
+        errorFunction: () => {
+          throw new Error("Test error");
+        },
+      };
+
+      const { result } = renderHook(() => {
+        const form = useForm({ defaultValues: { input: 5, result: 0 } });
+        return useLinkageManager({ form, linkages, linkageFunctions });
+      });
+
+      // 手动初始化联动
+      await act(async () => {
+        await result.current.refreshLinkage();
+      });
+      await waitFor(() => {
+        // 错误应该被捕获，状态可能为空或 null
+        expect(result.current.linkageStates.result).toBeDefined();
+      });
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("StaleResultError 竞态条件处理", () => {
+    it("应该在异步结果过期时抛出 StaleResultError 并正确处理", async () => {
+      // 这个测试专门验证 StaleResultError 的构造和抛出（覆盖第 23-24, 595 行）
+      // 策略：使用延迟不同的异步函数，让后触发的请求先完成
+      const consoleSpy = jest.spyOn(console, "error").mockImplementation();
+
+      let callCount = 0;
+      const linkages: Record<string, LinkageConfig[]> = {
+        asyncField: [
+          {
+            type: "value",
+            dependencies: ["trigger"],
+            fulfill: { function: "controlledAsync" },
+          },
+        ],
+      };
+
+      const linkageFunctions = {
+        controlledAsync: async (formData: Record<string, any>) => {
+          callCount++;
+          const value = formData.trigger;
+          const currentCall = callCount;
+          // 初始化阶段快速返回
+          if (currentCall === 1) {
+            return value * 10;
+          }
+          // 第二次调用（用户触发）延迟较长
+          if (currentCall === 2) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            return value * 10;
+          }
+          // 第三次调用（用户触发）延迟较短，会先完成
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          return value * 10;
+        },
+      };
+
+      let formRef: any;
+      const { result } = renderHook(() => {
+        const form = useForm({ defaultValues: { trigger: 1, asyncField: 0 } });
+        formRef = form;
+        return useLinkageManager({ form, linkages, linkageFunctions });
+      });
+
+      // 手动初始化联动
+      await act(async () => {
+        await result.current.refreshLinkage();
+      });
+
+      // 等待初始化完成
+      await waitFor(
+        () => {
+          expect(result.current.linkageStates.asyncField?.value).toBe(10);
+        },
+        { timeout: 200 },
+      );
+
+      // 第一次用户触发的变更（会延迟 100ms）
+      await act(async () => {
+        formRef.setValue("trigger", 2);
+      });
+
+      // 立即触发第二次变更（会延迟 10ms，先完成）
+      await act(async () => {
+        formRef.setValue("trigger", 3);
+      });
+
+      // 等待所有异步操作完成
+      // 第三次调用（trigger=3）应该先完成并设置值为 30
+      // 第二次调用（trigger=2）后完成时会触发 StaleResultError，结果被丢弃
+      await waitFor(
+        () => {
+          expect(result.current.linkageStates.asyncField?.value).toBe(30);
+        },
+        { timeout: 300 },
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("应该在快速连续触发时丢弃过期的异步结果", async () => {
+      const consoleSpy = jest.spyOn(console, "error").mockImplementation();
+
+      let callCount = 0;
+      const linkages: Record<string, LinkageConfig[]> = {
+        output: [
+          {
+            type: "value",
+            dependencies: ["trigger"],
+            fulfill: { function: "delayedAsync" },
+          },
+        ],
+      };
+
+      const linkageFunctions = {
+        delayedAsync: async (formData: Record<string, any>) => {
+          callCount++;
+          const currentCall = callCount;
+          const value = formData.trigger;
+          // 第一次调用延迟更长，后续调用快速返回
+          await new Promise((resolve) =>
+            setTimeout(resolve, currentCall === 1 ? 50 : 10),
+          );
+          return value * 10;
+        },
+      };
+
+      let formRef: any;
+      const { result } = renderHook(() => {
+        const form = useForm({ defaultValues: { trigger: 1, output: 0 } });
+        formRef = form;
+        return useLinkageManager({ form, linkages, linkageFunctions });
+      });
+
+      // 手动初始化联动
+      await act(async () => {
+        await result.current.refreshLinkage();
+      });
+
+      // 等待初始化完成
+      await waitFor(
+        () => {
+          expect(result.current.linkageStates.output?.value).toBe(10);
+        },
+        { timeout: 200 },
       );
 
       // 快速连续触发
       await act(async () => {
-        formRef.setValue('trigger', 2);
+        formRef.setValue("trigger", 2);
       });
 
       // 等待计算完成
@@ -1314,22 +1369,22 @@ describe('useLinkageManager', () => {
         () => {
           expect(result.current.linkageStates.output?.value).toBe(20);
         },
-        { timeout: 200 }
+        { timeout: 200 },
       );
 
       consoleSpy.mockRestore();
     });
 
-    it('应该处理异步函数抛出 StaleResultError 的情况', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+    it("应该处理异步函数抛出 StaleResultError 的情况", async () => {
+      const consoleSpy = jest.spyOn(console, "error").mockImplementation();
 
       let callCount = 0;
       const linkages: Record<string, LinkageConfig[]> = {
         result: [
           {
-            type: 'value',
-            dependencies: ['input'],
-            fulfill: { function: 'racingAsync' },
+            type: "value",
+            dependencies: ["input"],
+            fulfill: { function: "racingAsync" },
           },
         ],
       };
@@ -1339,8 +1394,8 @@ describe('useLinkageManager', () => {
           callCount++;
           const currentCall = callCount;
           // 第一次调用延迟更长
-          await new Promise(resolve =>
-            setTimeout(resolve, currentCall === 1 ? 100 : 10)
+          await new Promise((resolve) =>
+            setTimeout(resolve, currentCall === 1 ? 100 : 10),
           );
           return formData.input * currentCall;
         },
@@ -1365,9 +1420,9 @@ describe('useLinkageManager', () => {
 
       // 快速连续修改触发竞态
       await act(async () => {
-        formRef.setValue('input', 10);
+        formRef.setValue("input", 10);
         // 立即再次修改
-        formRef.setValue('input', 15);
+        formRef.setValue("input", 15);
       });
 
       // 等待所有异步操作完成
@@ -1376,29 +1431,29 @@ describe('useLinkageManager', () => {
           // 最终结果应该是最后一次计算的值
           expect(result.current.linkageStates.result?.value).toBeDefined();
         },
-        { timeout: 300 }
+        { timeout: 300 },
       );
 
       consoleSpy.mockRestore();
     });
   });
 
-  describe('队列处理边缘情况', () => {
-    it('应该在队列正在处理时将新任务加入队列', async () => {
-      let asyncResolvers: Array<() => void> = [];
+  describe("队列处理边缘情况", () => {
+    it("应该在队列正在处理时将新任务加入队列", async () => {
+      const asyncResolvers: Array<() => void> = [];
       const linkages: Record<string, LinkageConfig[]> = {
         output: [
           {
-            type: 'value',
-            dependencies: ['input'],
-            fulfill: { function: 'slowAsync' },
+            type: "value",
+            dependencies: ["input"],
+            fulfill: { function: "slowAsync" },
           },
         ],
       };
 
       const linkageFunctions = {
         slowAsync: async (formData: Record<string, any>) => {
-          await new Promise<void>(resolve => {
+          await new Promise<void>((resolve) => {
             asyncResolvers.push(resolve);
             // 自动在短时间后解决
             setTimeout(resolve, 50);
@@ -1424,12 +1479,12 @@ describe('useLinkageManager', () => {
         () => {
           expect(result.current.linkageStates.output?.value).toBe(10);
         },
-        { timeout: 200 }
+        { timeout: 200 },
       );
 
       // 快速连续触发多次，测试队列处理
       await act(async () => {
-        formRef.setValue('input', 10);
+        formRef.setValue("input", 10);
       });
 
       // 手动初始化联动
@@ -1437,7 +1492,7 @@ describe('useLinkageManager', () => {
         await result.current.refreshLinkage();
       });
       await act(async () => {
-        formRef.setValue('input', 15);
+        formRef.setValue("input", 15);
       });
 
       // 手动初始化联动
@@ -1445,7 +1500,7 @@ describe('useLinkageManager', () => {
         await result.current.refreshLinkage();
       });
       await act(async () => {
-        formRef.setValue('input', 20);
+        formRef.setValue("input", 20);
       });
 
       // 等待所有处理完成
@@ -1453,24 +1508,24 @@ describe('useLinkageManager', () => {
         () => {
           expect(result.current.linkageStates.output?.value).toBe(40);
         },
-        { timeout: 500 }
+        { timeout: 500 },
       );
     });
 
-    it('应该在处理完成后继续处理队列中的新任务', async () => {
+    it("应该在处理完成后继续处理队列中的新任务", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         output: [
           {
-            type: 'value',
-            dependencies: ['input'],
-            fulfill: { function: 'calculate' },
+            type: "value",
+            dependencies: ["input"],
+            fulfill: { function: "calculate" },
           },
         ],
       };
 
       const linkageFunctions = {
         calculate: async (formData: Record<string, any>) => {
-          await new Promise(resolve => setTimeout(resolve, 10));
+          await new Promise((resolve) => setTimeout(resolve, 10));
           return formData.input * 2;
         },
       };
@@ -1495,7 +1550,7 @@ describe('useLinkageManager', () => {
       // 连续触发多次
       for (let i = 1; i <= 5; i++) {
         await act(async () => {
-          formRef.setValue('input', i * 10);
+          formRef.setValue("input", i * 10);
         });
       }
 
@@ -1504,19 +1559,19 @@ describe('useLinkageManager', () => {
         () => {
           expect(result.current.linkageStates.output?.value).toBe(100);
         },
-        { timeout: 500 }
+        { timeout: 500 },
       );
     });
   });
 
-  describe('空联动配置', () => {
-    it('应该处理空的联动数组', async () => {
+  describe("空联动配置", () => {
+    it("应该处理空的联动数组", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         field: [],
       };
 
       const { result } = renderHook(() => {
-        const form = useForm({ defaultValues: { field: 'test' } });
+        const form = useForm({ defaultValues: { field: "test" } });
         return useLinkageManager({ form, linkages });
       });
 
@@ -1531,11 +1586,11 @@ describe('useLinkageManager', () => {
     });
   });
 
-  describe('processQueue 闭包陈旧修复', () => {
-    it('linkages 在 rerender 后更新，watch 触发的 processQueue 应使用最新 linkages', async () => {
+  describe("processQueue 闭包陈旧修复", () => {
+    it("linkages 在 rerender 后更新，watch 触发的 processQueue 应使用最新 linkages", async () => {
       const loadOptions = jest
         .fn()
-        .mockReturnValue([{ label: 'Beijing', value: 'beijing' }]);
+        .mockReturnValue([{ label: "Beijing", value: "beijing" }]);
 
       const { result, rerender } = renderHook(
         ({
@@ -1546,9 +1601,13 @@ describe('useLinkageManager', () => {
           linkageFunctions: Record<string, (...args: any[]) => any>;
         }) => {
           const form = useForm({
-            defaultValues: { country: 'china', province: '' },
+            defaultValues: { country: "china", province: "" },
           });
-          const manager = useLinkageManager({ form, linkages, linkageFunctions });
+          const manager = useLinkageManager({
+            form,
+            linkages,
+            linkageFunctions,
+          });
           return { manager, form };
         },
         {
@@ -1556,7 +1615,7 @@ describe('useLinkageManager', () => {
             linkages: {} as Record<string, LinkageConfig[]>,
             linkageFunctions: {},
           },
-        }
+        },
       );
 
       // 初始无联动
@@ -1571,9 +1630,9 @@ describe('useLinkageManager', () => {
           linkages: {
             province: [
               {
-                type: 'options',
-                dependencies: ['country'],
-                fulfill: { function: 'loadOptions' },
+                type: "options",
+                dependencies: ["country"],
+                fulfill: { function: "loadOptions" },
               },
             ],
           },
@@ -1583,31 +1642,33 @@ describe('useLinkageManager', () => {
 
       // 触发字段变化，让 watch 回调将任务入队并执行 processQueue
       await act(async () => {
-        result.current.form.setValue('country', 'usa');
+        result.current.form.setValue("country", "usa");
         await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       // processQueue 应读取最新 linkages，调用 loadOptions
       await waitFor(() => {
         expect(loadOptions).toHaveBeenCalled();
-        expect(result.current.manager.linkageStates.province?.options).toBeDefined();
+        expect(
+          result.current.manager.linkageStates.province?.options,
+        ).toBeDefined();
       });
     });
 
-    it('linkageFunctions 在 rerender 后更新，watch 触发的 processQueue 应使用最新函数', async () => {
+    it("linkageFunctions 在 rerender 后更新，watch 触发的 processQueue 应使用最新函数", async () => {
       const initialFn = jest
         .fn()
-        .mockReturnValue([{ label: 'Old', value: 'old' }]);
+        .mockReturnValue([{ label: "Old", value: "old" }]);
       const updatedFn = jest
         .fn()
-        .mockReturnValue([{ label: 'New', value: 'new' }]);
+        .mockReturnValue([{ label: "New", value: "new" }]);
 
       const linkages: Record<string, LinkageConfig[]> = {
         province: [
           {
-            type: 'options',
-            dependencies: ['country'],
-            fulfill: { function: 'loadOptions' },
+            type: "options",
+            dependencies: ["country"],
+            fulfill: { function: "loadOptions" },
           },
         ],
       };
@@ -1619,12 +1680,16 @@ describe('useLinkageManager', () => {
           linkageFunctions: Record<string, (...args: any[]) => any>;
         }) => {
           const form = useForm({
-            defaultValues: { country: 'china', province: '' },
+            defaultValues: { country: "china", province: "" },
           });
-          const manager = useLinkageManager({ form, linkages, linkageFunctions });
+          const manager = useLinkageManager({
+            form,
+            linkages,
+            linkageFunctions,
+          });
           return { manager, form };
         },
-        { initialProps: { linkageFunctions: { loadOptions: initialFn } } }
+        { initialProps: { linkageFunctions: { loadOptions: initialFn } } },
       );
 
       // 初始化联动，验证旧函数被调用
@@ -1632,7 +1697,9 @@ describe('useLinkageManager', () => {
         await result.current.manager.refreshLinkage();
       });
       await waitFor(() => {
-        expect(result.current.manager.linkageStates.province?.options?.[0].value).toBe('old');
+        expect(
+          result.current.manager.linkageStates.province?.options?.[0].value,
+        ).toBe("old");
       });
 
       // rerender：更新 linkageFunctions
@@ -1642,14 +1709,16 @@ describe('useLinkageManager', () => {
 
       // 触发字段变化，watch 回调将任务入队
       await act(async () => {
-        result.current.form.setValue('country', 'usa');
+        result.current.form.setValue("country", "usa");
         await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       // processQueue 应使用新函数，返回 new 选项
       await waitFor(() => {
         expect(updatedFn).toHaveBeenCalled();
-        expect(result.current.manager.linkageStates.province?.options?.[0].value).toBe('new');
+        expect(
+          result.current.manager.linkageStates.province?.options?.[0].value,
+        ).toBe("new");
       });
     });
   });

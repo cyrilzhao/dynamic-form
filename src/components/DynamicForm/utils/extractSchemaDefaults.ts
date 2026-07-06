@@ -1,4 +1,4 @@
-import type { ExtendedJSONSchema } from '../types/schema';
+import type { ExtendedJSONSchema } from "../types/schema";
 
 /**
  * 从 JSON Schema 中递归提取所有字段的 default 值
@@ -24,10 +24,12 @@ import type { ExtendedJSONSchema } from '../types/schema';
  * };
  * extractSchemaDefaults(schema); // { username: 'guest', settings: { theme: 'dark' } }
  */
-export function extractSchemaDefaults(schema: ExtendedJSONSchema): Record<string, any> {
+export function extractSchemaDefaults(
+  schema: ExtendedJSONSchema,
+): Record<string, any> {
   const defaults: Record<string, any> = {};
 
-  if (!schema || schema.type !== 'object' || !schema.properties) {
+  if (!schema || schema.type !== "object" || !schema.properties) {
     return defaults;
   }
 
@@ -41,7 +43,7 @@ export function extractSchemaDefaults(schema: ExtendedJSONSchema): Record<string
     }
 
     // 情况2：嵌套对象，递归提取
-    if (fieldSchema.type === 'object' && fieldSchema.properties) {
+    if (fieldSchema.type === "object" && fieldSchema.properties) {
       const nestedDefaults = extractSchemaDefaults(fieldSchema);
       if (Object.keys(nestedDefaults).length > 0) {
         defaults[key] = nestedDefaults;
@@ -67,16 +69,13 @@ export function extractSchemaDefaults(schema: ExtendedJSONSchema): Record<string
  */
 export function mergeDefaults(
   schemaDefaults: Record<string, any>,
-  userDefaults: Record<string, any>
+  userDefaults: Record<string, any>,
 ): Record<string, any> {
   const result = { ...schemaDefaults };
 
   Object.entries(userDefaults).forEach(([key, value]) => {
     // 如果两边都是普通对象，递归合并
-    if (
-      isPlainObject(result[key]) &&
-      isPlainObject(value)
-    ) {
+    if (isPlainObject(result[key]) && isPlainObject(value)) {
       result[key] = mergeDefaults(result[key], value);
     } else {
       // 否则用户值覆盖 schema 默认值
@@ -91,5 +90,5 @@ export function mergeDefaults(
  * 判断值是否为普通对象（非数组、非 null）
  */
 function isPlainObject(value: any): value is Record<string, any> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }

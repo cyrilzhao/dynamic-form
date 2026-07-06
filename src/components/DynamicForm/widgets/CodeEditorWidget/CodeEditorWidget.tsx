@@ -1,29 +1,32 @@
-import { forwardRef } from 'react';
-import { CodeEditor } from '../../../CodeEditor';
-import type { CodeEditorWidgetProps } from './types';
+import { forwardRef } from "react";
+import { CodeEditor } from "../../../CodeEditor";
+import type { CodeEditorWidgetProps } from "./types";
 
 /**
  * DynamicForm 的代码编辑器 Widget
  * 基于通用 CodeEditor 组件的表单适配器
  */
-export const CodeEditorWidget = forwardRef<HTMLDivElement, CodeEditorWidgetProps>(
+export const CodeEditorWidget = forwardRef<
+  HTMLDivElement,
+  CodeEditorWidgetProps
+>(
   (
     {
       name,
-      value = '',
+      value = "",
       onChange,
       onBlur,
       disabled = false,
       readonly = false,
       error,
-      language = 'javascript',
+      language = "javascript",
       config = {},
-      theme = 'light',
+      theme = "light",
       validator,
       formatter,
       ...rest
     },
-    ref
+    ref,
   ) => {
     return (
       <CodeEditor
@@ -42,7 +45,7 @@ export const CodeEditorWidget = forwardRef<HTMLDivElement, CodeEditorWidgetProps
         {...rest}
       />
     );
-  }
+  },
 );
 
-CodeEditorWidget.displayName = 'CodeEditorWidget';
+CodeEditorWidget.displayName = "CodeEditorWidget";

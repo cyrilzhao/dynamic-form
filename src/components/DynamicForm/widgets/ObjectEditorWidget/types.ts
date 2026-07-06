@@ -1,13 +1,12 @@
-import type { FieldWidgetProps } from '../../types/index';
-import type { ObjectEditorProps } from '../../../ObjectEditor';
+import type { FieldWidgetProps } from "../../types/index";
+import type { ObjectEditorProps } from "../../../ObjectEditor";
 
 /**
  * ObjectEditorWidget Props
  * 基于通用 ObjectEditor 的表单字段组件
  */
 export interface ObjectEditorWidgetProps
-  extends FieldWidgetProps,
-    Omit<ObjectEditorProps, 'value' | 'onChange'> {
+  extends FieldWidgetProps, Omit<ObjectEditorProps, "value" | "onChange"> {
   /** 对象值 */
   value?: Record<string, unknown>;
 

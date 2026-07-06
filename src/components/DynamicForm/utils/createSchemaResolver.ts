@@ -1,9 +1,9 @@
-import type { Resolver, FieldErrors } from 'react-hook-form';
-import type { RefObject } from 'react';
-import { SchemaValidator } from '../core/SchemaValidator';
-import { runAllFieldValidators } from './runFieldValidators';
-import { mergeSchemaWithLinkage } from './mergeSchemaWithLinkage';
-import type { ExtendedJSONSchema } from '../types/schema';
+import type { Resolver, FieldErrors } from "react-hook-form";
+import type { RefObject } from "react";
+import { SchemaValidator } from "../core/SchemaValidator";
+import { runAllFieldValidators } from "./runFieldValidators";
+import { mergeSchemaWithLinkage } from "./mergeSchemaWithLinkage";
+import type { ExtendedJSONSchema } from "../types/schema";
 
 /**
  * 将扁平路径（如 "arr[0].name"）写入嵌套错误对象
@@ -11,9 +11,9 @@ import type { ExtendedJSONSchema } from '../types/schema';
 function setError(
   errors: Record<string, any>,
   path: string,
-  value: { type: string; message: string }
+  value: { type: string; message: string },
 ): void {
-  const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.');
+  const parts = path.replace(/\[(\d+)\]/g, ".$1").split(".");
   let current = errors;
   for (let i = 0; i < parts.length - 1; i++) {
     const key = parts[i];
@@ -31,14 +31,22 @@ function setError(
  */
 function getFieldSchema(
   path: string,
-  schema: ExtendedJSONSchema
+  schema: ExtendedJSONSchema,
 ): ExtendedJSONSchema | null {
-  const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.').filter(p => !/^\d+$/.test(p));
+  const parts = path
+    .replace(/\[(\d+)\]/g, ".$1")
+    .split(".")
+    .filter((p) => !/^\d+$/.test(p));
   let current: ExtendedJSONSchema = schema;
   for (const part of parts) {
-    if (typeof current === 'boolean') return null;
-    const next = current.properties?.[part] ?? (current.items as any)?.properties?.[part];
-    if (!next || typeof next === 'boolean') return null;
+    if (typeof current === "boolean") {
+      return null;
+    }
+    const next =
+      current.properties?.[part] ?? (current.items as any)?.properties?.[part];
+    if (!next || typeof next === "boolean") {
+      return null;
+    }
     current = next as ExtendedJSONSchema;
   }
   return current;
@@ -50,28 +58,43 @@ function getFieldSchema(
 function isHiddenOrDisabled(
   fieldPath: string,
   linkageStates: Record<string, { visible?: boolean; disabled?: boolean }>,
-  schema: ExtendedJSONSchema
+  schema: ExtendedJSONSchema,
 ): boolean {
   // 检查字段自身：联动状态
   const state = linkageStates[fieldPath];
-  if (state?.visible === false || state?.disabled === true) return true;
+  if (state?.visible === false || state?.disabled === true) {
+    return true;
+  }
 
   // 检查字段自身：schema 静态配置
   const fieldSchema = getFieldSchema(fieldPath, schema);
-  if (fieldSchema?.ui?.hidden === true || fieldSchema?.ui?.disabled === true) return true;
+  if (fieldSchema?.ui?.hidden === true || fieldSchema?.ui?.disabled === true) {
+    return true;
+  }
 
   // 检查父级路径（处理嵌套字段）
-  const normalized = fieldPath.replace(/\[(\d+)\]/g, '.$1');
-  const parts = normalized.split('.');
+  const normalized = fieldPath.replace(/\[(\d+)\]/g, ".$1");
+  const parts = normalized.split(".");
   for (let i = 1; i < parts.length; i++) {
-    const parentNormalized = parts.slice(0, i).join('.');
-    const parentOriginal = parentNormalized.replace(/\.(\d+)/g, '[$1]');
+    const parentNormalized = parts.slice(0, i).join(".");
+    const parentOriginal = parentNormalized.replace(/\.(\d+)/g, "[$1]");
 
-    const parentLinkageState = linkageStates[parentOriginal] ?? linkageStates[parentNormalized];
-    if (parentLinkageState?.visible === false || parentLinkageState?.disabled === true) return true;
+    const parentLinkageState =
+      linkageStates[parentOriginal] ?? linkageStates[parentNormalized];
+    if (
+      parentLinkageState?.visible === false ||
+      parentLinkageState?.disabled === true
+    ) {
+      return true;
+    }
 
     const parentFieldSchema = getFieldSchema(parentOriginal, schema);
-    if (parentFieldSchema?.ui?.hidden === true || parentFieldSchema?.ui?.disabled === true) return true;
+    if (
+      parentFieldSchema?.ui?.hidden === true ||
+      parentFieldSchema?.ui?.disabled === true
+    ) {
+      return true;
+    }
   }
 
   return false;
@@ -84,7 +107,16 @@ function isHiddenOrDisabled(
 export function createSchemaResolver(
   schema: ExtendedJSONSchema,
   callbacks: Record<string, (...args: any[]) => any> = {},
-  linkageStatesRef?: RefObject<Record<string, { visible?: boolean; disabled?: boolean; schema?: Partial<ExtendedJSONSchema> }>>
+  linkageStatesRef?: RefObject<
+    Record<
+      string,
+      {
+        visible?: boolean;
+        disabled?: boolean;
+        schema?: Partial<ExtendedJSONSchema>;
+      }
+    >
+  >,
 ): Resolver {
   return async (values) => {
     const linkageStates = linkageStatesRef?.current ?? {};
@@ -93,7 +125,9 @@ export function createSchemaResolver(
     let effectiveSchema = schema;
 
     // 如果有 schema 联动，需要构建合并后的 schema
-    const hasSchemaLinkage = Object.values(linkageStates).some(state => state.schema);
+    const hasSchemaLinkage = Object.values(linkageStates).some(
+      (state) => state.schema,
+    );
 
     if (hasSchemaLinkage && schema.properties) {
       // 深拷贝 schema，避免修改原始 schema
@@ -103,13 +137,15 @@ export function createSchemaResolver(
       };
 
       // 对每个字段应用 schema 联动
-      for (const [fieldName, fieldSchema] of Object.entries(schema.properties)) {
+      for (const [fieldName, fieldSchema] of Object.entries(
+        schema.properties,
+      )) {
         const linkageState = linkageStates[fieldName];
         if (linkageState?.schema) {
           // 合并原始 schema 和联动 schema
           effectiveSchema.properties![fieldName] = mergeSchemaWithLinkage(
             fieldSchema as ExtendedJSONSchema,
-            linkageState.schema
+            linkageState.schema,
           );
         }
       }
@@ -118,7 +154,11 @@ export function createSchemaResolver(
     // 使用合并后的 schema 进行验证
     const validator = new SchemaValidator(effectiveSchema);
     const schemaErrors = validator.validate(values);
-    const fieldValidatorErrors = await runAllFieldValidators(values, schema, callbacks);
+    const fieldValidatorErrors = await runAllFieldValidators(
+      values,
+      schema,
+      callbacks,
+    );
     const errors = { ...schemaErrors, ...fieldValidatorErrors };
 
     if (Object.keys(errors).length === 0) {
@@ -127,8 +167,10 @@ export function createSchemaResolver(
 
     const fieldErrors: FieldErrors = {};
     for (const [field, message] of Object.entries(errors)) {
-      if (isHiddenOrDisabled(field, linkageStates, schema)) continue;
-      setError(fieldErrors, field, { type: 'validation', message });
+      if (isHiddenOrDisabled(field, linkageStates, schema)) {
+        continue;
+      }
+      setError(fieldErrors, field, { type: "validation", message });
     }
 
     return Object.keys(fieldErrors).length === 0

@@ -18,20 +18,22 @@ export class PathResolver {
    */
   static resolve(path: string, formData: Record<string, any>): any {
     // 如果不是 JSON Pointer 格式，直接返回字段值
-    if (!path.startsWith('#/')) {
+    if (!path.startsWith("#/")) {
       return this.getNestedValue(formData, path);
     }
 
     // 移除 #/ 前缀
-    const cleanPath = path.replace(/^#\//, '');
+    const cleanPath = path.replace(/^#\//, "");
 
     // 分割路径
-    const segments = cleanPath.split('/');
+    const segments = cleanPath.split("/");
 
     let value = formData;
     for (const segment of segments) {
       // 跳过 "properties" 和 "items" 关键字
-      if (segment === 'properties' || segment === 'items') continue;
+      if (segment === "properties" || segment === "items") {
+        continue;
+      }
 
       if (value === null || value === undefined) {
         return undefined;
@@ -55,14 +57,14 @@ export class PathResolver {
    * PathResolver.normalize('#/properties/age') // '#/properties/age'
    */
   static normalize(path: string): string {
-    if (path.startsWith('#/')) {
+    if (path.startsWith("#/")) {
       return path;
     }
 
     // 处理嵌套路径 (如 'user.age')
-    if (path.includes('.')) {
-      const parts = path.split('.');
-      return `#/properties/${parts.join('/properties/')}`;
+    if (path.includes(".")) {
+      const parts = path.split(".");
+      return `#/properties/${parts.join("/properties/")}`;
     }
 
     return `#/properties/${path}`;
@@ -80,17 +82,17 @@ export class PathResolver {
    * PathResolver.toFieldPath('#/properties/properties/properties') // 'properties'（字段名）
    */
   static toFieldPath(path: string): string {
-    if (!path.startsWith('#/')) {
+    if (!path.startsWith("#/")) {
       return path;
     }
 
-    const segments = path.replace(/^#\//, '').split('/');
+    const segments = path.replace(/^#\//, "").split("/");
     const result: string[] = [];
     let expectField = false;
 
     for (const segment of segments) {
       if (!expectField) {
-        if (segment === 'properties') {
+        if (segment === "properties") {
           expectField = true;
         }
         // items 后仍是关键字（如 /items/properties/name），保持状态不变
@@ -100,7 +102,7 @@ export class PathResolver {
       }
     }
 
-    return result.join('.');
+    return result.join(".");
   }
 
   /**
@@ -110,7 +112,9 @@ export class PathResolver {
    * 会智能匹配最长的 key 前缀，然后继续解析剩余路径。
    */
   static getNestedValue(obj: Record<string, any>, path: string): any {
-    if (!obj || !path) return undefined;
+    if (!obj || !path) {
+      return undefined;
+    }
 
     // 首先尝试直接匹配完整路径（最常见的情况）
     if (path in obj) {
@@ -120,17 +124,17 @@ export class PathResolver {
     // 尝试找到最长匹配的 key 前缀
     // 例如：path = "group~~category.contacts.0.category~~group.type"
     // obj 可能有 key = "group~~category.contacts"
-    const keys = path.split('.');
+    const keys = path.split(".");
 
     // 从最长前缀开始尝试匹配，直到单个 key（i = 1 时 prefix = keys[0]）。
     // 从长到短的原因：优先匹配最具体的 key，避免将 "a.b" 错误地匹配到 "a" 后再
     // 尝试在 obj["a"] 上查找 "b"，当 obj 中同时存在 "a" 和 "a.b" 两个 key 时，
     // 应优先匹配更精确的 "a.b"。
     for (let i = keys.length - 1; i >= 1; i--) {
-      const prefix = keys.slice(0, i).join('.');
+      const prefix = keys.slice(0, i).join(".");
       if (prefix in obj) {
         const value = obj[prefix];
-        const remainingPath = keys.slice(i).join('.');
+        const remainingPath = keys.slice(i).join(".");
         return this.getNestedValue(value, remainingPath);
       }
     }
@@ -145,13 +149,13 @@ export class PathResolver {
    * - ~0 表示 ~
    */
   private static decodePointerSegment(segment: string): string {
-    return segment.replace(/~1/g, '/').replace(/~0/g, '~');
+    return segment.replace(/~1/g, "/").replace(/~0/g, "~");
   }
 
   /**
    * 编码 JSON Pointer 转义字符
    */
   static encodePointerSegment(segment: string): string {
-    return segment.replace(/~/g, '~0').replace(/\//g, '~1');
+    return segment.replace(/~/g, "~0").replace(/\//g, "~1");
   }
 }

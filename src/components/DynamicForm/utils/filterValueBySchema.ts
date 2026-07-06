@@ -1,4 +1,4 @@
-import type { ExtendedJSONSchema } from '../types/schema';
+import type { ExtendedJSONSchema } from "../types/schema";
 
 /**
  * 根据 schema 递归过滤数据，只保留 schema 中定义的字段
@@ -31,24 +31,33 @@ import type { ExtendedJSONSchema } from '../types/schema';
  * // 结果: { name: 'John', age: 30 }
  * ```
  */
-export function filterValueBySchema(value: any, schema: ExtendedJSONSchema): any {
+export function filterValueBySchema(
+  value: any,
+  schema: ExtendedJSONSchema,
+): any {
   // 处理 null 或 undefined
   if (value === null || value === undefined) {
     return value;
   }
 
   // 处理数组类型
-  if (schema.type === 'array' && Array.isArray(value)) {
+  if (schema.type === "array" && Array.isArray(value)) {
     if (!schema.items) {
       return value;
     }
 
     // 递归过滤数组中的每个元素
-    return value.map(item => filterValueBySchema(item, schema.items as ExtendedJSONSchema));
+    return value.map((item) =>
+      filterValueBySchema(item, schema.items as ExtendedJSONSchema),
+    );
   }
 
   // 处理对象类型
-  if (schema.type === 'object' && typeof value === 'object' && !Array.isArray(value)) {
+  if (
+    schema.type === "object" &&
+    typeof value === "object" &&
+    !Array.isArray(value)
+  ) {
     if (!schema.properties) {
       return value;
     }

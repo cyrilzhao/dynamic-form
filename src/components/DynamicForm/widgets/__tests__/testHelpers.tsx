@@ -1,7 +1,7 @@
-import React from 'react';
-import { FormProvider, useForm } from 'react-hook-form';
-import { NestedSchemaProvider } from '../../context/NestedSchemaContext';
-import { PathPrefixProvider } from '../../context/PathPrefixContext';
+import React from "react";
+import { FormProvider, useForm } from "react-hook-form";
+import { NestedSchemaProvider } from "../../context/NestedSchemaContext";
+import { PathPrefixProvider } from "../../context/PathPrefixContext";
 
 /**
  * 测试用的 FormProvider 包装器
@@ -21,7 +21,7 @@ export const TestWrapper: React.FC<{
   children: React.ReactNode;
   defaultValues?: Record<string, any>;
   pathPrefix?: string;
-}> = ({ children, defaultValues = {}, pathPrefix = '' }) => {
+}> = ({ children, defaultValues = {}, pathPrefix = "" }) => {
   const methods = useForm({ defaultValues });
   return (
     <FormProvider {...methods}>

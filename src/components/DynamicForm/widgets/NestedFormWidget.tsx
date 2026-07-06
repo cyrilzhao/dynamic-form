@@ -1,12 +1,15 @@
-import { forwardRef, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useFormContext } from 'react-hook-form';
-import { Card } from '@blueprintjs/core';
-import { DynamicForm } from '../DynamicForm';
-import type { FieldWidgetProps } from '../types';
-import type { ExtendedJSONSchema } from '../types/schema';
-import { useNestedSchemaRegistry } from '../context/NestedSchemaContext';
-import { usePathPrefix, joinPath } from '../context/PathPrefixContext';
-import { extractSchemaDefaults, mergeDefaults } from '../utils/extractSchemaDefaults';
+import { forwardRef, useEffect, useRef, useCallback, useMemo } from "react";
+import { useFormContext } from "react-hook-form";
+import { Card } from "@blueprintjs/core";
+import { DynamicForm } from "../DynamicForm";
+import type { FieldWidgetProps } from "../types";
+import type { ExtendedJSONSchema } from "../types/schema";
+import { useNestedSchemaRegistry } from "../context/NestedSchemaContext";
+import { usePathPrefix, joinPath } from "../context/PathPrefixContext";
+import {
+  extractSchemaDefaults,
+  mergeDefaults,
+} from "../utils/extractSchemaDefaults";
 
 export interface NestedFormWidgetProps extends FieldWidgetProps {
   // 当前字段的 schema（包含 properties）
@@ -21,22 +24,31 @@ export interface NestedFormWidgetProps extends FieldWidgetProps {
   // 其他配置
   disabled?: boolean;
   readonly?: boolean;
-  layout?: 'vertical' | 'horizontal' | 'inline'; // 布局方式
+  layout?: "vertical" | "horizontal" | "inline"; // 布局方式
   labelWidth?: number | string; // 标签宽度
 
   // 是否不渲染 Card 容器（用于 ArrayFieldWidget 调用时避免双层 Card）
   noCard?: boolean;
 }
 
-export const NestedFormWidget = forwardRef<HTMLDivElement, NestedFormWidgetProps>(
-  ({ name, schema, disabled, readonly, layout, labelWidth, noCard = false }, ref) => {
+export const NestedFormWidget = forwardRef<
+  HTMLDivElement,
+  NestedFormWidgetProps
+>(
+  (
+    { name, schema, disabled, readonly, layout, labelWidth, noCard = false },
+    ref,
+  ) => {
     // 获取外层表单的 context，用于在动态 schema 变化时设置默认值
     const parentFormContext = useFormContext();
 
     // 获取父级路径前缀
     const parentPathPrefix = usePathPrefix();
     // ✅ 使用 useMemo 缓存完整路径，避免每次渲染都创建新字符串
-    const fullPath = useMemo(() => joinPath(parentPathPrefix, name), [parentPathPrefix, name]);
+    const fullPath = useMemo(
+      () => joinPath(parentPathPrefix, name),
+      [parentPathPrefix, name],
+    );
 
     // 获取嵌套 schema 注册表
     const nestedSchemaRegistry = useNestedSchemaRegistry();
@@ -79,8 +91,10 @@ export const NestedFormWidget = forwardRef<HTMLDivElement, NestedFormWidgetProps
       const mergedValue = mergeDefaults(newDefaults, currentValue);
 
       // 如果合并后的值与当前值不同，才更新表单
-      const hasChanges = Object.keys(newDefaults).some(key => {
-        return currentValue[key] === undefined && newDefaults[key] !== undefined;
+      const hasChanges = Object.keys(newDefaults).some((key) => {
+        return (
+          currentValue[key] === undefined && newDefaults[key] !== undefined
+        );
       });
 
       if (hasChanges) {
@@ -123,11 +137,7 @@ export const NestedFormWidget = forwardRef<HTMLDivElement, NestedFormWidgetProps
     if (useFlattenPath || noCard) {
       // 透明容器：无 Card、无 padding、无标题
       return (
-        <div
-          ref={ref}
-          className="nested-form-widget--flatten"
-          data-name={name}
-        >
+        <div ref={ref} className="nested-form-widget--flatten" data-name={name}>
           {formContent}
         </div>
       );
@@ -140,12 +150,12 @@ export const NestedFormWidget = forwardRef<HTMLDivElement, NestedFormWidgetProps
         className="nested-form-widget"
         data-name={name}
         elevation={1}
-        style={{ padding: '15px' }}
+        style={{ padding: "15px" }}
       >
         {formContent}
       </Card>
     );
-  }
+  },
 );
 
-NestedFormWidget.displayName = 'NestedFormWidget';
+NestedFormWidget.displayName = "NestedFormWidget";

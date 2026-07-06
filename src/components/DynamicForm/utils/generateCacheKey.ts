@@ -1,5 +1,5 @@
-import { toTemplatePath, toTemplatePathForCache } from './pathTransformer';
-import { PathResolver } from './pathResolver';
+import { toTemplatePath, toTemplatePathForCache } from "./pathTransformer";
+import { PathResolver } from "./pathResolver";
 
 /**
  * 生成联动缓存键
@@ -26,7 +26,7 @@ import { PathResolver } from './pathResolver';
 export function generateCacheKey(
   fieldName: string,
   dependencies: string[],
-  formData: Record<string, any>
+  formData: Record<string, any>,
 ): string {
   // 移除字段名中的数组索引，获取模板字段名
   // 例如：departments.0.employees.1.techStack -> departments.employees.techStack
@@ -36,7 +36,7 @@ export function generateCacheKey(
   const sortedDeps = [...dependencies].sort();
 
   // 构建依赖字段的名称-值映射
-  const depPairs = sortedDeps.map(dep => {
+  const depPairs = sortedDeps.map((dep) => {
     // 将 JSON Pointer 格式转换为字段路径格式
     // 例如：'#/properties/actionId' -> 'actionId'
     const fieldPath = PathResolver.toFieldPath(dep);
@@ -55,5 +55,5 @@ export function generateCacheKey(
   });
 
   // 组合成缓存键：模板字段名:依赖1=值1|依赖2=值2|...
-  return `${templateFieldName}:${depPairs.join('|')}`;
+  return `${templateFieldName}:${depPairs.join("|")}`;
 }

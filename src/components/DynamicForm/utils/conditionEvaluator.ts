@@ -1,5 +1,5 @@
-import type { ConditionExpression, ConditionOperator } from '../types/linkage';
-import { PathResolver } from './pathResolver';
+import type { ConditionExpression, ConditionOperator } from "../types/linkage";
+import { PathResolver } from "./pathResolver";
 
 /**
  * 条件表达式求值器
@@ -10,25 +10,25 @@ export class ConditionEvaluator {
    */
   static evaluate(
     condition: ConditionExpression,
-    formData: Record<string, any>
+    formData: Record<string, any>,
   ): boolean {
     // 处理逻辑组合 - and
-    if ('and' in condition && condition.and) {
-      return condition.and.every(c => this.evaluate(c, formData));
+    if ("and" in condition && condition.and) {
+      return condition.and.every((c) => this.evaluate(c, formData));
     }
 
     // 处理逻辑组合 - or
-    if ('or' in condition && condition.or) {
-      return condition.or.some(c => this.evaluate(c, formData));
+    if ("or" in condition && condition.or) {
+      return condition.or.some((c) => this.evaluate(c, formData));
     }
 
     // 单条件求值
-    if ('field' in condition) {
+    if ("field" in condition) {
       const fieldValue = this.getFieldValue(formData, condition.field);
       return this.evaluateOperator(
         fieldValue,
         condition.operator,
-        condition.value
+        condition.value,
       );
     }
 
@@ -40,7 +40,7 @@ export class ConditionEvaluator {
    */
   private static getFieldValue(
     formData: Record<string, any>,
-    fieldPath: string
+    fieldPath: string,
   ): any {
     // 使用 PathResolver 支持 JSON Pointer 格式
     return PathResolver.resolve(fieldPath, formData);
@@ -52,52 +52,54 @@ export class ConditionEvaluator {
   private static evaluateOperator(
     fieldValue: any,
     operator: ConditionOperator,
-    compareValue: any
+    compareValue: any,
   ): boolean {
     switch (operator) {
-      case '==':
+      case "==":
         return fieldValue === compareValue;
 
-      case '!=':
+      case "!=":
         return fieldValue !== compareValue;
 
-      case '>':
+      case ">":
         return fieldValue > compareValue;
 
-      case '<':
+      case "<":
         return fieldValue < compareValue;
 
-      case '>=':
+      case ">=":
         return fieldValue >= compareValue;
 
-      case '<=':
+      case "<=":
         return fieldValue <= compareValue;
 
-      case 'in':
+      case "in":
         return Array.isArray(compareValue) && compareValue.includes(fieldValue);
 
-      case 'notIn':
-        return Array.isArray(compareValue) && !compareValue.includes(fieldValue);
+      case "notIn":
+        return (
+          Array.isArray(compareValue) && !compareValue.includes(fieldValue)
+        );
 
-      case 'includes':
+      case "includes":
         return Array.isArray(fieldValue) && fieldValue.includes(compareValue);
 
-      case 'notIncludes':
+      case "notIncludes":
         return Array.isArray(fieldValue) && !fieldValue.includes(compareValue);
 
-      case 'isEmpty':
+      case "isEmpty":
         return (
           fieldValue === null ||
           fieldValue === undefined ||
-          fieldValue === '' ||
+          fieldValue === "" ||
           (Array.isArray(fieldValue) && fieldValue.length === 0)
         );
 
-      case 'isNotEmpty':
+      case "isNotEmpty":
         return (
           fieldValue !== null &&
           fieldValue !== undefined &&
-          fieldValue !== '' &&
+          fieldValue !== "" &&
           (!Array.isArray(fieldValue) || fieldValue.length > 0)
         );
 

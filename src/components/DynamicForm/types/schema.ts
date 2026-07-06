@@ -1,44 +1,44 @@
-import type { JSONSchema7 } from 'json-schema'
-import type { LinkageConfig } from './linkage'
+import type { JSONSchema7 } from "json-schema";
+import type { LinkageConfig } from "./linkage";
 
 // 重新导出联动相关类型，方便其他模块使用
-export type { LinkageConfig, ConditionExpression } from './linkage'
+export type { LinkageConfig, ConditionExpression } from "./linkage";
 
 /**
  * Widget 类型
  */
 export type WidgetType =
-  | 'text'
-  | 'textarea'
-  | 'password'
-  | 'email'
-  | 'url'
-  | 'number'
-  | 'select'
-  | 'radio'
-  | 'checkbox'
-  | 'checkboxes'
-  | 'switch'
-  | 'date'
-  | 'datetime'
-  | 'time'
-  | 'range'
-  | 'color'
-  | 'file'
-  | 'nested-form'
-  | 'array'
+  | "text"
+  | "textarea"
+  | "password"
+  | "email"
+  | "url"
+  | "number"
+  | "select"
+  | "radio"
+  | "checkbox"
+  | "checkboxes"
+  | "switch"
+  | "date"
+  | "datetime"
+  | "time"
+  | "range"
+  | "color"
+  | "file"
+  | "nested-form"
+  | "array";
 
 /**
  * 错误信息配置
  */
 export interface ErrorMessages {
-  required?: string
-  minLength?: string
-  maxLength?: string
-  min?: string
-  max?: string
-  pattern?: string
-  [key: string]: string | undefined
+  required?: string;
+  minLength?: string;
+  maxLength?: string;
+  min?: string;
+  max?: string;
+  pattern?: string;
+  [key: string]: string | undefined;
 }
 
 /**
@@ -60,58 +60,58 @@ export interface ErrorMessages {
  * ⚠️ 内联 script 仅适用于受信任的内部工具环境
  */
 export interface ScriptValidator {
-  type: 'script'
-  callback: string | { type: 'script'; code: string }
+  type: "script";
+  callback: string | { type: "script"; code: string };
 }
 
-export type ValidatorRule = ScriptValidator
+export type ValidatorRule = ScriptValidator;
 
 export interface UIConfig {
-  widget?: WidgetType | string
-  placeholder?: string
-  disabled?: boolean
-  readonly?: boolean
-  hidden?: boolean
-  help?: string
-  className?: string
-  style?: React.CSSProperties
-  order?: string[]
-  errorMessages?: ErrorMessages
-  linkages?: LinkageConfig[] // 联动配置（支持多个联动规则）
-  labelWidth?: number | string // 标签宽度（仅在 horizontal layout 下生效）
-  layout?: 'vertical' | 'horizontal' | 'inline' // 布局方式（优先级高于全局配置）
-  prefixLabel?: string // 字段标签前缀（由 flattenPrefix 场景写入）
+  widget?: WidgetType | string;
+  placeholder?: string;
+  disabled?: boolean;
+  readonly?: boolean;
+  hidden?: boolean;
+  help?: string;
+  className?: string;
+  style?: React.CSSProperties;
+  order?: string[];
+  errorMessages?: ErrorMessages;
+  linkages?: LinkageConfig[]; // 联动配置（支持多个联动规则）
+  labelWidth?: number | string; // 标签宽度（仅在 horizontal layout 下生效）
+  layout?: "vertical" | "horizontal" | "inline"; // 布局方式（优先级高于全局配置）
+  prefixLabel?: string; // 字段标签前缀（由 flattenPrefix 场景写入）
 
   // 多列布局
-  columnsCount?: number // object 类型字段的多列布局列数（默认 1）
-  colSpan?: number // 在多列布局下，该字段占用的列数（默认 1）
+  columnsCount?: number; // object 类型字段的多列布局列数（默认 1）
+  colSpan?: number; // 在多列布局下，该字段占用的列数（默认 1）
 
   // 字段透明化渲染配置
-  flattenPath?: boolean // 是否将嵌套对象的子字段提升到当前层级渲染
-  flattenPrefix?: boolean // 是否在字段标签前添加父级标题作为前缀
+  flattenPath?: boolean; // 是否将嵌套对象的子字段提升到当前层级渲染
+  flattenPrefix?: boolean; // 是否在字段标签前添加父级标题作为前缀
 
   // 数组特有配置
-  arrayMode?: 'dynamic' | 'static' // 渲染模式：dynamic 可增删，static 不可增删
-  showAddButton?: boolean // 是否显示添加按钮
-  showRemoveButton?: boolean // 是否显示删除按钮
-  showMoveButtons?: boolean // 是否显示移动按钮
-  enableDragSort?: boolean // 是否启用拖拽排序
-  addButtonText?: string // 添加按钮文本
-  removeButtonText?: string // 删除按钮文本
-  emptyText?: string // 空数组提示文本
-  itemLayout?: 'vertical' | 'horizontal' | 'inline' // 数组项布局
-  itemClassName?: string // 数组项自定义类名
-  itemStyle?: React.CSSProperties // 数组项自定义样式
-  autogenerate?: 'uuid'
+  arrayMode?: "dynamic" | "static"; // 渲染模式：dynamic 可增删，static 不可增删
+  showAddButton?: boolean; // 是否显示添加按钮
+  showRemoveButton?: boolean; // 是否显示删除按钮
+  showMoveButtons?: boolean; // 是否显示移动按钮
+  enableDragSort?: boolean; // 是否启用拖拽排序
+  addButtonText?: string; // 添加按钮文本
+  removeButtonText?: string; // 删除按钮文本
+  emptyText?: string; // 空数组提示文本
+  itemLayout?: "vertical" | "horizontal" | "inline"; // 数组项布局
+  itemClassName?: string; // 数组项自定义类名
+  itemStyle?: React.CSSProperties; // 数组项自定义样式
+  autogenerate?: "uuid";
 
   // 自定义 widget 额外参数，会被直接展开传递给 widget 组件
-  widgetProps?: Record<string, any>
+  widgetProps?: Record<string, any>;
 
   // Widget 回调函数引用（key=prop名，value=函数名，运行时从 DynamicForm.callbacks 注册表解析）
-  callbackProps?: Record<string, string>
+  callbackProps?: Record<string, string>;
 
   // 字段级自定义校验规则（由 SchemaBuilder 用户配置，运行时执行）
-  validators?: ValidatorRule[]
+  validators?: ValidatorRule[];
 
   /**
    * 字段值转换配置
@@ -125,63 +125,63 @@ export interface UIConfig {
    */
   transform?: {
     // 可以是 callbacks 注册表中的函数名（string），也可以是内联 JS 函数体（ScriptTransform）
-    callback: string | { type: 'script'; code: string }
-    reverseCallback?: string | { type: 'script'; code: string }
-  }
+    callback: string | { type: "script"; code: string };
+    reverseCallback?: string | { type: "script"; code: string };
+  };
 }
 
 /**
  * 扩展的 JSON Schema 类型
  */
 export interface ExtendedJSONSchema extends JSONSchema7 {
-  ui?: UIConfig
-  enumNames?: string[]
-  dependencies?: Record<string, any>
-  properties?: Record<string, ExtendedJSONSchema>
-  items?: ExtendedJSONSchema | ExtendedJSONSchema[]
+  ui?: UIConfig;
+  enumNames?: string[];
+  dependencies?: Record<string, any>;
+  properties?: Record<string, ExtendedJSONSchema>;
+  items?: ExtendedJSONSchema | ExtendedJSONSchema[];
 }
 
 /**
  * 字段选项
  */
 export interface FieldOption {
-  label: string
-  value: any
-  disabled?: boolean
+  label: string;
+  value: any;
+  disabled?: boolean;
 }
 
 /**
  * 验证规则
  */
 export interface ValidationRules {
-  required?: string | boolean
-  minLength?: { value: number; message: string }
-  maxLength?: { value: number; message: string }
-  min?: { value: number; message: string }
-  max?: { value: number; message: string }
-  pattern?: { value: RegExp; message: string }
-  validate?: Record<string, (value: any) => boolean | string>
+  required?: string | boolean;
+  minLength?: { value: number; message: string };
+  maxLength?: { value: number; message: string };
+  min?: { value: number; message: string };
+  max?: { value: number; message: string };
+  pattern?: { value: RegExp; message: string };
+  validate?: Record<string, (value: any) => boolean | string>;
 }
 
 /**
  * 字段配置
  */
 export interface FieldConfig {
-  name: string
-  type: string
-  widget: string
-  label?: string
-  placeholder?: string
-  description?: string
-  defaultValue?: any
-  required?: boolean
-  disabled?: boolean
-  readonly?: boolean
-  hidden?: boolean
-  validation?: ValidationRules
-  options?: FieldOption[]
-  dependencies?: any
-  schema?: ExtendedJSONSchema
+  name: string;
+  type: string;
+  widget: string;
+  label?: string;
+  placeholder?: string;
+  description?: string;
+  defaultValue?: any;
+  required?: boolean;
+  disabled?: boolean;
+  readonly?: boolean;
+  hidden?: boolean;
+  validation?: ValidationRules;
+  options?: FieldOption[];
+  dependencies?: any;
+  schema?: ExtendedJSONSchema;
 }
 
 // const schema: ExtendedJSONSchema = {
