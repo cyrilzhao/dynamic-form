@@ -1,10 +1,5 @@
 import React, { useState } from 'react'
-import {
-  Button,
-  FormGroup,
-  InputGroup,
-  Callout,
-} from '@blueprintjs/core'
+import { Button, FormGroup, InputGroup, Callout } from '@blueprintjs/core'
 import { Select } from '../../../../Select'
 import { CodeEditor } from '../../../../CodeEditor'
 import type { UIConfig } from '../../../../DynamicForm/types/schema'
@@ -44,13 +39,17 @@ function TransformFnEditor({
     <div style={{ marginBottom: 12 }}>
       <FormGroup label={label} style={{ marginBottom: 4 }}>
         <Select
+          style={{
+            marginTop: '10px',
+          }}
           value={mode}
-          onChange={(value) =>
-            handleModeChange(value as 'callback' | 'script')
-          }
+          onChange={(value) => handleModeChange(value as 'callback' | 'script')}
           disabled={disabled}
           options={[
-            { label: 'Callback name (from callbacks registry)', value: 'callback' },
+            {
+              label: 'Callback name (from callbacks registry)',
+              value: 'callback',
+            },
             { label: 'Inline JS script', value: 'script' },
           ]}
         />

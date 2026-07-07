@@ -243,7 +243,7 @@ export const PropertyEditor: React.FC = () => {
   const [keyInput, setKeyInput] = useState(currentKey || '')
   const [keyError, setKeyError] = useState('')
 
-  const { control, register, handleSubmit, reset, watch, setValue } = useForm({
+  const { control, reset, watch, setValue } = useForm({
     defaultValues: createEditorFormDefaults({ currentKey, currentNode }),
     mode: 'onBlur',
   })
