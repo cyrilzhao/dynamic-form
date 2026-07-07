@@ -46,46 +46,6 @@ export const FieldPathSelector: React.FC<FieldPathSelectorProps> = ({
   const [pathType, setPathType] = useState<'absolute' | 'relative'>('absolute');
   const treeContainerRef = useRef<HTMLDivElement>(null);
 
-  // 根据路径获取字段的 title
-  const getFieldTitleFromPath = (path: string, rootSchema: ExtendedJSONSchema): string => {
-    if (!path || !rootSchema) return path;
-
-    // 相对路径直接返回
-    if (path.startsWith('./')) {
-      const fieldName = path.substring(2);
-      return fieldName;
-    }
-
-    // 解析绝对路径
-    if (!path.startsWith('#/')) return path;
-
-    const pathSegments = path.replace(/^#\//, '').split('/');
-    let currentSchema: ExtendedJSONSchema = rootSchema;
-    let fieldName = '';
-
-    for (let i = 0; i < pathSegments.length; i++) {
-      const segment = pathSegments[i];
-
-      if (segment === 'properties') {
-        // 下一个段是字段名
-        fieldName = pathSegments[i + 1];
-        if (!fieldName || !currentSchema.properties) break;
-
-        const fieldSchema = currentSchema.properties[fieldName];
-        if (!fieldSchema || typeof fieldSchema === 'boolean') break;
-
-        currentSchema = fieldSchema as ExtendedJSONSchema;
-        i++; // 跳过字段名
-      } else if (segment === 'items') {
-        // 进入数组的 items
-        if (!currentSchema.items || typeof currentSchema.items === 'boolean') break;
-        currentSchema = currentSchema.items as ExtendedJSONSchema;
-      }
-    }
-
-    // 返回 title 或字段名
-    return currentSchema.title || fieldName || path;
-  };
 
   // 格式化显示值：Address.City 或 Users[].Name
   const getDisplayValue = (path: string): string => {
