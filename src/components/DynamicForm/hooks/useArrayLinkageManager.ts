@@ -10,6 +10,7 @@ import {
 } from "../utils/arrayLinkageHelper";
 import { DependencyGraph } from "../utils/dependencyGraph";
 import { PathResolver } from "../utils/pathResolver";
+import type { LinkageOperationController } from "../utils/linkageOperationController";
 
 interface ArrayLinkageManagerOptions {
   form: UseFormReturn<any>;
@@ -20,6 +21,8 @@ interface ArrayLinkageManagerOptions {
   onCycleDetected?: (cycle: string[]) => void;
   /** 是否在检测到循环依赖时抛出错误（默认 false） */
   throwOnCycle?: boolean;
+  /** 共享联动事务控制器 */
+  operationController?: LinkageOperationController;
 }
 
 /**
@@ -40,6 +43,7 @@ export function useArrayLinkageManager({
   schema,
   onCycleDetected,
   throwOnCycle = false,
+  operationController,
 }: ArrayLinkageManagerOptions) {
   const { watch, getValues } = form;
 
@@ -190,6 +194,7 @@ export function useArrayLinkageManager({
     form,
     linkages: allLinkages,
     linkageFunctions,
+    operationController,
   });
 
   // 监听 allLinkages 变化，自动触发联动刷新
@@ -264,5 +269,13 @@ export function useArrayLinkageManager({
     await new Promise((resolve) => setTimeout(resolve, 0));
   }, [generateDynamicLinkages]);
 
-  return { linkageStates, refresh, setValueWithoutLinkage };
+  return {
+    linkageStates,
+    refresh,
+    setValueWithoutLinkage,
+    // 向父级 Context 暴露实际生效的联动配置，而不是只暴露 baseLinkages。
+    // 原因：数组元素联动会根据当前数组长度展开成 contacts.0.xxx 这样的动态 key；
+    // 嵌套 DynamicForm 需要这些真实 key 来过滤自己重复接管的联动，否则父子状态会互相覆盖。
+    activeLinkages: allLinkages,
+  };
 }

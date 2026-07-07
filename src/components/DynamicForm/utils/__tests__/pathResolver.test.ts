@@ -31,6 +31,16 @@ describe("PathResolver", () => {
       expect(result).toBe("Alice");
     });
 
+    it("应该解析数组元素中的嵌套字段", () => {
+      const formData = {
+        contacts: [{ name: "Alice", type: "personal" }],
+      };
+
+      const result = PathResolver.resolve("contacts.0.type", formData);
+
+      expect(result).toBe("personal");
+    });
+
     it("应该处理不存在的字段", () => {
       const formData = { age: 18 };
       const result = PathResolver.resolve("name", formData);
@@ -206,6 +216,42 @@ describe("PathResolver", () => {
         "#/properties/properties/properties",
       );
       expect(result).toBe("properties");
+    });
+  });
+
+  describe("setNestedValue - 设置嵌套字段", () => {
+    it("应该设置对象中的嵌套字段", () => {
+      const formData = { user: { name: "Alice" } };
+
+      PathResolver.setNestedValue(formData, "user.age", 18);
+
+      expect(formData).toEqual({
+        user: { name: "Alice", age: 18 },
+      });
+    });
+
+    it("应该设置数组元素中的嵌套字段", () => {
+      const formData = {
+        contacts: [{ name: "Alice", type: "personal" }],
+      };
+
+      PathResolver.setNestedValue(formData, "contacts.0.showCompany", false);
+
+      expect(formData.contacts[0]).toEqual({
+        name: "Alice",
+        type: "personal",
+        showCompany: false,
+      });
+    });
+
+    it("应该在路径不存在时创建中间结构", () => {
+      const formData = {};
+
+      PathResolver.setNestedValue(formData, "items.0.enabled", true);
+
+      expect(formData).toEqual({
+        items: [{ enabled: true }],
+      });
     });
   });
 

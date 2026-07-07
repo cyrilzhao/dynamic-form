@@ -3,6 +3,22 @@ import { useForm } from "react-hook-form";
 import { useLinkageManager } from "../useLinkageManager";
 import type { LinkageConfig } from "../../types/linkage";
 
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 // Helper to create a mock form
 function createMockForm(defaultValues: Record<string, any> = {}) {
   const { result } = renderHook(() => useForm({ defaultValues }));
@@ -1083,6 +1099,55 @@ describe("useLinkageManager", () => {
   });
 
   describe("异步竞态条件", () => {
+    it("refreshLinkage 异步计算期间表单变更时，旧快照结果不应该提交", async () => {
+      const deferred = createDeferred<number>();
+      const linkages: Record<string, LinkageConfig[]> = {
+        output: [
+          {
+            type: "value",
+            dependencies: ["trigger"],
+            fulfill: { function: "slowCalculate" },
+          },
+        ],
+      };
+
+      const linkageFunctions = {
+        slowCalculate: jest.fn((formData: Record<string, unknown>) => {
+          const trigger = Number(formData.trigger ?? 0);
+          return deferred.promise.then(() => trigger * 10);
+        }),
+      };
+
+      let formRef: any;
+      const { result } = renderHook(() => {
+        const form = useForm({
+          defaultValues: { trigger: 1, output: 0 },
+        });
+        formRef = form;
+        return useLinkageManager({ form, linkages, linkageFunctions });
+      });
+
+      const refreshPromise = result.current.refreshLinkage();
+
+      await waitFor(() => {
+        expect(linkageFunctions.slowCalculate).toHaveBeenCalledTimes(1);
+      });
+
+      await act(async () => {
+        formRef.setValue("trigger", 2);
+      });
+
+      await act(async () => {
+        deferred.resolve(0);
+        await refreshPromise;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(formRef.getValues("trigger")).toBe(2);
+      expect(formRef.getValues("output")).not.toBe(10);
+      expect(result.current.linkageStates.output?.value).not.toBe(10);
+    });
+
     it("应该处理快速连续的异步请求", async () => {
       let callCount = 0;
       const linkages: Record<string, LinkageConfig[]> = {

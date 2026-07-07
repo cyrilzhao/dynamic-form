@@ -1,4 +1,11 @@
-import { useMemo, useEffect, useState, useRef, useCallback } from "react";
+import {
+  useMemo,
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useLayoutEffect,
+} from "react";
 import type { UseFormReturn } from "react-hook-form";
 import type {
   LinkageConfig,
@@ -13,9 +20,14 @@ import { PathResolver } from "../utils/pathResolver";
 import { LinkageTaskQueue } from "../utils/linkageTaskQueue";
 import { LinkageResultCache } from "../utils/linkageResultCache";
 import { generateCacheKey } from "../utils/generateCacheKey";
+import {
+  LinkageOperationController,
+  type LinkageRunToken,
+} from "../utils/linkageOperationController";
 
 // 用于执行动态脚本
 const DynamicFn = globalThis["Function"] as FunctionConstructor; // trusted-dynamic-code
+let linkageManagerScopeCounter = 0;
 
 /**
  * 异步结果过期错误
@@ -123,10 +135,47 @@ function extractArrayContext(fieldPath: string): {
   return {};
 }
 
+function isSameValue(prev: unknown, next: unknown): boolean {
+  if (Object.is(prev, next)) {
+    return true;
+  }
+
+  if (
+    prev &&
+    next &&
+    typeof prev === "object" &&
+    typeof next === "object"
+  ) {
+    try {
+      return JSON.stringify(prev) === JSON.stringify(next);
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * 克隆表单快照。
+ *
+ * React Hook Form 的 watch 回调可能复用并原地修改同一个数据对象。
+ * 如果 latestFormDataRef 直接保存这个对象引用，后续字段变化会把“上一份快照”也一起改掉，
+ * 导致 previousValue 和 nextValue 总是相同，进而漏掉 contacts.0.type 这类数组内字段变化。
+ */
+function cloneFormData(data: Record<string, any>): Record<string, any> {
+  if (typeof structuredClone === "function") {
+    return structuredClone(data);
+  }
+
+  return JSON.parse(JSON.stringify(data));
+}
+
 interface LinkageManagerOptions {
   form: UseFormReturn<any>;
   linkages: Record<string, LinkageConfig[]>; // v3.1: 支持多联动类型
   linkageFunctions?: Record<string, LinkageFunction>;
+  operationController?: LinkageOperationController;
 }
 
 /**
@@ -138,8 +187,16 @@ export function useLinkageManager({
   form,
   linkages,
   linkageFunctions = {},
+  operationController,
 }: LinkageManagerOptions) {
   const { watch, getValues, setValue } = form;
+
+  const ownOperationControllerRef = useRef(new LinkageOperationController());
+  const controller = operationController ?? ownOperationControllerRef.current;
+  const scopeIdRef = useRef(
+    `linkage-manager-${++linkageManagerScopeCounter}`,
+  );
+  const scopeId = scopeIdRef.current;
 
   // 创建异步序列号管理器实例（使用 useRef 保持引用稳定）
   const asyncSequenceManager = useRef(new AsyncSequenceManager()).current;
@@ -175,6 +232,27 @@ export function useLinkageManager({
     return graph;
   }, [linkages]);
 
+  const previousLinkagesRef = useRef(linkages);
+  const previousLinkageFunctionsRef = useRef(linkageFunctions);
+  // 同步联动配置/函数版本。
+  // token 不只保护表单值，也保护“用哪一版规则计算”：
+  // linkages 变化意味着依赖图和效果定义变了，linkageFunctions 变化意味着业务计算函数变了，
+  // 旧异步结果即使基于相同表单值，也不能再提交。
+  const syncOperationVersions = useCallback(() => {
+    if (previousLinkagesRef.current !== linkages) {
+      controller.markLinkagesChanged(scopeId);
+      previousLinkagesRef.current = linkages;
+    }
+    if (previousLinkageFunctionsRef.current !== linkageFunctions) {
+      controller.markLinkageFunctionsChanged(scopeId);
+      previousLinkageFunctionsRef.current = linkageFunctions;
+    }
+  }, [linkages, linkageFunctions, controller, scopeId]);
+
+  useLayoutEffect(() => {
+    syncOperationVersions();
+  }, [syncOperationVersions]);
+
   // 联动状态缓存（使用 useState 而不是 useMemo，以便在 useEffect 中更新）
   const [linkageStates, setLinkageStates] = useState<
     Record<string, LinkageResult>
@@ -190,89 +268,106 @@ export function useLinkageManager({
       states,
       updatedFormData,
       preMarkFields = false,
+      token,
     }: {
       fields: string[];
       states: Record<string, LinkageResult>;
       updatedFormData: Record<string, any>;
       preMarkFields?: boolean;
+      token?: LinkageRunToken;
     }) => {
-      taskQueue.setUpdatingForm(true);
-
-      // 预先标记字段：processQueue 场景中，setValue 会触发 watch，
-      // watch 会再次检查这些字段是否需要联动。预先标记可防止自己触发自己，避免无限级联。
-      // refreshLinkage 场景无需预标记，因为它是主动刷新，不存在触发自身的问题。
-      if (preMarkFields) {
-        fields.forEach((fieldName) => taskQueue.markFieldUpdating(fieldName));
+      if (token && !controller.canCommit(token)) {
+        return { committed: false };
       }
 
-      // 批量更新表单值（先更新值，再更新状态，避免时序问题）
-      fields.forEach((fieldName) => {
-        const linkageArray = linkages[fieldName];
-        const hasValueLinkage = linkageArray?.some(
-          (linkage) => linkage.type === "value",
-        );
-        if (hasValueLinkage && updatedFormData[fieldName] !== undefined) {
-          const currentValue = getValues(fieldName);
-          if (currentValue !== updatedFormData[fieldName]) {
-            if (!preMarkFields) {
-              taskQueue.markFieldUpdating(fieldName);
-            }
-            setValue(fieldName, updatedFormData[fieldName], {
-              shouldValidate: false,
-              shouldDirty: false,
-            });
-          }
+      taskQueue.setUpdatingForm(true);
+
+      try {
+        // 预先标记字段：processQueue 场景中，setValue 会触发 watch，
+        // watch 会再次检查这些字段是否需要联动。预先标记可防止自己触发自己，避免无限级联。
+        // refreshLinkage 场景无需预标记，因为它是主动刷新，不存在触发自身的问题。
+        if (preMarkFields) {
+          fields.forEach((fieldName) => taskQueue.markFieldUpdating(fieldName));
         }
 
-        // 处理 options 联动：当 options 更新后，原有值可能已不在新选项列表中。
-        // 若不清空，表单会包含非法值（UI 显示为空但 getValues() 返回旧值），导致提交数据错误。
-        // 对多选（数组）要求每个元素都合法；对单选直接检查。
-        const hasOptionsLinkage = linkageArray?.some(
-          (linkage) => linkage.type === "options",
-        );
-        if (hasOptionsLinkage && states[fieldName]?.options) {
-          const newOptions = states[fieldName].options;
-          const currentValue = getValues(fieldName);
-
-          // 检查当前值是否在新 options 中
-          if (
-            currentValue !== undefined &&
-            currentValue !== null &&
-            currentValue !== ""
-          ) {
-            const optionValues = newOptions.map((opt: any) => opt.value);
-            const isValidValue = Array.isArray(currentValue)
-              ? currentValue.every((v) => optionValues.includes(v))
-              : optionValues.includes(currentValue);
-
-            // 如果当前值不在新 options 中，清空该值
-            if (!isValidValue) {
+        // 批量更新表单值（先更新值，再更新状态，避免时序问题）
+        fields.forEach((fieldName) => {
+          const linkageArray = linkages[fieldName];
+          const hasValueLinkage = linkageArray?.some(
+            (linkage) => linkage.type === "value",
+          );
+          const nextValue = PathResolver.getNestedValue(
+            updatedFormData,
+            fieldName,
+          );
+          // value 联动的目标可能是数组元素路径（如 features.0.enabled）。
+          // 这里必须从嵌套快照读取，而不是只读 updatedFormData[fieldName]：
+          // 拓扑计算会同时维护嵌套结构，后续联动函数和 RHF setValue 都依赖该标准路径形态。
+          if (hasValueLinkage && nextValue !== undefined) {
+            const currentValue = getValues(fieldName);
+            if (currentValue !== nextValue) {
               if (!preMarkFields) {
                 taskQueue.markFieldUpdating(fieldName);
               }
-              setValue(
-                fieldName,
-                Array.isArray(currentValue) ? [] : undefined,
-                {
-                  shouldValidate: false,
-                  shouldDirty: false,
-                },
-              );
+              setValue(fieldName, nextValue, {
+                shouldValidate: false,
+                shouldDirty: false,
+              });
             }
           }
+
+          // 处理 options 联动：当 options 更新后，原有值可能已不在新选项列表中。
+          // 若不清空，表单会包含非法值（UI 显示为空但 getValues() 返回旧值），导致提交数据错误。
+          // 对多选（数组）要求每个元素都合法；对单选直接检查。
+          const hasOptionsLinkage = linkageArray?.some(
+            (linkage) => linkage.type === "options",
+          );
+          if (hasOptionsLinkage && states[fieldName]?.options) {
+            const newOptions = states[fieldName].options;
+            const currentValue = getValues(fieldName);
+
+            // 检查当前值是否在新 options 中
+            if (
+              currentValue !== undefined &&
+              currentValue !== null &&
+              currentValue !== ""
+            ) {
+              const optionValues = newOptions.map((opt: any) => opt.value);
+              const isValidValue = Array.isArray(currentValue)
+                ? currentValue.every((v) => optionValues.includes(v))
+                : optionValues.includes(currentValue);
+
+              // 如果当前值不在新 options 中，清空该值
+              if (!isValidValue) {
+                if (!preMarkFields) {
+                  taskQueue.markFieldUpdating(fieldName);
+                }
+                setValue(
+                  fieldName,
+                  Array.isArray(currentValue) ? [] : undefined,
+                  {
+                    shouldValidate: false,
+                    shouldDirty: false,
+                  },
+                );
+              }
+            }
+          }
+        });
+
+        // 更新联动状态（在更新表单值之后，确保值和状态同步）
+        if (Object.keys(states).length > 0) {
+          setLinkageStates((prev) => ({ ...prev, ...states }));
         }
-      });
 
-      // 更新联动状态（在更新表单值之后，确保值和状态同步）
-      if (Object.keys(states).length > 0) {
-        setLinkageStates((prev) => ({ ...prev, ...states }));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        return { committed: true };
+      } finally {
+        taskQueue.clearUpdatingFields();
+        taskQueue.setUpdatingForm(false);
       }
-
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      taskQueue.clearUpdatingFields();
-      taskQueue.setUpdatingForm(false);
     },
-    [linkages, getValues, setValue, taskQueue, setLinkageStates],
+    [linkages, getValues, setValue, taskQueue, setLinkageStates, controller],
   );
 
   // ✅ 运行时依赖 ref：每次 render 阶段同步更新
@@ -336,6 +431,16 @@ export function useLinkageManager({
           continue;
         }
 
+        let taskToken = task.token;
+        if (taskToken && !controller.canCommit(taskToken)) {
+          // 任务还没有开始计算时，如果 token 已经过期，不直接丢弃任务。
+          // 典型场景是初始化阶段连续 setValue：第一个依赖字段创建了任务，
+          // 后续字段写入提升了 formMutationVersion，但后续字段本身未必是依赖源。
+          // 此时重新签发 token，表示“用最新快照执行这个尚未消费的必要任务”；
+          // 已经开始计算的旧异步结果仍会在 applyLinkageResults 被提交校验拦截。
+          taskToken = controller.createRun(scopeId);
+        }
+
         // 使用最新的表单数据（优先使用 latestFormDataRef，解决 setValues 批量更新时的时序问题）
         // ✅ 从 runtimeRef 读取最新运行时依赖，避免闭包陈旧
         const {
@@ -348,8 +453,8 @@ export function useLinkageManager({
 
         const formData =
           Object.keys(latestFormDataRef.current).length > 0
-            ? { ...latestFormDataRef.current }
-            : { ...currentGetValues() };
+            ? cloneFormData(latestFormDataRef.current)
+            : cloneFormData(currentGetValues());
 
         // ✅ 优化：直接使用任务中的 affectedFields，避免重复调用 getAffectedFields
         const affectedFields = task.affectedFields;
@@ -373,6 +478,7 @@ export function useLinkageManager({
           states: newStates,
           updatedFormData,
           preMarkFields: true, // processQueue 需要预先标记，防止级联触发
+          token: taskToken,
         });
       }
     } finally {
@@ -387,7 +493,9 @@ export function useLinkageManager({
   }).current;
 
   // 保存最新的 formData（用于解决 setValues 批量更新时的时序问题）
-  const latestFormDataRef = useRef<Record<string, any>>({});
+  const latestFormDataRef = useRef<Record<string, any>>(
+    cloneFormData(getValues()),
+  );
   // 延迟执行 processQueue 的定时器（用于批量更新场景）
   const processQueueTimerRef = useRef<number | null>(null);
   // 跳过联动处理的标志（用于外部直接赋值时不触发联动）
@@ -410,8 +518,33 @@ export function useLinkageManager({
         return;
       }
 
-      // 保存最新的 formData（解决 setValues 批量更新时的时序问题）
-      latestFormDataRef.current = formData as Record<string, any>;
+      const nextFormData = formData as Record<string, any>;
+      const previousValue = PathResolver.getNestedValue(
+        latestFormDataRef.current,
+        name,
+      );
+      const nextValue = PathResolver.getNestedValue(nextFormData, name);
+
+      // React Hook Form 在字段注册/校验时也可能触发 watch。
+      // 只有字段值实际变化时才认为表单版本变化，避免初始化 refresh 被注册事件误判为过期。
+      if (isSameValue(previousValue, nextValue)) {
+        // 即使值没有变化，也要刷新快照引用。
+        // RHF 注册/校验可能触发无值变化 watch；保存克隆后的最新快照可以避免后续比较基于过旧数据。
+        latestFormDataRef.current = cloneFormData(nextFormData);
+        return;
+      }
+
+      // 保存最新的 formData（解决 setValues 批量更新时的时序问题）。
+      // 必须保存克隆值，不能保存 RHF 传入对象引用，否则下一次原地修改会污染 previousValue。
+      latestFormDataRef.current = cloneFormData(nextFormData);
+      controller.markFormMutation();
+
+      if (controller.isBatching()) {
+        // setValues 会递归写入多个字段，期间 watch 看到的是中间态。
+        // 批处理中只记录“需要刷新联动”，等批量写入结束后统一基于最终快照刷新一次。
+        controller.markPendingLinkage();
+        return;
+      }
 
       // ✅ 精确监听优化：检查该字段及其所有祖先路径是否被任何联动依赖
       // 支持跨数组边界的依赖：当数组元素内部字段（如 items.0.price）变化时，
@@ -447,7 +580,9 @@ export function useLinkageManager({
       }
 
       // 将任务加入队列
-      taskQueue.enqueue(name, affectedFields);
+      syncOperationVersions();
+      const token = controller.createRun(scopeId);
+      taskQueue.enqueue(name, affectedFields, token);
 
       // 如果队列正在处理中，不重复触发（队列会自动继续处理）
       if (taskQueue.getProcessing()) {
@@ -495,27 +630,49 @@ export function useLinkageManager({
       // 设置刷新标志，阻止 processQueue 执行
       taskQueue.setRefreshing(true);
 
-      const formData = { ...getValues() };
-      const allFields = Object.keys(linkages);
+      // 先让已排队的 watch 回调完成，再创建本轮 token。
+      // 否则初始化 setValue 产生的延迟 watch 可能在 token 创建后才 enqueue，
+      // 用旧事件创建的新 run 误杀当前 refresh。
+      // 这一步只等待当前事件循环中已存在的 watch，不会放宽提交保护：
+      // 如果等待之后又发生新的真实表单变化，formMutationVersion 仍会让当前 token 失效。
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
+      syncOperationVersions();
+      const token = controller.createRun(scopeId);
+
+      const {
+        linkages: currentLinkages,
+        linkageFunctions: currentLinkageFunctions,
+        dependencyGraph: currentDependencyGraph,
+        getValues: currentGetValues,
+        applyLinkageResults: currentApplyLinkageResults,
+      } = runtimeRef.current;
+
+      const formData = cloneFormData(currentGetValues());
+      latestFormDataRef.current = cloneFormData(formData);
+      if (!controller.canCommit(token)) {
+        return;
+      }
+
+      const allFields = Object.keys(currentLinkages);
       const { states, updatedFormData } = await evaluateLinkagesByLayers({
         fields: allFields,
-        linkages,
+        linkages: currentLinkages,
         formData,
-        linkageFunctions,
+        linkageFunctions: currentLinkageFunctions,
         asyncSequenceManager,
-        dependencyGraph,
+        dependencyGraph: currentDependencyGraph,
         cache,
         skipSequenceCheck: true,
         _caller: "refreshLinkage",
       });
-
       // 使用公共函数应用联动结果
-      await applyLinkageResults({
+      await currentApplyLinkageResults({
         fields: allFields,
         states,
         updatedFormData,
         preMarkFields: false, // refreshLinkage 不需要预先标记
+        token,
       });
     } catch (error) {
       console.error("[useLinkageManager] Error in refreshLinkage:", error);
@@ -532,6 +689,9 @@ export function useLinkageManager({
     asyncSequenceManager,
     cache,
     applyLinkageResults,
+    controller,
+    scopeId,
+    syncOperationVersions,
   ]);
 
   /**
@@ -718,9 +878,17 @@ async function evaluateLinkagesByLayers({
         if (result) {
           states[fieldName] = result;
 
-          // 如果是值联动，更新 formData 以供后续层使用
+          // 如果是值联动，更新 formData 以供后续层使用。
+          // 同时写扁平 key 和嵌套结构：
+          // - 扁平 key 兼容历史逻辑和直接字段查找；
+          // - 嵌套结构保证 contacts.0.showCompany 这类中间值能被后续条件和函数按标准路径读到。
           if (result.value !== undefined) {
             updatedFormData[fieldName] = result.value;
+            PathResolver.setNestedValue(
+              updatedFormData,
+              fieldName,
+              result.value,
+            );
           }
         }
       }

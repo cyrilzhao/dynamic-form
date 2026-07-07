@@ -1,3 +1,5 @@
+import type { LinkageRunToken } from "./linkageOperationController";
+
 /**
  * 联动任务
  */
@@ -5,6 +7,13 @@ export interface LinkageTask {
   fieldName: string;
   timestamp: number;
   affectedFields: string[];
+  /**
+   * 创建任务时捕获的联动运行令牌。
+   *
+   * 队列里的任务可能晚于新的 setValues/refreshLinkage 执行；
+   * token 让 processQueue 能在计算前识别过期任务，并让 applyLinkageResults 在提交前做最终拦截。
+   */
+  token?: LinkageRunToken;
 }
 
 /**
@@ -22,8 +31,15 @@ export class LinkageTaskQueue {
   /**
    * 将字段任务加入队列
    * 如果队列中已有相同字段的任务，更新其 timestamp 和 affectedFields（任务合并）
+   *
+   * token 会跟随任务一起更新。这样同一字段的连续变化只保留最新任务，
+   * 旧异步计算即使完成，也不能用旧 token 覆盖新值。
    */
-  enqueue(fieldName: string, affectedFields: string[]): void {
+  enqueue(
+    fieldName: string,
+    affectedFields: string[],
+    token?: LinkageRunToken,
+  ): void {
     const timestamp = Date.now();
     const existingIndex = this.queue.findIndex(
       (t) => t.fieldName === fieldName,
@@ -33,9 +49,10 @@ export class LinkageTaskQueue {
       // 队列中已有该字段的任务，更新 timestamp 和 affectedFields
       this.queue[existingIndex].timestamp = timestamp;
       this.queue[existingIndex].affectedFields = affectedFields;
+      this.queue[existingIndex].token = token;
     } else {
       // 队列中没有该字段的任务，添加新任务
-      this.queue.push({ fieldName, timestamp, affectedFields });
+      this.queue.push({ fieldName, timestamp, affectedFields, token });
     }
 
     // 记录该字段的最新 timestamp

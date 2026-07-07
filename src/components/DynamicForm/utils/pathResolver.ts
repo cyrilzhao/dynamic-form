@@ -143,6 +143,45 @@ export class PathResolver {
   }
 
   /**
+   * 设置嵌套对象的值（支持点号路径）
+   *
+   * 与 getNestedValue 的直接 key 兼容不同，这里始终按嵌套结构写入，
+   * 用于让联动计算的中间快照保持和 RHF 表单数据一致的结构。
+   */
+  static setNestedValue(
+    obj: Record<string, any>,
+    path: string,
+    value: any,
+  ): void {
+    if (!obj || !path) {
+      return;
+    }
+
+    const keys = path.split(".");
+    let current: any = obj;
+
+    keys.forEach((key, index) => {
+      const isLast = index === keys.length - 1;
+      if (isLast) {
+        current[key] = value;
+        return;
+      }
+
+      const nextKey = keys[index + 1];
+      // 下一个路径片段是数字时创建数组，否则创建普通对象。
+      // 这让 items.0.enabled 这类路径能生成 { items: [{ enabled: true }] }，
+      // 与 React Hook Form 和联动函数读取的嵌套数据结构保持一致。
+      const shouldCreateArray = !Number.isNaN(Number(nextKey));
+
+      if (current[key] === null || current[key] === undefined) {
+        current[key] = shouldCreateArray ? [] : {};
+      }
+
+      current = current[key];
+    });
+  }
+
+  /**
    * 解码 JSON Pointer 转义字符
    * 根据 RFC 6901 规范：
    * - ~1 表示 /

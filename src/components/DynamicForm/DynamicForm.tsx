@@ -46,6 +46,7 @@ import {
 import { createSchemaResolver } from "./utils/createSchemaResolver";
 import { resolveTransformFn } from "./utils/resolveTransformFn";
 import { mergeSchemaWithLinkage } from "./utils/mergeSchemaWithLinkage";
+import { LinkageOperationController } from "./utils/linkageOperationController";
 import "@blueprintjs/core/lib/css/blueprint.css";
 
 // 空对象常量，避免每次渲染创建新对象
@@ -474,6 +475,16 @@ const DynamicFormInner = React.memo(
       const methods =
         asNestedForm && parentFormContext ? parentFormContext : ownMethods;
 
+      const ownOperationControllerRef = useRef(
+        new LinkageOperationController(),
+      );
+      // 根表单创建控制器，嵌套表单复用 Context 中的控制器。
+      // 这样外部 ref.setValues/reset、父级数组联动和子级 DynamicForm 的异步联动
+      // 都使用同一套表单版本号；否则不同层级各自判断“最新”，旧结果仍可能跨层覆盖新值。
+      const operationController =
+        linkageStateContext?.operationController ??
+        ownOperationControllerRef.current;
+
       // ✅ 使用 useRef 保持 methods 引用稳定，避免触发不必要的重新计算
       const methodsRef = React.useRef(methods);
       React.useEffect(() => {
@@ -579,6 +590,7 @@ const DynamicFormInner = React.memo(
           asNestedForm,
           pathPrefix,
           linkageStateContext?.parentLinkageStates,
+          linkageStateContext?.parentLinkages,
           linkageStateContext?.form,
           linkageStateContext?.linkageFunctions,
           stableLinkageFunctions,
@@ -591,11 +603,13 @@ const DynamicFormInner = React.memo(
         linkageStates: ownLinkageStates,
         refresh: refreshLinkage,
         setValueWithoutLinkage,
+        activeLinkages,
       } = useArrayLinkageManager({
         form: formToUse,
         baseLinkages: processedLinkages,
         linkageFunctions: effectiveLinkageFunctions,
         schema,
+        operationController,
       });
 
       // // 更新 refreshLinkageRef
@@ -606,21 +620,14 @@ const DynamicFormInner = React.memo(
       // 步骤4: 合并父级和自己的联动状态
       const linkageStates = useMemo(() => {
         if (linkageStateContext?.parentLinkageStates) {
+          // 父级状态后合并，确保同一个字段被父级动态数组联动管理时，父级结果是权威值。
+          // 原因：数组元素内层 DynamicForm 可能在动态 linkages 更新前短暂生成过自己的状态；
+          // 如果让这些旧 ownLinkageStates 覆盖父级状态，会出现 workInfo 等字段明明已由父级算出隐藏，
+          // 但渲染仍使用子级旧状态而显示的竞态。
           const merged = {
-            ...linkageStateContext.parentLinkageStates,
             ...ownLinkageStates,
+            ...linkageStateContext.parentLinkageStates,
           };
-          // if (process.env.NODE_ENV !== 'production') {
-          //   console.log(
-          //     '[DynamicForm] 合并联动状态:',
-          //     JSON.stringify({
-          //       pathPrefix,
-          //       parentStates: linkageStateContext.parentLinkageStates,
-          //       ownStates: ownLinkageStates,
-          //       merged,
-          //     })
-          //   );
-          // }
           return merged;
         }
         return { ...ownLinkageStates };
@@ -640,6 +647,7 @@ const DynamicFormInner = React.memo(
         ref,
         () => ({
           setValue: (name, value, options) => {
+            operationController.markFormMutation();
             const fieldSchema = getSchemaAtPath(schema, name);
             const reverseFn = resolveTransformFn(
               fieldSchema?.ui?.transform?.reverseCallback,
@@ -669,30 +677,46 @@ const DynamicFormInner = React.memo(
             );
           },
           setValues: (values, options) => {
+            // 外部批量写入代表表单快照整体变化，必须先递增版本，让所有旧异步联动失效。
+            // 之后再进入 batch，把递归 setValue 触发的多次 watch 合并为一次最终快照刷新。
+            operationController.markFormMutation();
             const displayValues = reverseFieldTransforms(
               values,
               schema,
               callbacksRef.current,
             );
-            if (options?.silence) {
-              setValueWithoutLinkage(() => {
+            operationController.beginBatch();
+            try {
+              if (options?.silence) {
+                // silence 语义是“不触发新联动”，不是“允许旧联动继续提交”。
+                // 因此前面的 markFormMutation 仍然保留，用来阻止旧 run 覆盖本次静默写入的新值。
+                setValueWithoutLinkage(() => {
+                  setFormValues({
+                    methods,
+                    values: displayValues,
+                    schema,
+                    options,
+                  });
+                });
+              } else {
                 setFormValues({
                   methods,
                   values: displayValues,
                   schema,
                   options,
                 });
-              });
-            } else {
-              setFormValues({
-                methods,
-                values: displayValues,
-                schema,
-                options,
-              });
+              }
+            } finally {
+              const shouldRefresh = operationController.endBatch();
+              if (shouldRefresh && !options?.silence) {
+                // 批量写入结束后只刷新一次，且刷新读取的是最终表单快照。
+                // 不 await 是为了保持 setValues 现有 void API；refreshLinkage 内部仍有 token 保护。
+                void refreshLinkage();
+              }
             }
           },
           reset: (values) => {
+            operationController.markFormMutation();
             if (values && Object.keys(values).length > 0) {
               const reversed = reverseFieldTransforms(
                 values,
@@ -730,7 +754,7 @@ const DynamicFormInner = React.memo(
             await refreshLinkage();
           },
         }),
-        [methods, schema, refreshLinkage],
+        [methods, schema, refreshLinkage, operationController],
       );
 
       React.useEffect(() => {
@@ -749,10 +773,6 @@ const DynamicFormInner = React.memo(
       const onSubmitHandler = useCallback(
         async (data: Record<string, any>) => {
           if (onSubmit) {
-            // if (process.env.NODE_ENV !== 'production') {
-            //   console.info('[DynamicForm] onSubmitHandler - 原始数据:', JSON.stringify(data));
-            // }
-
             // 使用公共函数进行数据转换，包含过滤步骤
             const filteredData = transformFormData(
               data,
@@ -760,10 +780,6 @@ const DynamicFormInner = React.memo(
               nestedSchemaRegistry || undefined,
               true, // 需要过滤数据
             );
-
-            // if (process.env.NODE_ENV !== 'production') {
-            //   console.info('[DynamicForm] onSubmitHandler - 过滤后:', JSON.stringify(filteredData));
-            // }
 
             await onSubmit(
               applyFieldTransforms(filteredData, schema, stableCallbacks),
@@ -778,18 +794,20 @@ const DynamicFormInner = React.memo(
       const linkageContextValue = useMemo(
         () => ({
           parentLinkageStates: linkageStates,
-          parentLinkages: processedLinkages, // 传递静态配置，用于子级过滤
+          parentLinkages: activeLinkages, // 传递实际配置，用于子级过滤动态数组联动
           form: methodsRef.current, // ✅ 使用 ref 避免 methods 变化触发重新计算
           rootSchema: schema,
           pathPrefix: pathPrefix,
           linkageFunctions: effectiveLinkageFunctions,
+          operationController,
         }),
         [
           linkageStates,
-          processedLinkages,
+          activeLinkages,
           schema,
           pathPrefix,
           effectiveLinkageFunctions,
+          operationController,
         ], // ✅ 移除 methods 依赖
       );
 

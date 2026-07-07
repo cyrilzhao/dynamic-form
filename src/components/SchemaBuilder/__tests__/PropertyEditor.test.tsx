@@ -32,9 +32,9 @@ jest.mock("../../Select", () => ({
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
     >
-      {options.map((opt: any) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
+      {options.map((opt: any, index: number) => (
+        <option key={opt?.value ?? index} value={opt?.value ?? opt}>
+          {opt?.label ?? opt}
         </option>
       ))}
     </select>
