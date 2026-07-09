@@ -393,6 +393,9 @@ const DynamicFormInner = React.memo(
       // ========== Context 获取（集中管理） ==========
       const parentFormContext = useFormContext();
       const linkageStateContext = useLinkageStateContext();
+      const inheritedLinkageStateContext = asNestedForm
+        ? linkageStateContext
+        : null;
       const nestedSchemaRegistry = useNestedSchemaRegistryOptional();
 
       // ========== 空对象常量处理（统一管理） ==========
@@ -482,7 +485,7 @@ const DynamicFormInner = React.memo(
       // 这样外部 ref.setValues/reset、父级数组联动和子级 DynamicForm 的异步联动
       // 都使用同一套表单版本号；否则不同层级各自判断“最新”，旧结果仍可能跨层覆盖新值。
       const operationController =
-        linkageStateContext?.operationController ??
+        inheritedLinkageStateContext?.operationController ??
         ownOperationControllerRef.current;
 
       // ✅ 使用 useRef 保持 methods 引用稳定，避免触发不必要的重新计算
@@ -536,10 +539,10 @@ const DynamicFormInner = React.memo(
             // parentLinkageStates 在外层 refreshLinkage 执行前为空，内层初始化时若依赖它做过滤，
             // 会因时序问题导致过滤失败，内层错误接管外层的联动，产生空对象覆盖有效状态的问题。
             // parentLinkages 是静态配置，在外层 useMemo 时即可确定，内层初始化时立即可读。
-            if (linkageStateContext?.parentLinkages) {
+            if (inheritedLinkageStateContext?.parentLinkages) {
               const filtered: Record<string, LinkageConfig[]> = {};
               Object.entries(transformed).forEach(([key, value]) => {
-                if (!(key in linkageStateContext.parentLinkages)) {
+                if (!(key in inheritedLinkageStateContext.parentLinkages)) {
                   filtered[key] = value;
                 }
               });
@@ -562,7 +565,8 @@ const DynamicFormInner = React.memo(
             Object.keys(stableLinkageFunctions).length > 0;
           const finalLinkageFunctions = hasOwnFunctions
             ? stableLinkageFunctions
-            : linkageStateContext?.linkageFunctions || EMPTY_LINKAGE_FUNCTIONS;
+            : inheritedLinkageStateContext?.linkageFunctions ||
+              EMPTY_LINKAGE_FUNCTIONS;
 
           // if (process.env.NODE_ENV !== 'production') {
           //   console.log(
@@ -582,17 +586,17 @@ const DynamicFormInner = React.memo(
 
           return {
             processedLinkages: linkages,
-            formToUse: linkageStateContext?.form || methodsRef.current,
+            formToUse: inheritedLinkageStateContext?.form || methodsRef.current,
             effectiveLinkageFunctions: finalLinkageFunctions,
           };
         }, [
           rawLinkages,
           asNestedForm,
           pathPrefix,
-          linkageStateContext?.parentLinkageStates,
-          linkageStateContext?.parentLinkages,
-          linkageStateContext?.form,
-          linkageStateContext?.linkageFunctions,
+          inheritedLinkageStateContext?.parentLinkageStates,
+          inheritedLinkageStateContext?.parentLinkages,
+          inheritedLinkageStateContext?.form,
+          inheritedLinkageStateContext?.linkageFunctions,
           stableLinkageFunctions,
           // 移除 methods 依赖，因为它会在每次表单状态变化时触发重新计算
           // methods 只是用来获取表单实例，不应该触发联动配置的重新计算
@@ -619,19 +623,19 @@ const DynamicFormInner = React.memo(
 
       // 步骤4: 合并父级和自己的联动状态
       const linkageStates = useMemo(() => {
-        if (linkageStateContext?.parentLinkageStates) {
+        if (inheritedLinkageStateContext?.parentLinkageStates) {
           // 父级状态后合并，确保同一个字段被父级动态数组联动管理时，父级结果是权威值。
           // 原因：数组元素内层 DynamicForm 可能在动态 linkages 更新前短暂生成过自己的状态；
           // 如果让这些旧 ownLinkageStates 覆盖父级状态，会出现 workInfo 等字段明明已由父级算出隐藏，
           // 但渲染仍使用子级旧状态而显示的竞态。
           const merged = {
             ...ownLinkageStates,
-            ...linkageStateContext.parentLinkageStates,
+            ...inheritedLinkageStateContext.parentLinkageStates,
           };
           return merged;
         }
         return { ...ownLinkageStates };
-      }, [linkageStateContext, ownLinkageStates, pathPrefix]);
+      }, [inheritedLinkageStateContext, ownLinkageStates, pathPrefix]);
 
       // 同步更新 ref，确保 resolver 始终使用最新联动状态
       linkageStatesRef.current = linkageStates;

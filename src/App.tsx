@@ -45,6 +45,7 @@ const groups = [
       { id: 'json-pointer-nested', label: 'JSON Pointer 嵌套', component: namedLazy(() => import('./examples/NestedForm/JsonPointerNestedExample'), 'JsonPointerNestedExample') },
       { id: 'async-schema-linkage', label: '异步 Schema 联动', component: namedLazy(() => import('./examples/NestedForm/AsyncSchemaLinkageExample'), 'AsyncSchemaLinkageExample') },
       { id: 'schema-loader', label: 'Schema 加载器', component: namedLazy(() => import('./examples/NestedForm/SchemaLoaderExample'), 'SchemaLoaderExample') },
+      { id: 'independent-linkage', label: '独立联动隔离', component: namedLazy(() => import('./examples/NestedForm/IndependentLinkageExample'), 'IndependentLinkageExample') },
       { id: 'set-values-nested', label: '嵌套设值', component: namedLazy(() => import('./examples/SetValuesNestedExample'), 'SetValuesNestedExample') },
     ],
   },
