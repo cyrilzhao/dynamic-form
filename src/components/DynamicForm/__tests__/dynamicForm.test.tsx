@@ -178,8 +178,179 @@ describe("DynamicForm", () => {
     await waitFor(() => {
       expect(getInputByName({ container, name: "rate" })).toHaveValue("45");
     });
+    expect(container).toHaveTextContent("Converted value: 0.45");
     expect(formRef.current!.getValue("rate")).toBe(0.45);
     expect(formRef.current!.getValues()).toEqual({ rate: 0.45 });
+  });
+
+  it("transform 配置 hideConvertedValue 为 true 时应该隐藏转换预览但保留转换逻辑", async () => {
+    const schema: ExtendedJSONSchema = {
+      type: "object",
+      properties: {
+        rate: {
+          type: "number",
+          title: "Rate",
+          ui: {
+            transform: {
+              callback: "toStorageRate",
+              reverseCallback: "toDisplayRate",
+              hideConvertedValue: true,
+            },
+          },
+        },
+      },
+    };
+
+    const callbacks = {
+      toStorageRate: (value: number) => value / 100,
+      toDisplayRate: (value: number) => value * 100,
+    };
+
+    const { formRef, container } = renderDynamicForm({
+      props: { schema, callbacks },
+    });
+    await waitForFormReady({ formRef });
+
+    await setFieldValue({ formRef, name: "rate", value: 0.45 });
+
+    await waitFor(() => {
+      expect(getInputByName({ container, name: "rate" })).toHaveValue("45");
+    });
+    expect(container).not.toHaveTextContent("Converted value:");
+    expect(formRef.current!.getValue("rate")).toBe(0.45);
+    expect(formRef.current!.getValues()).toEqual({ rate: 0.45 });
+  });
+
+  it("object 字段配置整体 transform 时不应该继续递归转换子字段", async () => {
+    const schema: ExtendedJSONSchema = {
+      type: "object",
+      properties: {
+        address: {
+          type: "object",
+          title: "Address",
+          properties: {
+            street: {
+              type: "string",
+              title: "Street",
+            },
+            ratio: {
+              type: "number",
+              title: "Ratio",
+              ui: {
+                transform: {
+                  callback: "childToStorage",
+                  reverseCallback: "childToDisplay",
+                },
+              },
+            },
+          },
+          ui: {
+            transform: {
+              callback: "addressToStorage",
+              reverseCallback: "addressToDisplay",
+            },
+          },
+        },
+      },
+    };
+
+    const callbacks = {
+      addressToStorage: (value: { street: string; ratio: number }) => ({
+        street: value.street,
+        ratio: value.ratio / 10,
+      }),
+      addressToDisplay: (value: { street: string; ratio: number }) => ({
+        street: value.street,
+        ratio: value.ratio * 10,
+      }),
+      childToStorage: (value: number) => value / 100,
+      childToDisplay: (value: number) => value * 100,
+    };
+
+    const { formRef, container } = renderDynamicForm({
+      props: { schema, callbacks },
+    });
+    await waitForFormReady({ formRef });
+
+    await act(async () => {
+      formRef.current!.setValues({
+        address: {
+          street: "Main Street",
+          ratio: 2,
+        },
+      });
+    });
+
+    expect(getInputByName({ container, name: "address.ratio" })).toHaveValue(
+      "20",
+    );
+    expect(formRef.current!.getValues()).toEqual({
+      address: {
+        street: "Main Street",
+        ratio: 2,
+      },
+    });
+  });
+
+  it("array 字段配置整体 transform 时不应该继续递归转换元素字段", async () => {
+    const schema: ExtendedJSONSchema = {
+      type: "object",
+      properties: {
+        lines: {
+          type: "array",
+          title: "Lines",
+          items: {
+            type: "object",
+            title: "Line",
+            properties: {
+              amount: {
+                type: "number",
+                title: "Amount",
+                ui: {
+                  transform: {
+                    callback: "childToStorage",
+                    reverseCallback: "childToDisplay",
+                  },
+                },
+              },
+            },
+          },
+          ui: {
+            transform: {
+              callback: "linesToStorage",
+              reverseCallback: "linesToDisplay",
+            },
+          },
+        },
+      },
+    };
+
+    const callbacks = {
+      linesToStorage: (value: Array<{ amount: number }>) =>
+        value.map((item) => ({ amount: item.amount / 10 })),
+      linesToDisplay: (value: Array<{ amount: number }>) =>
+        value.map((item) => ({ amount: item.amount * 10 })),
+      childToStorage: (value: number) => value / 100,
+      childToDisplay: (value: number) => value * 100,
+    };
+
+    const { formRef, container } = renderDynamicForm({
+      props: { schema, callbacks },
+    });
+    await waitForFormReady({ formRef });
+
+    await act(async () => {
+      formRef.current!.setValues({
+        lines: [{ amount: 3 }],
+      });
+    });
+
+    expect(getInputByName({ container, name: "lines.0.amount" })).toHaveValue(
+      "30",
+    );
+    expect(formRef.current!.getValues()).toEqual({
+      lines: [{ amount: 3 }],
+    });
   });
 
   it("onChange 和 onSubmit 应该返回转换并按 schema 过滤后的数据", async () => {

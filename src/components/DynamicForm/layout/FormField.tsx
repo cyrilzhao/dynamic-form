@@ -88,6 +88,7 @@ interface WidgetWithTransformProps {
   controllerField: any;
   WidgetComponent: React.ComponentType<any>;
   transformFn: (val: any) => any;
+  hideConvertedValue?: boolean;
   widgetProps: Record<string, any>;
 }
 
@@ -95,6 +96,7 @@ const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
   controllerField,
   WidgetComponent,
   transformFn,
+  hideConvertedValue = false,
   widgetProps,
 }) => {
   const [displayValue, setDisplayValue] = useState(
@@ -172,7 +174,7 @@ const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
         onChange={handleChange}
         onBlur={handleBlur}
       />
-      {transformedPreview != null && (
+      {!hideConvertedValue && transformedPreview != null && (
         <span
           style={{
             fontSize: 12,
@@ -327,6 +329,7 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
                     controllerField={controllerField}
                     WidgetComponent={WidgetComponent}
                     transformFn={transformFn}
+                    hideConvertedValue={transformConfig.hideConvertedValue}
                     widgetProps={commonWidgetProps}
                   />
                 ) : (

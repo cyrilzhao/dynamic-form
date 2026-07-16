@@ -219,6 +219,7 @@ function applyFieldTransforms(
       } catch {
         /* keep */
       }
+      continue
     }
     if (fieldSchema.type === 'object' && fieldSchema.properties) {
       result[key] = applyFieldTransforms(result[key], fieldSchema, callbacks)
@@ -296,6 +297,7 @@ function reverseFieldTransforms(
       } catch {
         /* keep */
       }
+      continue
     }
     if (fieldSchema.type === 'object' && fieldSchema.properties) {
       result[key] = reverseFieldTransforms(result[key], fieldSchema, callbacks)

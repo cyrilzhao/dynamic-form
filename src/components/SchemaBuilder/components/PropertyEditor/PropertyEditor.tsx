@@ -9,7 +9,6 @@ import {
   NumericInput,
   Switch,
   Callout,
-  ControlGroup,
   Divider,
   Button,
   Tag,
@@ -431,9 +430,10 @@ export const PropertyEditor: React.FC = () => {
   const currentType = watch('type') as SchemaNodeType
   const currentWidgetOptions = (widgetOptions[currentType] || []).map(
     (widget) => ({
-      label: widget.charAt(0).toUpperCase() + widget.slice(1).replace(/-/g, ' '),
+      label:
+        widget.charAt(0).toUpperCase() + widget.slice(1).replace(/-/g, ' '),
       value: widget,
-    }),
+    })
   )
   const showWidgetConfig = currentWidgetOptions.length > 0
   const defaultWidget = getDefaultWidget(currentNode)

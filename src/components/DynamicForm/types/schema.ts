@@ -122,11 +122,13 @@ export interface UIConfig {
    *
    * - callback：展示域 → 存储域，在 getValues/onChange/onSubmit 时自动应用
    * - reverseCallback：存储域 → 展示域，在 setValues/setValue 时自动应用（将外部存储值转为用户可见的展示值）
+   * - hideConvertedValue：是否隐藏字段下方转换后的值，默认不隐藏
    */
   transform?: {
     // 可以是 callbacks 注册表中的函数名（string），也可以是内联 JS 函数体（ScriptTransform）
     callback: string | { type: "script"; code: string };
     reverseCallback?: string | { type: "script"; code: string };
+    hideConvertedValue?: boolean;
   };
 }
 
