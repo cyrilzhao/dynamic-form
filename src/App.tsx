@@ -78,6 +78,7 @@ const groups = [
       { id: 'category-action', label: 'Category-Action', component: namedLazy(() => import('./examples/CategoryActionExample'), 'CategoryActionExample') },
       { id: 'multiple-linkages', label: '多联动', component: namedLazy(() => import('./examples/MultipleLinkagesExample'), 'MultipleLinkagesExample') },
       { id: 'refresh-linkage', label: '刷新联动', component: namedLazy(() => import('./examples/RefreshLinkageExample'), 'RefreshLinkageExample') },
+      { id: 'linkage-context', label: 'Linkage Context', component: namedLazy(() => import('./examples/LinkageContextExample'), 'LinkageContextExample') },
       { id: 'schema-defaults', label: 'Schema 默认值', component: namedLazy(() => import('./examples/SchemaDefaultsExample'), 'SchemaDefaultsExample') },
       { id: 'race-condition', label: '竞态条件', component: namedLazy(() => import('./examples/RaceConditionExample'), 'RaceConditionExample') },
     ],

@@ -106,6 +106,8 @@ export interface LinkageFunctionContext {
   arrayIndex?: number;
   /** 如果字段在数组内，这是数组的路径，如 'contacts' */
   arrayPath?: string;
+  /** 页面级外部数据（通过 linkageContext prop 传入） */
+  externalData: Record<string, any>;
 }
 
 /**

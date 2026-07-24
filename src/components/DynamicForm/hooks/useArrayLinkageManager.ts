@@ -16,6 +16,7 @@ interface ArrayLinkageManagerOptions {
   form: UseFormReturn<any>;
   baseLinkages: Record<string, LinkageConfig[]>; // v3.1: 支持多联动类型
   linkageFunctions?: Record<string, LinkageFunction>;
+  linkageContext?: Record<string, any>; // 联动函数的外部上下文数据
   schema?: ExtendedJSONSchema; // 用于完整的路径解析
   /** 检测到循环依赖时的回调 */
   onCycleDetected?: (cycle: string[]) => void;
@@ -40,6 +41,7 @@ export function useArrayLinkageManager({
   form,
   baseLinkages,
   linkageFunctions = {},
+  linkageContext = {},
   schema,
   onCycleDetected,
   throwOnCycle = false,
@@ -194,6 +196,7 @@ export function useArrayLinkageManager({
     form,
     linkages: allLinkages,
     linkageFunctions,
+    linkageContext,
     operationController,
   });
 

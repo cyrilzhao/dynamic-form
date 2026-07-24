@@ -366,6 +366,7 @@ const DynamicFormInner = React.memo(
         onChange,
         widgets,
         linkageFunctions,
+        linkageContext,
         callbacks,
         customFormats,
         layout = 'vertical',
@@ -414,6 +415,7 @@ const DynamicFormInner = React.memo(
 
       // ========== 空对象常量处理（统一管理） ==========
       const stableLinkageFunctions = linkageFunctions || EMPTY_LINKAGE_FUNCTIONS
+      const stableLinkageContext = linkageContext || {}
       const stableWidgets = widgets || EMPTY_WIDGETS
       const stableCustomFormats = customFormats || EMPTY_CUSTOM_FORMATS
       const stableCallbacks = callbacks || EMPTY_CALLBACKS
@@ -627,6 +629,7 @@ const DynamicFormInner = React.memo(
         form: formToUse,
         baseLinkages: processedLinkages,
         linkageFunctions: effectiveLinkageFunctions,
+        linkageContext: stableLinkageContext,
         schema,
         operationController,
       })

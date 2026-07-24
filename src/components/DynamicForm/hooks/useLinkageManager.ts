@@ -175,6 +175,7 @@ interface LinkageManagerOptions {
   form: UseFormReturn<any>;
   linkages: Record<string, LinkageConfig[]>; // v3.1: 支持多联动类型
   linkageFunctions?: Record<string, LinkageFunction>;
+  linkageContext?: Record<string, any>; // 联动函数的外部上下文数据
   operationController?: LinkageOperationController;
 }
 
@@ -187,6 +188,7 @@ export function useLinkageManager({
   form,
   linkages,
   linkageFunctions = {},
+  linkageContext = {},
   operationController,
 }: LinkageManagerOptions) {
   const { watch, getValues, setValue } = form;
@@ -466,6 +468,7 @@ export function useLinkageManager({
             linkages: currentLinkages,
             formData,
             linkageFunctions: currentLinkageFunctions,
+            linkageContext,
             asyncSequenceManager,
             dependencyGraph: currentDependencyGraph,
             cache,
@@ -660,6 +663,7 @@ export function useLinkageManager({
         linkages: currentLinkages,
         formData,
         linkageFunctions: currentLinkageFunctions,
+        linkageContext,
         asyncSequenceManager,
         dependencyGraph: currentDependencyGraph,
         cache,
@@ -710,6 +714,34 @@ export function useLinkageManager({
     }
   }, []);
 
+  // 监听 linkageContext 变化，自动刷新联动
+  // 使用 ref 实现 shallow compare，避免不必要的刷新
+  const prevLinkageContextRef = useRef<Record<string, any>>(linkageContext);
+
+  useEffect(() => {
+    // 如果没有联动配置，不需要监听
+    if (Object.keys(linkages).length === 0) {
+      return;
+    }
+
+    const prev = prevLinkageContextRef.current;
+    const next = linkageContext;
+
+    // Shallow compare：比较 key 集合和每个 key 的引用
+    const prevKeys = Object.keys(prev);
+    const nextKeys = Object.keys(next);
+
+    const hasChanged =
+      prevKeys.length !== nextKeys.length ||
+      nextKeys.some((key) => prev[key] !== next[key]);
+
+    if (hasChanged) {
+      prevLinkageContextRef.current = next;
+      // linkageContext 变化时，触发联动刷新
+      void refreshLinkage();
+    }
+  }, [linkageContext, linkages, refreshLinkage]);
+
   return { linkageStates, refreshLinkage, setValueWithoutLinkage };
 }
 
@@ -731,6 +763,7 @@ async function evaluateLinkagesByLayers({
   linkages,
   formData,
   linkageFunctions,
+  linkageContext = {},
   asyncSequenceManager,
   dependencyGraph,
   cache,
@@ -741,6 +774,7 @@ async function evaluateLinkagesByLayers({
   linkages: Record<string, LinkageConfig[]>; // v3.1: 支持多联动类型
   formData: Record<string, any>;
   linkageFunctions: Record<string, LinkageFunction>;
+  linkageContext?: Record<string, any>;
   asyncSequenceManager: AsyncSequenceManager;
   dependencyGraph: DependencyGraph;
   cache?: LinkageResultCache;
@@ -779,6 +813,7 @@ async function evaluateLinkagesByLayers({
                 linkage,
                 formData: updatedFormData,
                 linkageFunctions,
+                linkageContext,
                 fieldPath: fieldName,
                 asyncSequenceManager,
                 cache,
@@ -905,6 +940,7 @@ async function evaluateLinkage({
   linkage,
   formData,
   linkageFunctions,
+  linkageContext = {},
   fieldPath,
   asyncSequenceManager,
   cache,
@@ -913,6 +949,7 @@ async function evaluateLinkage({
   linkage: LinkageConfig;
   formData: Record<string, any>;
   linkageFunctions: Record<string, LinkageFunction>;
+  linkageContext?: Record<string, any>;
   fieldPath: string;
   asyncSequenceManager: AsyncSequenceManager;
   cache?: LinkageResultCache;
@@ -943,6 +980,7 @@ async function evaluateLinkage({
     fieldPath,
     arrayPath,
     arrayIndex,
+    externalData: linkageContext,
   };
 
   // 如果没有 when 条件，默认使用 fulfill

@@ -1396,6 +1396,49 @@ When options change, DynamicForm automatically clears the field value if it's no
 // → subcategory is automatically cleared (laptop not in books options)
 ```
 
+**Using linkageContext for External Data:**
+
+When linkage functions need to access external data (e.g., API responses, page-level state), use `linkageContext` to pass it cleanly without closure issues:
+
+```typescript
+const [apiData, setApiData] = useState(null);
+
+useEffect(() => {
+  fetchCities().then(data => setApiData(data));
+}, []);
+
+// ✅ Linkage function receives external data via context.externalData
+const linkageFunctions = {
+  loadCityOptions: (formData, context) => {
+    const { apiData } = context.externalData;
+    const country = formData.country;
+    
+    if (!apiData || !country) return [];
+    
+    return apiData[country].map(city => ({
+      label: city,
+      value: city
+    }));
+  }
+};
+
+// ✅ Use useMemo to stabilize linkageContext reference
+const linkageContext = useMemo(() => ({ apiData }), [apiData]);
+
+<DynamicForm
+  schema={schema}
+  linkageFunctions={linkageFunctions}
+  linkageContext={linkageContext}  // Stable reference
+/>
+```
+
+**Benefits:**
+- ✅ **Pure functions**: Linkage functions don't depend on closures
+- ✅ **Automatic refresh**: When `linkageContext` changes, linkage automatically re-executes
+- ✅ **Type-safe**: Full TypeScript support for context data
+- ✅ **Clear separation**: Distinguishes form data from external context
+- ✅ **Performance**: useMemo prevents unnecessary re-renders
+
 **6. schema** - Dynamic schema switching
 
 > **Note**: Schema linkage works on all field types (string, number, boolean, object, array). It allows you to dynamically change validation rules, UI configuration, or the entire schema structure based on other field values.
