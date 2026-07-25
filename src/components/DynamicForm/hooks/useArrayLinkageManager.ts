@@ -153,7 +153,7 @@ export function useArrayLinkageManager({
     Object.entries(candidate).forEach(([fieldName, linkageArray]) => {
       // 遍历数组中的每个联动配置
       linkageArray.forEach((linkage) => {
-        linkage.dependencies.forEach((dep) => {
+        (linkage.dependencies || []).forEach((dep) => {
           const normalizedDep = PathResolver.toFieldPath(dep);
           tempGraph.addDependency(fieldName, normalizedDep);
         });

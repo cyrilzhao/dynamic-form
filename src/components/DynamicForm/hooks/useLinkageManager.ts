@@ -217,7 +217,7 @@ export function useLinkageManager({
     Object.entries(linkages).forEach(([fieldName, linkageArray]) => {
       // 遍历数组中的每个联动配置
       linkageArray.forEach((linkage) => {
-        linkage.dependencies.forEach((dep) => {
+        (linkage.dependencies || []).forEach((dep) => {
           // 标准化路径并添加依赖关系
           const normalizedDep = PathResolver.toFieldPath(dep);
           graph.addDependency(fieldName, normalizedDep);
@@ -961,7 +961,7 @@ async function evaluateLinkage({
   // ✅ 缓存优化：生成缓存键（如果启用缓存）
   const cacheKey =
     cache && isCacheEnabled
-      ? generateCacheKey(fieldPath, linkage.dependencies, formData)
+      ? generateCacheKey(fieldPath, linkage.dependencies || [], formData)
       : null;
 
   // ✅ 缓存优化：尝试从缓存获取结果
