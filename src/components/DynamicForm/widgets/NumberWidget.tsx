@@ -1,6 +1,6 @@
-import React, { forwardRef, useCallback } from "react";
-import { NumericInput } from "@blueprintjs/core";
-import type { FieldWidgetProps } from "../types";
+import React, { forwardRef, useCallback } from 'react'
+import { NumericInput } from '@blueprintjs/core'
+import type { FieldWidgetProps } from '../types'
 
 export const NumberWidget = forwardRef<HTMLInputElement, FieldWidgetProps>(
   (
@@ -15,37 +15,43 @@ export const NumberWidget = forwardRef<HTMLInputElement, FieldWidgetProps>(
       value,
       ...rest
     },
-    ref,
+    ref
   ) => {
     const handleValueChange = useCallback(
-      (valueAsNumber: number, _valueAsString: string) => {
-        // 确保输出的是数字类型，而不是字符串
+      (valueAsNumber: number, valueAsString: string) => {
         if (onChange) {
-          onChange(isNaN(valueAsNumber) ? undefined : valueAsNumber);
+          // 允许用户输入中间状态（如 "1.", "-", "1e"）
+          // 只有在空字符串时才返回 undefined
+          if (valueAsString === '') {
+            onChange(undefined)
+          } else if (!isNaN(valueAsNumber)) {
+            onChange(valueAsNumber)
+          }
+          // 对于无效的中间状态（如 "1."），不触发 onChange，保持输入框状态
         }
       },
-      [onChange],
-    );
+      [onChange]
+    )
 
     const handleBlur = useCallback(
       (e: React.FocusEvent<HTMLInputElement>) => {
-        const inputValue = e.target.value;
+        const inputValue = e.target.value
 
         // 检查是否为合法数字
         if (inputValue && isNaN(Number(inputValue))) {
           // 不是合法数字，清空输入框并返回 undefined
           if (onChange) {
-            onChange(undefined);
+            onChange(undefined)
           }
         }
 
         // 调用原始的 onBlur 回调
         if (onBlur) {
-          onBlur(e);
+          onBlur(e)
         }
       },
-      [onChange, onBlur],
-    );
+      [onChange, onBlur]
+    )
 
     return (
       <NumericInput
@@ -54,15 +60,15 @@ export const NumberWidget = forwardRef<HTMLInputElement, FieldWidgetProps>(
         placeholder={placeholder}
         disabled={disabled}
         readOnly={readonly}
-        intent={error ? "danger" : "none"}
+        intent={error ? 'danger' : 'none'}
         fill
         value={value as string | number}
         onValueChange={handleValueChange}
         onBlur={handleBlur}
         {...rest}
       />
-    );
-  },
-);
+    )
+  }
+)
 
-NumberWidget.displayName = "NumberWidget";
+NumberWidget.displayName = 'NumberWidget'
