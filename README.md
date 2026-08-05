@@ -700,13 +700,13 @@ The `ui` field provides extensive customization options:
 {
   type: 'string',
   title: 'Email',
+  description: 'We will never share your email', // Help text below field
   ui: {
     widget: 'email',           // Widget type
     placeholder: 'Enter email', // Placeholder text
     disabled: false,            // Disable field
     readonly: false,            // Make field readonly
     hidden: false,              // Hide field
-    help: 'We will never share your email', // Help text
     className: 'custom-class',  // CSS class
     layout: 'horizontal',       // Layout override
     labelWidth: 120,            // Label width (horizontal layout)
@@ -2223,9 +2223,9 @@ Additional UI customization options:
 {
   type: 'string',
   title: 'Email',
+  description: 'We will never share your email', // Help text below field
   ui: {
     placeholder: 'Enter your email',     // Input placeholder
-    help: 'We will never share your email', // Help text below field
     className: 'custom-field',           // Custom CSS class
     disabled: false,                     // Disable field
     readonly: false,                     // Make field readonly
@@ -2240,7 +2240,6 @@ Additional UI customization options:
 | --------------- | --------- | ---------------------------------------------------------------------------------- |
 | `widget`        | `string`  | Widget type                                                                        |
 | `placeholder`   | `string`  | Input placeholder text                                                             |
-| `help`          | `string`  | Help text below field                                                              |
 | `className`     | `string`  | Custom CSS class                                                                   |
 | `disabled`      | `boolean` | Disable field                                                                      |
 | `readonly`      | `boolean` | Make field readonly                                                                |
@@ -2256,6 +2255,8 @@ Additional UI customization options:
 | `widgetProps`   | `object`  | Props passed to widget component                                                   |
 | `callbackProps` | `object`  | Callback function references (key=prop name, value=function name from `callbacks`) |
 | `transform`     | `object`  | Value transform config (see below)                                                 |
+
+**Note:** Help text should be set using the top-level `description` field (JSON Schema standard), not `ui.help`.
 
 #### Value Transform (`ui.transform`)
 
