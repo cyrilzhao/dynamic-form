@@ -66,6 +66,16 @@ export interface ScriptValidator {
 
 export type ValidatorRule = ScriptValidator;
 
+/**
+ * Widget 回调函数引用
+ *
+ * - string：从 DynamicForm callbacks 注册表获取函数
+ * - { type: 'script'; code: string }：内联 JavaScript 函数字符串
+ *
+ * ⚠️ 内联 script 仅适用于受信任的内部工具环境
+ */
+export type CallbackPropRef = string | { type: "script"; code: string };
+
 export interface UIConfig {
   widget?: WidgetType | string;
   placeholder?: string;
@@ -107,8 +117,8 @@ export interface UIConfig {
   // 自定义 widget 额外参数，会被直接展开传递给 widget 组件
   widgetProps?: Record<string, any>;
 
-  // Widget 回调函数引用（key=prop名，value=函数名，运行时从 DynamicForm.callbacks 注册表解析）
-  callbackProps?: Record<string, string>;
+  // Widget 回调函数引用（key=prop名，value=函数名或内联脚本，运行时解析为函数）
+  callbackProps?: Record<string, CallbackPropRef>;
 
   // 字段级自定义校验规则（由 SchemaBuilder 用户配置，运行时执行）
   validators?: ValidatorRule[];

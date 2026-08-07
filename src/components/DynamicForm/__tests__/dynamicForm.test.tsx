@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom";
+import React from "react";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import type { ExtendedJSONSchema } from "../types/schema";
 import {
@@ -12,6 +13,67 @@ import {
 beforeAll(setupDynamicFormTest);
 
 describe("DynamicForm", () => {
+  it("应该支持 callbackProps 使用内联 script 定义 widget 函数 prop", async () => {
+    const schema: ExtendedJSONSchema = {
+      type: "object",
+      properties: {
+        formatter: {
+          type: "string",
+          title: "Formatter",
+          ui: {
+            widget: "script-callback-widget",
+            callbackProps: {
+              onFormat: {
+                type: "script",
+                code: `function(value, meta) {
+                  return value + "-" + meta.source;
+                }`,
+              },
+            },
+          },
+        },
+      },
+    };
+
+    const ScriptCallbackWidget = React.forwardRef<
+      HTMLDivElement,
+      {
+        onFormat?: (value: string, meta: { source: string }) => string;
+      }
+    >(({ onFormat }, ref) => {
+      const [result, setResult] = React.useState("");
+
+      return (
+        <div ref={ref}>
+          <button
+            type="button"
+            onClick={() =>
+              setResult(onFormat?.("alice", { source: "schema" }) ?? "")
+            }
+          >
+            Run formatter
+          </button>
+          <span data-testid="format-result">{result}</span>
+        </div>
+      );
+    });
+
+    renderDynamicForm({
+      props: {
+        schema,
+        widgets: {
+          "script-callback-widget": ScriptCallbackWidget,
+        },
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Run formatter" }));
+
+    expect(screen.getByTestId("format-result")).toHaveTextContent(
+      "alice-schema",
+    );
+  });
+
   it("应该合并 schema default 和 defaultValues，并在 getValues 时解包基本类型数组赋值", async () => {
     const schema: ExtendedJSONSchema = {
       type: "object",

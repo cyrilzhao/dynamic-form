@@ -2060,7 +2060,7 @@ import { CustomInputWidget } from './widgets/CustomInputWidget';
 
 **Widget Callbacks:**
 
-Use `callbacks` + `ui.callbackProps` to pass runtime functions to widgets (e.g., upload handlers, search handlers). Function names in the schema are resolved at render time from the `callbacks` registry.
+Use `ui.callbackProps` to pass runtime functions to widgets (e.g., upload handlers, search handlers). Values can be either function names from the `callbacks` registry or trusted inline scripts defined in schema.
 
 ```typescript
 const schema = {
@@ -2111,11 +2111,39 @@ function MyForm() {
 }
 ```
 
+**Inline script callback props:**
+
+```typescript
+const schema = {
+  type: 'object',
+  properties: {
+    avatar: {
+      type: 'string',
+      title: 'Avatar',
+      ui: {
+        widget: 'upload',
+        callbackProps: {
+          onFormatFileName: {
+            type: 'script',
+            code: `function(file) {
+              return file.name.toUpperCase();
+            }`
+          }
+        },
+        widgetProps: { accept: 'image/*' }
+      }
+    }
+  }
+};
+```
+
 **Rules:**
 
 - `callbackProps` keys override same-named keys in `widgetProps`
 - If a function name in `callbackProps` is not found in `callbacks`, it is silently skipped (with a dev warning)
 - The `callbacks` registry is shared across all fields; each field selects its own functions via `callbackProps`
+- Keep static JSON data in `widgetProps`; put function props in `callbackProps`
+- Inline JavaScript uses `Function` constructor and should only be used with trusted schema sources
 
 ````
 
@@ -2253,7 +2281,7 @@ Additional UI customization options:
 | `flattenPrefix` | `boolean` | Add parent title as prefix                                                         |
 | `errorMessages` | `object`  | Custom error messages                                                              |
 | `widgetProps`   | `object`  | Props passed to widget component                                                   |
-| `callbackProps` | `object`  | Callback function references (key=prop name, value=function name from `callbacks`) |
+| `callbackProps` | `object`  | Callback function refs (key=prop name, value=function name from `callbacks` or `{ type: 'script', code }`) |
 | `transform`     | `object`  | Value transform config (see below)                                                 |
 
 **Note:** Help text should be set using the top-level `description` field (JSON Schema standard), not `ui.help`.

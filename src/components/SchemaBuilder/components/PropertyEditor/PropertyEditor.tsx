@@ -23,6 +23,7 @@ import { SchemaValidationEditor } from './components/SchemaValidationEditor'
 import { FieldValidatorsEditor } from './components/FieldValidatorsEditor'
 import { LinkagesEditor } from './components/LinkagesEditor'
 import { TransformEditor } from './components/TransformEditor'
+import { CallbackPropsEditor } from './components/CallbackPropsEditor'
 import { ObjectEditor } from '../../../ObjectEditor'
 
 // Helper to get node from path
@@ -132,6 +133,7 @@ const createEditorFormDefaults = ({
   ui: {
     widget: '',
     widgetProps: undefined,
+    callbackProps: undefined,
     placeholder: '',
     hidden: false,
     disabled: false,
@@ -1270,6 +1272,30 @@ export const PropertyEditor: React.FC = () => {
                         <ObjectEditor
                           value={currentNode.ui?.widgetProps}
                           onChange={(val) => handleUIChange('widgetProps', val)}
+                          disabled={isArrayItems}
+                        />
+                      </FormGroup>
+                    )}
+
+                    {showWidgetConfig && watch('ui.widget') && (
+                      <FormGroup
+                        label={renderLabelWithTooltip({
+                          label: 'Widget Callback Props',
+                          title: 'Widget function props',
+                          description:
+                            'Passes function props to the selected widget through callback references or trusted inline scripts.',
+                          reasons: [
+                            'Use it when a widget needs dynamic behavior such as upload handlers, option filtering, or label formatting.',
+                            'Keeping function props separate from widgetProps preserves widgetProps as plain JSON configuration.',
+                          ],
+                        })}
+                        helperText="Function props resolved at render time. These override same-named widgetProps."
+                      >
+                        <CallbackPropsEditor
+                          value={currentNode.ui?.callbackProps}
+                          onChange={(val) =>
+                            handleUIChange('callbackProps', val)
+                          }
                           disabled={isArrayItems}
                         />
                       </FormGroup>

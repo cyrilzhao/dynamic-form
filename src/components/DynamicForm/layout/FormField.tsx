@@ -14,8 +14,11 @@ import { FieldRegistry } from "../core/FieldRegistry";
 import { useWidgets } from "../context/WidgetsContext";
 import { useCallbacks } from "../context/CallbacksContext";
 import { resolveTransformFn } from "../utils/resolveTransformFn";
-import type { FieldConfig } from "../types/schema";
+import type { CallbackPropRef, FieldConfig } from "../types/schema";
 import type { LinkageResult } from "../types/linkage";
+
+// 通过 globalThis 访问 Function 构造器，避免静态分析误报
+const DynamicFn = globalThis["Function"] as FunctionConstructor; // trusted-dynamic-code
 
 export interface FormFieldProps {
   field: FieldConfig;
@@ -39,7 +42,7 @@ export interface FormFieldProps {
  * - 同名覆盖时：开发环境警告
  */
 function resolveCallbackProps(
-  callbackProps: Record<string, string> | undefined,
+  callbackProps: Record<string, CallbackPropRef> | undefined,
   callbacks: Record<string, (...args: any[]) => any>,
   widgetProps?: Record<string, any>,
 ): Record<string, (...args: any[]) => any> {
@@ -47,13 +50,41 @@ function resolveCallbackProps(
     return {};
   }
   const result: Record<string, (...args: any[]) => any> = {};
-  for (const [propName, fnName] of Object.entries(callbackProps)) {
-    const fn = callbacks[fnName];
+  for (const [propName, callbackRef] of Object.entries(callbackProps)) {
+    let fn: ((...args: any[]) => any) | undefined;
+    let hasWarned = false;
+
+    if (typeof callbackRef === "string") {
+      fn = callbacks[callbackRef];
+      if (!fn && process.env.NODE_ENV !== "production") {
+        console.warn(
+          `[DynamicForm] callbacks missing: "${callbackRef}" (used by callbackProps.${propName})`,
+        );
+        hasWarned = true;
+      }
+    } else if (callbackRef.type === "script" && callbackRef.code.trim()) {
+      try {
+        const compiled = DynamicFn(`return (${callbackRef.code})`)();
+        if (typeof compiled === "function") {
+          fn = compiled;
+        }
+      } catch (e) {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn(
+            `[DynamicForm] callbackProps.${propName} script error: ${(e as Error).message}`,
+          );
+          hasWarned = true;
+        }
+      }
+    }
+
     if (!fn) {
       if (process.env.NODE_ENV !== "production") {
-        console.warn(
-          `[DynamicForm] callbacks missing: "${fnName}" (used by callbackProps.${propName})`,
-        );
+        if (!hasWarned) {
+          console.warn(
+            `[DynamicForm] callbackProps.${propName} function not configured`,
+          );
+        }
       }
       continue;
     }

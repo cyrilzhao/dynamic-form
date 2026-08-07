@@ -7,6 +7,7 @@ import "@testing-library/jest-dom";
 import { PropertyEditor } from "../components/PropertyEditor/PropertyEditor";
 import { SchemaBuilderContext } from "../SchemaBuilder";
 import { basicSchema, nestedSchema } from "./testHelpers";
+import type { ExtendedJSONSchema } from "../../DynamicForm/types/schema";
 
 // Mock SchemaValidationEditor 组件
 let mockSchemaValidationEditorOnChange: ((config: any) => void) | null = null;
@@ -26,11 +27,12 @@ jest.mock(
 
 // Mock Select 组件以便测试
 jest.mock("../../Select", () => ({
-  Select: ({ value, onChange, disabled, options }: any) => (
+  Select: ({ value, onChange, disabled, options, ...rest }: any) => (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
+      {...rest}
     >
       {options.map((opt: any, index: number) => (
         <option key={opt?.value ?? index} value={opt?.value ?? opt}>
@@ -38,6 +40,17 @@ jest.mock("../../Select", () => ({
         </option>
       ))}
     </select>
+  ),
+}));
+
+jest.mock("../../CodeEditor", () => ({
+  CodeEditor: ({ value, onChange, disabled }: any) => (
+    <textarea
+      aria-label="code-editor"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={disabled}
+    />
   ),
 }));
 
@@ -1356,6 +1369,67 @@ describe("PropertyEditor", () => {
         fireEvent.click(flattenPrefixSwitch);
         expect(onUpdate).toHaveBeenCalled();
       }
+    });
+
+    it("应该支持配置 widget callbackProps 的内联 script", () => {
+      const onUpdate = jest.fn();
+      const schema: ExtendedJSONSchema = {
+        type: "object",
+        properties: {
+          avatar: {
+            type: "string",
+            title: "Avatar",
+            ui: {
+              widget: "upload",
+            },
+          },
+        },
+      };
+
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema,
+          selectedPath: ["properties", "avatar"],
+          onUpdate,
+        }),
+      });
+
+      fireEvent.click(screen.getByText("UI Config"));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Add Callback Prop" }),
+      );
+
+      fireEvent.change(screen.getByLabelText("Callback Prop Name"), {
+        target: { value: "onUpload" },
+      });
+      fireEvent.change(screen.getByLabelText("Callback Mode", { selector: "select" }), {
+        target: { value: "inline-script" },
+      });
+      const codeEditors = screen.getAllByLabelText("code-editor");
+      fireEvent.change(codeEditors[codeEditors.length - 1], {
+        target: {
+          value: "function(file) { return file.name; }",
+        },
+      });
+      fireEvent.click(
+        screen.getByRole("button", { name: "Save Callback Prop" }),
+      );
+
+      expect(onUpdate).toHaveBeenLastCalledWith(
+        ["properties", "avatar"],
+        expect.objectContaining({
+          ui: expect.objectContaining({
+            widget: "upload",
+            callbackProps: {
+              onUpload: {
+                type: "script",
+                code: "function(file) { return file.name; }",
+              },
+            },
+          }),
+        }),
+      );
     });
   });
 });
