@@ -2,11 +2,42 @@ import type { FieldErrors } from "react-hook-form";
 import type { ExtendedJSONSchema, FieldOption } from "./schema";
 import type { LinkageFunction } from "./linkage";
 
-export type {
-  WidgetPreset,
-  PartialWidgetPreset,
-  WidgetRegistry,
-} from "./widgets";
+/**
+ * Widget 回调函数类型 - 用于 ui.callbackProps
+ * Widget 决定传递哪些参数，统一包装为 args 数组
+ */
+export type WidgetCallback = (params: {
+  args: any[];
+  helpers: Record<string, any>;
+}) => any;
+
+/**
+ * Transform 回调函数类型 - 用于 ui.transform.callback 和 ui.transform.reverseCallback
+ * 将值在展示域和存储域之间转换
+ */
+export type TransformCallback = (params: {
+  value: any;
+  helpers: Record<string, any>;
+}) => any;
+
+/**
+ * Validator 回调函数类型 - 用于 ui.validators
+ * 返回 null 表示验证通过，返回字符串表示错误信息
+ */
+export type ValidatorCallback = (params: {
+  value: any;
+  formValues: Record<string, any>;
+  helpers: Record<string, any>;
+}) => string | null | Promise<string | null>;
+
+/**
+ * Callback 函数联合类型
+ * 所有 callback 都使用对象解构参数形式，并自动注入 helpers
+ */
+export type CallbackFunction =
+  | WidgetCallback
+  | TransformCallback
+  | ValidatorCallback;
 
 /**
  * DynamicForm 组件对外暴露的方法
@@ -145,13 +176,13 @@ export interface DynamicFormProps {
    * 回调函数注册表，用于 Widget callbacks、Transform、Validators
    *
    * 所有 callback 函数都使用对象解构参数形式，并自动注入 helpers：
-   * - Widget callbacks: `({ args, helpers }) => any` - args 为 Widget 传递的参数数组
-   * - Transform callbacks: `({ value, helpers }) => any` - value 为待转换的值
-   * - Validator callbacks: `({ value, formValues, helpers }) => any | Promise<any>` - 返回 null（有效）或错误信息字符串
+   * - WidgetCallback: `({ args, helpers }) => any` - args 为 Widget 传递的参数数组
+   * - TransformCallback: `({ value, helpers }) => any` - value 为待转换的值
+   * - ValidatorCallback: `({ value, formValues, helpers }) => any | Promise<any>` - 返回 null（有效）或错误信息字符串
    *
    * @example
    * ```tsx
-   * const callbacks = {
+   * const callbacks: Record<string, CallbackFunction> = {
    *   // Widget callback
    *   handleUpload: async ({ args, helpers }) => {
    *     const [file] = args;
@@ -173,7 +204,7 @@ export interface DynamicFormProps {
    * };
    * ```
    */
-  callbacks?: Record<string, (...args: any[]) => any>;
+  callbacks?: Record<string, CallbackFunction>;
   customFormats?: Record<string, (value: string) => boolean>; // 自定义格式验证器
 
   /**
