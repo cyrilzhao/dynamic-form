@@ -144,6 +144,30 @@ export interface DynamicFormProps {
   callbacks?: Record<string, (...args: any[]) => any>; // Widget 回调函数注册表（配合 schema ui.callbackProps 使用）
   customFormats?: Record<string, (value: string) => boolean>; // 自定义格式验证器
 
+  /**
+   * 帮助函数和工具库，可在 inline script 和 callbacks 中使用
+   *
+   * 内置 helpers:
+   * - ofetch: 跨浏览器和 Node.js 环境的请求能力
+   * - _: lodash 完整功能
+   * - v: Valibot 校验工具
+   *
+   * 用户可以注入自定义 helpers，会与内置 helpers 合并
+   *
+   * @example
+   * ```tsx
+   * import dayjs from 'dayjs';
+   * <DynamicForm
+   *   schema={schema}
+   *   helpers={{
+   *     dayjs,        // 日期处理库
+   *     myUtils,      // 自定义工具函数
+   *   }}
+   * />
+   * ```
+   */
+  helpers?: Record<string, any>;
+
   // UI 配置
   layout?: "vertical" | "horizontal" | "inline";
   labelWidth?: number | string; // 全局标签宽度（仅 horizontal layout 下生效）

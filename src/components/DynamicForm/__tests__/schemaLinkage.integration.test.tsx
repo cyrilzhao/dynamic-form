@@ -41,7 +41,7 @@ describe("schema 联动集成测试", () => {
     };
 
     const linkageFunctions = {
-      getValueSchema: (formData: Record<string, unknown>) => {
+      getValueSchema: ({ formData }: { formData: Record<string, unknown> }) => {
         if (formData.mode === "loose") {
           return {
             minLength: 3,
@@ -142,7 +142,7 @@ describe("schema 联动集成测试", () => {
     };
 
     const linkageFunctions = {
-      getUsernameSchema: (formData: Record<string, unknown>) =>
+      getUsernameSchema: ({ formData }: { formData: Record<string, unknown> }) =>
         formData.mode === "strict" ? { minLength: 10 } : { minLength: 3 },
     };
 
@@ -188,7 +188,7 @@ describe("schema 联动集成测试", () => {
     };
 
     const linkageFunctions = {
-      getNotesSchema: (formData: Record<string, unknown>) =>
+      getNotesSchema: ({ formData }: { formData: Record<string, unknown> }) =>
         formData.phase === "closed"
           ? { ui: { disabled: true, readonly: true } }
           : { ui: { disabled: false, readonly: false } },

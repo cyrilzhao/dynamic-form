@@ -60,13 +60,14 @@ describe("NumberWidget", () => {
       expect(handleChange).toHaveBeenCalledWith(42);
     });
 
-    it("输入 NaN 时应该调用 onChange 并传递 undefined", () => {
+    it("输入 NaN 后失焦时应该调用 onChange 并传递 undefined", () => {
       const handleChange = jest.fn();
       render(<NumberWidget {...defaultProps} onChange={handleChange} />);
 
       const input = screen.getByRole("spinbutton");
       // 输入非数字字符触发 NaN
       fireEvent.change(input, { target: { value: "abc" } });
+      fireEvent.blur(input);
 
       expect(handleChange).toHaveBeenCalledWith(undefined);
     });

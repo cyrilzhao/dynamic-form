@@ -35,6 +35,7 @@ import {
 } from './context/LinkageStateContext'
 import { WidgetsProvider } from './context/WidgetsContext'
 import { CallbacksProvider } from './context/CallbacksContext'
+import { HelpersProvider } from './context/HelpersContext'
 import {
   wrapPrimitiveArrays,
   unwrapPrimitiveArrays,
@@ -47,6 +48,7 @@ import { createSchemaResolver } from './utils/createSchemaResolver'
 import { resolveTransformFn } from './utils/resolveTransformFn'
 import { mergeSchemaWithLinkage } from './utils/mergeSchemaWithLinkage'
 import { LinkageOperationController } from './utils/linkageOperationController'
+import { builtInHelpers } from './utils/builtInHelpers'
 import '@blueprintjs/core/lib/css/blueprint.css'
 
 // 空对象常量，避免每次渲染创建新对象
@@ -54,6 +56,7 @@ const EMPTY_LINKAGE_FUNCTIONS = {}
 const EMPTY_WIDGETS = {}
 const EMPTY_CUSTOM_FORMATS = {}
 const EMPTY_CALLBACKS = {}
+const EMPTY_HELPERS = {}
 
 /**
  * 递归展开嵌套对象，对每层路径都调用 setValue
@@ -200,7 +203,8 @@ function transformFormData(
 function applyFieldTransforms(
   data: any,
   schema: ExtendedJSONSchema,
-  callbacks: Record<string, (...args: any[]) => any>
+  callbacks: Record<string, (...args: any[]) => any>,
+  helpers: Record<string, any>
 ): any {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return data
@@ -215,14 +219,14 @@ function applyFieldTransforms(
     const fn = resolveTransformFn(cb, callbacks)
     if (fn) {
       try {
-        result[key] = fn(result[key])
+        result[key] = fn({ value: result[key], helpers })
       } catch {
         /* keep */
       }
       continue
     }
     if (fieldSchema.type === 'object' && fieldSchema.properties) {
-      result[key] = applyFieldTransforms(result[key], fieldSchema, callbacks)
+      result[key] = applyFieldTransforms(result[key], fieldSchema, callbacks, helpers)
     }
     if (
       fieldSchema.type === 'array' &&
@@ -234,7 +238,8 @@ function applyFieldTransforms(
         applyFieldTransforms(
           item,
           fieldSchema.items as ExtendedJSONSchema,
-          callbacks
+          callbacks,
+          helpers
         )
       )
     }
@@ -278,7 +283,8 @@ function getSchemaAtPath(
 function reverseFieldTransforms(
   data: any,
   schema: ExtendedJSONSchema,
-  callbacks: Record<string, (...args: any[]) => any>
+  callbacks: Record<string, (...args: any[]) => any>,
+  helpers: Record<string, any>
 ): any {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return data
@@ -293,14 +299,14 @@ function reverseFieldTransforms(
     const fn = resolveTransformFn(cb, callbacks)
     if (fn) {
       try {
-        result[key] = fn(result[key])
+        result[key] = fn({ value: result[key], helpers })
       } catch {
         /* keep */
       }
       continue
     }
     if (fieldSchema.type === 'object' && fieldSchema.properties) {
-      result[key] = reverseFieldTransforms(result[key], fieldSchema, callbacks)
+      result[key] = reverseFieldTransforms(result[key], fieldSchema, callbacks, helpers)
     }
     if (
       fieldSchema.type === 'array' &&
@@ -312,7 +318,8 @@ function reverseFieldTransforms(
         reverseFieldTransforms(
           item,
           fieldSchema.items as ExtendedJSONSchema,
-          callbacks
+          callbacks,
+          helpers
         )
       )
     }
@@ -369,6 +376,7 @@ const DynamicFormInner = React.memo(
         linkageContext,
         callbacks,
         customFormats,
+        helpers,
         layout = 'vertical',
         labelWidth,
         columnsCount = 1,
@@ -419,6 +427,14 @@ const DynamicFormInner = React.memo(
       const stableWidgets = widgets || EMPTY_WIDGETS
       const stableCustomFormats = customFormats || EMPTY_CUSTOM_FORMATS
       const stableCallbacks = callbacks || EMPTY_CALLBACKS
+      const stableHelpers = helpers || EMPTY_HELPERS
+
+      // 合并内置和用户提供的 helpers
+      // 用户提供的 helpers 优先级更高，可以覆盖内置 helpers
+      const mergedHelpers = useMemo(() => ({
+        ...builtInHelpers,
+        ...stableHelpers,
+      }), [stableHelpers])
 
       // 设置自定义格式验证器并解析字段
       // 当 asNestedForm 为 true 时，需要为字段名添加 pathPrefix 前缀
@@ -476,6 +492,10 @@ const DynamicFormInner = React.memo(
         Record<string, { visible?: boolean; disabled?: boolean }>
       >({})
 
+      // 用于向 resolver 传递最新 helpers
+      const helpersRef = useRef<Record<string, any>>(mergedHelpers)
+      helpersRef.current = mergedHelpers
+
       // 只有非嵌套表单模式才创建新的 useForm 实例
       const ownMethods = useForm({
         defaultValues: processedDefaultValues,
@@ -484,7 +504,8 @@ const DynamicFormInner = React.memo(
         resolver: createSchemaResolver(
           schema,
           stableCallbacks,
-          linkageStatesRef
+          linkageStatesRef,
+          helpersRef
         ),
       })
 
@@ -677,7 +698,7 @@ const DynamicFormInner = React.memo(
             )
             methods.setValue(
               name,
-              reverseFn ? reverseFn(value) : value,
+              reverseFn ? reverseFn({ value, helpers: mergedHelpers }) : value,
               options
             )
           },
@@ -688,14 +709,15 @@ const DynamicFormInner = React.memo(
               fieldSchema?.ui?.transform?.callback,
               callbacksRef.current
             )
-            return fn ? fn(displayValue) : displayValue
+            return fn ? fn({ value: displayValue, helpers: mergedHelpers }) : displayValue
           },
           getValues: () => {
             const displayValues = methods.getValues()
             return applyFieldTransforms(
               transformFormData(displayValues, schema),
               schema,
-              callbacksRef.current
+              callbacksRef.current,
+              mergedHelpers
             )
           },
           setValues: (values, options) => {
@@ -705,12 +727,13 @@ const DynamicFormInner = React.memo(
             const displayValues = reverseFieldTransforms(
               values,
               schema,
-              callbacksRef.current
+              callbacksRef.current,
+              mergedHelpers
             )
             operationController.beginBatch()
             try {
               if (options?.silence) {
-                // silence 语义是“不触发新联动”，不是“允许旧联动继续提交”。
+                // silence 语义是”不触发新联动”，不是”允许旧联动继续提交”。
                 // 因此前面的 markFormMutation 仍然保留，用来阻止旧 run 覆盖本次静默写入的新值。
                 setValueWithoutLinkage(() => {
                   setFormValues({
@@ -743,7 +766,8 @@ const DynamicFormInner = React.memo(
               const reversed = reverseFieldTransforms(
                 values,
                 schema,
-                callbacksRef.current
+                callbacksRef.current,
+                mergedHelpers
               )
               const processed = wrapPrimitiveArrays(reversed, schema)
               methods.reset(processed)
@@ -784,12 +808,12 @@ const DynamicFormInner = React.memo(
           const subscription = watch((data) => {
             const processedData = transformFormData(data, schema)
             onChange(
-              applyFieldTransforms(processedData, schema, callbacksRef.current)
+              applyFieldTransforms(processedData, schema, callbacksRef.current, mergedHelpers)
             )
           })
           return () => subscription.unsubscribe()
         }
-      }, [watch, onChange, schema])
+      }, [watch, onChange, schema, mergedHelpers])
 
       // ✅ 使用 useCallback 缓存 onSubmitHandler，避免每次渲染创建新函
       const onSubmitHandler = useCallback(
@@ -804,11 +828,11 @@ const DynamicFormInner = React.memo(
             )
 
             await onSubmit(
-              applyFieldTransforms(filteredData, schema, stableCallbacks)
+              applyFieldTransforms(filteredData, schema, stableCallbacks, mergedHelpers)
             )
           }
         },
-        [onSubmit, schema, nestedSchemaRegistry, stableCallbacks]
+        [onSubmit, schema, nestedSchemaRegistry, stableCallbacks, mergedHelpers]
       )
 
       // 使用 useMemo 缓存 LinkageStateContext 的 value 对象
@@ -1000,9 +1024,11 @@ const DynamicFormInner = React.memo(
         }
 
         return (
-          <CallbacksProvider callbacks={stableCallbacks}>
-            <WidgetsProvider widgets={stableWidgets}>{content}</WidgetsProvider>
-          </CallbacksProvider>
+          <HelpersProvider helpers={mergedHelpers}>
+            <CallbacksProvider callbacks={stableCallbacks}>
+              <WidgetsProvider widgets={stableWidgets}>{content}</WidgetsProvider>
+            </CallbacksProvider>
+          </HelpersProvider>
         )
       }, [
         asNestedForm,

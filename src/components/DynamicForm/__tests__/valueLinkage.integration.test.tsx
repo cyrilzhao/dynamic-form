@@ -39,7 +39,7 @@ describe("value 联动集成测试", () => {
     };
 
     const linkageFunctions = {
-      getFullName: (formData: Record<string, unknown>) =>
+      getFullName: ({ formData }: { formData: Record<string, unknown> }) =>
         `${formData.firstName ?? ""} ${formData.lastName ?? ""}`.trim(),
     };
 
@@ -100,9 +100,9 @@ describe("value 联动集成测试", () => {
     };
 
     const linkageFunctions = {
-      getTax: (formData: Record<string, unknown>) =>
+      getTax: ({ formData }: { formData: Record<string, unknown> }) =>
         Number(formData.amount ?? 0) * 0.1,
-      getTotal: (formData: Record<string, unknown>) =>
+      getTotal: ({ formData }: { formData: Record<string, unknown> }) =>
         Number(formData.amount ?? 0) + Number(formData.tax ?? 0),
     };
 

@@ -10,14 +10,14 @@ describe("resolveTransformFn", () => {
   });
 
   it("ref 为字符串时应该从 callbacks 注册表返回对应函数", () => {
-    const toStored = jest.fn((value: number) => value / 100);
+    const toStored = jest.fn(({ value }: { value: number; helpers: Record<string, any> }) => value / 100);
     const callbacks = { toStored };
 
     const fn = resolveTransformFn("toStored", callbacks);
 
     expect(fn).toBe(toStored);
-    expect(fn?.(96)).toBe(0.96);
-    expect(toStored).toHaveBeenCalledWith(96);
+    expect(fn?.({ value: 96, helpers: {} })).toBe(0.96);
+    expect(toStored).toHaveBeenCalledWith({ value: 96, helpers: {} });
   });
 
   it("ref 为字符串但 callbacks 中不存在时应该返回 undefined", () => {
@@ -30,7 +30,7 @@ describe("resolveTransformFn", () => {
     const fn = resolveTransformFn(
       {
         type: "script",
-        code: `function(value) {
+        code: `function({ value }) {
           return value == null ? value : value.trim().toUpperCase();
         }`,
       },
@@ -38,8 +38,8 @@ describe("resolveTransformFn", () => {
     );
 
     expect(fn).toBeDefined();
-    expect(fn?.(" alice ")).toBe("ALICE");
-    expect(fn?.(null)).toBeNull();
+    expect(fn?.({ value: " alice ", helpers: {} })).toBe("ALICE");
+    expect(fn?.({ value: null, helpers: {} })).toBeNull();
   });
 
   it("script 完整函数可以访问 value 参数但不依赖 callbacks", () => {
@@ -50,14 +50,14 @@ describe("resolveTransformFn", () => {
     const fn = resolveTransformFn(
       {
         type: "script",
-        code: `function(value) {
+        code: `function({ value }) {
           return { stored: value * 2 };
         }`,
       },
       callbacks,
     );
 
-    expect(fn?.(21)).toEqual({ stored: 42 });
+    expect(fn?.({ value: 21, helpers: {} })).toEqual({ stored: 42 });
     expect(callbacks.unused).not.toHaveBeenCalled();
   });
 
@@ -83,13 +83,13 @@ describe("resolveTransformFn", () => {
     const fn = resolveTransformFn(
       {
         type: "script",
-        code: "function(value) { throw new Error('boom'); }",
+        code: "function({ value }) { throw new Error('boom'); }",
       },
       {},
     );
 
     expect(fn).toBeDefined();
-    expect(() => fn?.("value")).toThrow("boom");
+    expect(() => fn?.({ value: "value", helpers: {} })).toThrow("boom");
   });
 
   it("script 为函数体时应该返回 undefined", () => {

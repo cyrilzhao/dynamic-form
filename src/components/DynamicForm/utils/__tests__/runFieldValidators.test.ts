@@ -86,7 +86,9 @@ describe("runAllFieldValidators", () => {
         name: createField([createScriptRule("requiredName")]),
       });
       const callbacks = {
-        requiredName: jest.fn((value: string) => (value ? null : "Required")),
+        requiredName: jest.fn(({ value }: { value: string }) =>
+          value ? null : "Required",
+        ),
       };
 
       const errors = await runAllFieldValidators(
@@ -96,8 +98,12 @@ describe("runAllFieldValidators", () => {
       );
 
       expect(errors).toEqual({});
-      expect(callbacks.requiredName).toHaveBeenCalledWith("Alice", {
-        name: "Alice",
+      expect(callbacks.requiredName).toHaveBeenCalledWith({
+        value: "Alice",
+        formValues: {
+          name: "Alice",
+        },
+        helpers: {},
       });
     });
 
@@ -106,7 +112,7 @@ describe("runAllFieldValidators", () => {
         age: createField([createScriptRule("minAge")]),
       });
       const callbacks = {
-        minAge: jest.fn((value: number) =>
+        minAge: jest.fn(({ value }: { value: number }) =>
           value >= 18 ? null : "Age must be at least 18",
         ),
       };
@@ -121,7 +127,7 @@ describe("runAllFieldValidators", () => {
         username: createField([createScriptRule("uniqueUsername")]),
       });
       const callbacks = {
-        uniqueUsername: jest.fn(async (value: string) =>
+        uniqueUsername: jest.fn(async ({ value }: { value: string }) =>
           value === "taken" ? "Username already exists" : null,
         ),
       };
@@ -229,7 +235,7 @@ describe("runAllFieldValidators", () => {
         confirmPassword: createField([
           createScriptRule({
             type: "script",
-            code: "(value, formValues) => value === formValues.password ? null : 'Passwords do not match'",
+            code: "({ value, formValues }) => value === formValues.password ? null : 'Passwords do not match'",
           }),
         ]),
       });
@@ -251,7 +257,7 @@ describe("runAllFieldValidators", () => {
         name: createField([
           createScriptRule({
             type: "script",
-            code: "(value, formValues) => {",
+            code: "({ value, formValues }) => {",
           }),
         ]),
       });
@@ -267,7 +273,7 @@ describe("runAllFieldValidators", () => {
         name: createField([
           createScriptRule({
             type: "script",
-            code: "(value, formValues) => {",
+            code: "({ value, formValues }) => {",
           }),
         ]),
       });

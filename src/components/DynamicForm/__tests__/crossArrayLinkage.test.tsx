@@ -56,7 +56,7 @@ describe("跨数组联动测试", () => {
     };
 
     const linkageFunctions = {
-      checkAdminPermission: (formData: any) => {
+      checkAdminPermission: ({ formData }: { formData: any }) => {
         const permissions = formData.permissions || [];
         return permissions.some((p: any) => p.isAdmin === true);
       },
@@ -149,7 +149,7 @@ describe("跨数组联动测试", () => {
     };
 
     const linkageFunctions = {
-      checkAdminPermission: (formData: any) => {
+      checkAdminPermission: ({ formData }: { formData: any }) => {
         const permissions = formData.permissions || [];
         return permissions.some((p: any) => p.isAdmin === true);
       },

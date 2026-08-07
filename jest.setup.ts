@@ -1,6 +1,18 @@
 // Jest 全局设置文件
 import '@testing-library/jest-dom';
 
+// 全局 mock ofetch 模块（ESM 模块在 Jest 中需要特殊处理）
+jest.mock('ofetch', () => ({
+  ofetch: jest.fn(async (url: string, options?: any) => {
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+      text: async () => '',
+    };
+  }),
+}));
+
 // 保存原始的 console 方法
 const originalError = console.error;
 const originalWarn = console.warn;

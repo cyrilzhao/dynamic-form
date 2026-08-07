@@ -6,16 +6,17 @@
 2. [Installation](#installation)
 3. [Quick Start](#quick-start)
 4. [Basic Usage](#basic-usage)
-5. [Schema Definition](#schema-definition)
+5. [Inline Script Helpers](#inline-script-helpers)
+6. [Schema Definition](#schema-definition)
    - [Basic Field Types](#1-basic-field-types)
    - [Field Validation](#2-field-validation)
    - [Field Linkage](#3-field-linkage)
    - [UI Configuration](#4-ui-configuration)
-6. [Advanced Features](#advanced-features)
-7. [API Reference](#api-reference)
-8. [Examples](#examples)
-9. [Best Practices](#best-practices)
-10. [Troubleshooting](#troubleshooting)
+7. [Advanced Features](#advanced-features)
+8. [API Reference](#api-reference)
+9. [Examples](#examples)
+10. [Best Practices](#best-practices)
+11. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -30,6 +31,7 @@ DynamicForm is a powerful, configuration-driven form component built on top of `
 - **Validation**: Automatic validation based on JSON Schema rules
 - **High Performance**: Built on react-hook-form's uncontrolled components
 - **Extensible**: Support for custom widgets and validation rules
+- **Inline Script Helpers**: Built-in `ofetch`, Lodash, and Valibot helpers for trusted inline scripts
 - **UI Linkage**: Dynamic field visibility, disabled states, and computed values
 - **Nested Forms**: Support for nested objects and arrays
 - **Field Path Flattening**: Simplify deeply nested parameter display
@@ -49,6 +51,7 @@ DynamicForm is a powerful, configuration-driven form component built on top of `
 npm install react-hook-form
 npm install ajv ajv-formats
 npm install @types/json-schema
+npm install ofetch lodash valibot
 ```
 
 ### Optional Dependencies
@@ -198,6 +201,196 @@ DynamicForm supports three layout modes:
   onSubmit={handleSubmit}
 />
 ```
+
+---
+
+## Inline Script Helpers
+
+Inline scripts and registered callback functions can access shared helper utilities through the `helpers` parameter. Helpers are available in:
+
+- `ui.validators`
+- `ui.transform`
+- `ui.linkages.fulfill` / `ui.linkages.otherwise`
+- `ui.callbackProps`
+
+This guide keeps helper usage in one place because the same helper object is shared by all inline script entry points.
+
+### Built-in Helpers
+
+DynamicForm provides these helpers by default:
+
+| Helper | Description | Example |
+| ------ | ----------- | ------- |
+| `helpers.ofetch` | Cross-browser and Node.js request utility based on `ofetch` | `await helpers.ofetch('/api/users')` |
+| `helpers._` | Lodash utilities | `helpers._.sumBy(items, 'price')` |
+| `helpers.v` | Valibot runtime validation utilities | `helpers.v.safeParse(schema, value)` |
+
+You can override or extend helpers through the `helpers` prop:
+
+```typescript
+import { ofetch } from 'ofetch';
+import dayjs from 'dayjs';
+
+const helpers = {
+  ofetch: ofetch.create({
+    baseURL: '/api',
+  }),
+  dayjs,
+};
+
+<DynamicForm
+  schema={schema}
+  helpers={helpers}
+  onSubmit={handleSubmit}
+/>
+```
+
+### Function Signatures
+
+All helper-aware functions use an object parameter:
+
+| Entry Point | Signature |
+| ----------- | --------- |
+| `ui.validators` | `({ value, formValues, helpers }) => string \| null \| Promise<string \| null>` |
+| `ui.transform` | `({ value, helpers }) => any` |
+| `ui.linkages.*.function` | `({ formData, context, helpers }) => any \| Promise<any>` |
+| `ui.callbackProps` | `({ args, helpers }) => any \| Promise<any>` |
+
+`ui.transform` is intentionally synchronous. Use value linkages for asynchronous computed values.
+
+### Validation with Valibot
+
+```typescript
+{
+  type: 'string',
+  title: 'Username',
+  ui: {
+    validators: [
+      {
+        type: 'script',
+        callback: {
+          type: 'script',
+          code: `function({ value, helpers }) {
+            if (!value) return 'Username is required';
+
+            const schema = helpers.v.pipe(
+              helpers.v.string(),
+              helpers.v.minLength(3),
+              helpers.v.regex(/^[a-zA-Z0-9_]+$/)
+            );
+
+            const result = helpers.v.safeParse(schema, value);
+            return result.success
+              ? null
+              : 'Username must be at least 3 characters and contain only letters, numbers, or underscores';
+          }`,
+        },
+      },
+    ],
+  },
+}
+```
+
+### Async Validation with ofetch
+
+```typescript
+const callbacks = {
+  checkUsernameAvailability: async ({ value, helpers }) => {
+    if (!value) return null;
+
+    const result = await helpers.ofetch('/check-username', {
+      method: 'POST',
+      body: { username: value },
+    });
+
+    return result.available ? null : 'Username is already taken';
+  },
+};
+
+<DynamicForm
+  schema={schema}
+  callbacks={callbacks}
+/>
+```
+
+### Transform with Lodash
+
+```typescript
+{
+  type: 'string',
+  title: 'Currency',
+  ui: {
+    transform: {
+      callback: {
+        type: 'script',
+        code: `function({ value, helpers }) {
+          return helpers._.toUpper(helpers._.trim(value));
+        }`,
+      },
+    },
+  },
+}
+```
+
+### Linkage with Helpers
+
+```typescript
+const linkageFunctions = {
+  loadCityOptions: async ({ formData, helpers }) => {
+    if (!formData.country) return [];
+
+    const cities = await helpers.ofetch('/cities', {
+      query: { country: formData.country },
+    });
+
+    return helpers._.map(cities, (city) => ({
+      label: city.name,
+      value: city.id,
+    }));
+  },
+};
+```
+
+### callbackProps with Helpers
+
+```typescript
+{
+  type: 'string',
+  title: 'Avatar',
+  ui: {
+    widget: 'upload',
+    callbackProps: {
+      onUpload: {
+        type: 'script',
+        code: `async function({ args, helpers }) {
+          const [file] = args;
+          const mimeSchema = helpers.v.pipe(
+            helpers.v.string(),
+            helpers.v.regex(/^image\\//)
+          );
+
+          if (!helpers.v.safeParse(mimeSchema, file.type).success) {
+            throw new Error('Only images are allowed');
+          }
+
+          const body = new FormData();
+          body.append('file', file);
+          const result = await helpers.ofetch('/upload', {
+            method: 'POST',
+            body,
+          });
+
+          return result.url;
+        }`,
+      },
+    },
+  },
+}
+```
+
+### Security Boundary
+
+Helpers are dependency injection, not a sandbox. Inline scripts still use dynamic JavaScript execution and should only be used with trusted schema sources. Do not accept inline scripts from untrusted user input.
 
 ---
 
@@ -927,7 +1120,7 @@ const schema = {
 
 #### Custom Field Validators (ui.validators)
 
-For advanced validation scenarios beyond JSON Schema rules and custom formats, you can use `ui.validators` to define field-level custom validators.
+For advanced validation scenarios beyond JSON Schema rules and custom formats, you can use `ui.validators` to define field-level custom validators. Validators can use inline script helpers; see [Inline Script Helpers](#inline-script-helpers).
 
 **ScriptValidator** allows you to define custom validation logic using JavaScript functions. It supports two callback modes:
 
@@ -955,11 +1148,20 @@ Reference a function from the `callbacks` registry for reusable validation logic
 
 ```typescript
 // Define validation function
-const validateUsername = (value: any, formValues: Record<string, any>) => {
+const validateUsername = ({ value, helpers }: {
+  value: any;
+  helpers: Record<string, any>;
+}) => {
   if (!value) return 'Username is required';
-  if (value.length < 3) return 'Username must be at least 3 characters';
-  if (!/^[a-zA-Z0-9_]+$/.test(value)) return 'Username can only contain letters, numbers, and underscores';
-  return null;
+  const schema = helpers.v.pipe(
+    helpers.v.string(),
+    helpers.v.minLength(3),
+    helpers.v.regex(/^[a-zA-Z0-9_]+$/)
+  );
+  const result = helpers.v.safeParse(schema, value);
+  return result.success
+    ? null
+    : 'Username must be at least 3 characters and contain only letters, numbers, or underscores';
 };
 
 // Pass to DynamicForm
@@ -999,9 +1201,10 @@ Provide a complete JavaScript function string for simple, one-off validation.
         type: 'script',
         callback: {
           type: 'script',
-          code: `function(value, formValues) {
+          code: `function({ value, formValues }) {
             // value: current field value
             // formValues: entire form data object
+            // helpers: built-in helper utilities
             // Return null for valid, error message string for invalid
             
             if (value !== formValues.password) {
@@ -1019,12 +1222,17 @@ Provide a complete JavaScript function string for simple, one-off validation.
 **Function signature:**
 
 ```typescript
-(value: any, formValues: Record<string, any>) => string | null | Promise<string | null>
+({ value, formValues, helpers }: {
+  value: any;
+  formValues: Record<string, any>;
+  helpers: Record<string, any>;
+}) => string | null | Promise<string | null>
 ```
 
 **Parameters:**
 - `value`: Current field value
 - `formValues`: Entire form data object
+- `helpers`: Built-in and user-provided helper utilities
 
 **Return value:**
 - `null` → Validation passes
@@ -1035,7 +1243,10 @@ Provide a complete JavaScript function string for simple, one-off validation.
 
 ```typescript
 // Using callback registry (recommended)
-const validatePassword = (value: any, formValues: Record<string, any>) => {
+const validatePassword = ({ value, formValues }: {
+  value: any;
+  formValues: Record<string, any>;
+}) => {
   if (!value) return 'Please confirm your password';
   if (value !== formValues.password) {
     return 'Passwords do not match';
@@ -1077,12 +1288,16 @@ const schema: ExtendedJSONSchema = {
             // Inline script for simple one-off validation
             callback: {
               type: 'script',
-              code: `function(value, formValues) {
+              code: `function({ value, helpers }) {
                 // Async validation is supported
                 if (!value) return null; // Optional field
                 
                 // Example: validate coupon format
-                if (!/^[A-Z0-9]{6,10}$/.test(value)) {
+                const schema = helpers.v.pipe(
+                  helpers.v.string(),
+                  helpers.v.regex(/^[A-Z0-9]{6,10}$/)
+                );
+                if (!helpers.v.safeParse(schema, value).success) {
                   return 'Invalid coupon format (6-10 uppercase letters/numbers)';
                 }
                 return null;
@@ -1123,17 +1338,17 @@ const schema: ExtendedJSONSchema = {
 
 ```typescript
 // Define async validation function that calls your API
-const checkUsernameAvailability = async (value: any) => {
+const checkUsernameAvailability = async ({ value, helpers }: {
+  value: any;
+  helpers: Record<string, any>;
+}) => {
   if (!value) return null;
   
   try {
-    const response = await fetch('/api/check-username', {
+    const result = await helpers.ofetch('/api/check-username', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: value }),
+      body: { username: value },
     });
-    
-    const result = await response.json();
     return result.available ? null : 'Username is already taken';
   } catch (error) {
     return 'Failed to validate username';
@@ -1285,7 +1500,7 @@ const schema = {
 };
 
 const linkageFunctions = {
-  calculateTotal: (formData: any) => {
+  calculateTotal: ({ formData }: { formData: Record<string, any> }) => {
     return (formData.price || 0) * (formData.quantity || 0);
   }
 };
@@ -1330,7 +1545,7 @@ const schema = {
 }
 
 const linkageFunctions = {
-  getProvinceOptions: (formData: any) => {
+  getProvinceOptions: ({ formData }: { formData: Record<string, any> }) => {
     if (formData.country === 'china') {
       return [
         { label: 'Beijing', value: 'beijing' },
@@ -1490,7 +1705,7 @@ const schema = {
 }
 
 const linkageFunctions = {
-  loadUserSchema: (formData: any) => {
+  loadUserSchema: ({ formData }: { formData: Record<string, any> }) => {
     return userSchemas[formData.userType] || { type: 'object', properties: {} }
   },
 }
@@ -1838,7 +2053,7 @@ fulfill: {
 
 **Dynamic Linkage** - Function-based computation:
 
-Dynamic linkage supports both registered function names and trusted inline scripts.
+Dynamic linkage supports both registered function names and trusted inline scripts. Linkage functions can use inline script helpers; see [Inline Script Helpers](#inline-script-helpers).
 
 **Form 1: Function name reference**
 
@@ -1849,9 +2064,12 @@ fulfill: {
 
 // Register the function
 const linkageFunctions = {
-  myLinkageFunction: (formData: any) => {
+  myLinkageFunction: ({ formData, helpers }: {
+    formData: Record<string, any>;
+    helpers: Record<string, any>;
+  }) => {
     // Compute and return the result
-    return calculatedValue;
+    return helpers._.sumBy(formData.items || [], 'price');
   }
 };
 ```
@@ -1862,7 +2080,7 @@ const linkageFunctions = {
 fulfill: {
   function: {
     type: 'script',
-    code: `function(formData, context) {
+    code: `function({ formData, context, helpers }) {
       return (formData.price || 0) * (formData.quantity || 0);
     }`,
   },
@@ -1873,6 +2091,7 @@ Inline linkage scripts must be complete JavaScript functions. They receive:
 
 - `formData` - Current form values
 - `context` - Linkage context, including `fieldPath`, array metadata, and `externalData` from `linkageContext`
+- `helpers` - Built-in and user-provided helper utilities
 
 The return value is applied according to the linkage type:
 
@@ -1898,31 +2117,37 @@ Linkage functions can be asynchronous, which is useful for fetching data from AP
 ```typescript
 const linkageFunctions = {
   // Async function to load options from API
-  loadCityOptions: async (formData: any) => {
+  loadCityOptions: async ({ formData, helpers }: {
+    formData: Record<string, any>;
+    helpers: Record<string, any>;
+  }) => {
     const countryId = formData.country
     if (!countryId) return []
 
-    const response = await fetch(`/api/cities?country=${countryId}`)
-    const cities = await response.json()
+    const cities = await helpers.ofetch('/api/cities', {
+      query: { country: countryId },
+    })
 
-    return cities.map((city: any) => ({
+    return helpers._.map(cities, (city: any) => ({
       label: city.name,
       value: city.id,
     }))
   },
 
   // Async function to validate and compute value
-  calculateShipping: async (formData: any) => {
+  calculateShipping: async ({ formData, helpers }: {
+    formData: Record<string, any>;
+    helpers: Record<string, any>;
+  }) => {
     const { weight, destination } = formData
     if (!weight || !destination) return 0
 
-    const response = await fetch('/api/calculate-shipping', {
+    const result = await helpers.ofetch('/api/calculate-shipping', {
       method: 'POST',
-      body: JSON.stringify({ weight, destination }),
+      body: { weight, destination },
     })
-    const { cost } = await response.json()
 
-    return cost
+    return result.cost
   },
 }
 
@@ -2097,7 +2322,7 @@ import { CustomInputWidget } from './widgets/CustomInputWidget';
 
 **Widget Callbacks:**
 
-Use `ui.callbackProps` to pass runtime functions to widgets (e.g., upload handlers, search handlers). Values can be either function names from the `callbacks` registry or trusted inline scripts defined in schema.
+Use `ui.callbackProps` to pass runtime functions to widgets (e.g., upload handlers, search handlers). Values can be either function names from the `callbacks` registry or trusted inline scripts defined in schema. Callback props can use inline script helpers; see [Inline Script Helpers](#inline-script-helpers).
 
 ```typescript
 const schema = {
@@ -2127,11 +2352,13 @@ function MyForm() {
   // ✅ 必须用 useMemo 稳定引用，否则每次渲染都创建新对象，
   //    导致 CallbacksContext 持续触发所有 Widget 重渲染
   const callbacks = useMemo(() => ({
-    handleAvatarUpload: async (file: File) => {
+    handleAvatarUpload: async ({ args }: { args: any[] }) => {
+      const [file] = args as [File];
       const url = await uploadAvatarAPI(file);
       return url;
     },
-    handleResumeUpload: async (file: File) => {
+    handleResumeUpload: async ({ args }: { args: any[] }) => {
+      const [file] = args as [File];
       const url = await uploadResumeAPI(file);
       return url;
     }
@@ -2162,7 +2389,8 @@ const schema = {
         callbackProps: {
           onFormatFileName: {
             type: 'script',
-            code: `function(file) {
+            code: `function({ args, helpers }) {
+              const [file] = args;
               return file.name.toUpperCase();
             }`
           }
@@ -2181,8 +2409,6 @@ const schema = {
 - The `callbacks` registry is shared across all fields; each field selects its own functions via `callbackProps`
 - Keep static JSON data in `widgetProps`; put function props in `callbackProps`
 - Inline JavaScript uses `Function` constructor and should only be used with trusted schema sources
-
-````
 
 #### Layout Configuration
 
@@ -2325,7 +2551,7 @@ Additional UI customization options:
 
 #### Value Transform (`ui.transform`)
 
-Use `ui.transform` when a field needs to accept input in one domain (e.g. percentage) but store a different value (e.g. decimal). The conversion is transparent to external callers.
+Use `ui.transform` when a field needs to accept input in one domain (e.g. percentage) but store a different value (e.g. decimal). The conversion is transparent to external callers. Transform functions can use inline script helpers; see [Inline Script Helpers](#inline-script-helpers).
 
 **Value domain contract:**
 
@@ -2347,9 +2573,9 @@ The `callback` and `reverseCallback` support two forms:
 ui: {
   transform: {
     callback: string          // function name from the `callbacks` registry
-                              // signature: (inputValue: any) => storedValue
+                              // signature: ({ value, helpers }) => storedValue
     reverseCallback?: string  // reverse function name
-                              // signature: (storedValue: any) => inputValue
+                              // signature: ({ value, helpers }) => inputValue
   }
 }
 ```
@@ -2361,8 +2587,8 @@ ui: {
   transform: {
     callback: {
       type: 'script',
-      code: string            // Complete JavaScript function, e.g. 'function(value) { return value / 100; }'
-                              // receives `value` parameter, must return transformed value
+      code: string            // Complete JavaScript function, e.g. 'function({ value }) { return value / 100; }'
+                              // receives object parameter, must return transformed value
     },
     reverseCallback?: {
       type: 'script',
@@ -2376,6 +2602,7 @@ ui: {
 
 - Use **function name reference** when the transform logic is reused across multiple fields, or requires external dependencies
 - Use **inline JavaScript** for simple, self-contained transforms that are field-specific
+- Transform functions must be synchronous. Use value linkage for asynchronous computed values.
 
 ⚠️ **Security note**: Inline JavaScript uses `Function` constructor and should only be used with trusted code sources. Never accept inline scripts from untrusted user input.
 
@@ -2428,8 +2655,8 @@ const schema: ExtendedJSONSchema = {
 <DynamicForm
   schema={schema}
   callbacks={{
-    percentToDecimal: (val: number) => val / 100,
-    decimalToPercent: (val: number) => val * 100,
+    percentToDecimal: ({ value }: { value: number }) => value / 100,
+    decimalToPercent: ({ value }: { value: number }) => value * 100,
   }}
   onSubmit={(data) => {
     console.log(data.rate); // 0.96 — stored domain
@@ -2455,11 +2682,11 @@ const schema: ExtendedJSONSchema = {
           // Inline JavaScript function - no callbacks registry needed
           callback: {
             type: 'script',
-            code: 'function(value) { return value / 100; }',
+            code: 'function({ value }) { return value / 100; }',
           },
           reverseCallback: {
             type: 'script',
-            code: 'function(value) { return value * 100; }',
+            code: 'function({ value }) { return value * 100; }',
           },
         },
       },
@@ -2559,7 +2786,7 @@ const schema = {
 };
 
 const linkageFunctions = {
-  calculateTotal: (formData: any) => {
+  calculateTotal: ({ formData }: { formData: Record<string, any> }) => {
     return (formData.price || 0) * (formData.quantity || 0);
   }
 };
@@ -2604,7 +2831,7 @@ const schema = {
 }
 
 const linkageFunctions = {
-  getProvinceOptions: (formData: any) => {
+  getProvinceOptions: ({ formData }: { formData: Record<string, any> }) => {
     if (formData.country === 'china') {
       return [
         { label: 'Beijing', value: 'beijing' },
@@ -2819,8 +3046,9 @@ const schema = {
 | `onSubmit`         | `(data: any) => void \| Promise<void>`          | No       | -            | Submit handler                                                   |
 | `onChange`         | `(data: any) => void`                           | No       | -            | Change handler                                                   |
 | `widgets`          | `Record<string, ComponentType>`                 | No       | `{}`         | Custom widgets                                                   |
-| `linkageFunctions` | `Record<string, Function>`                      | No       | `{}`         | Linkage functions                                                |
-| `callbacks`        | `Record<string, Function>`                      | No       | `{}`         | Widget callback function registry (used with `ui.callbackProps`) |
+| `helpers`          | `Record<string, any>`                           | No       | built-in helpers | Helper utilities available in inline scripts and callbacks    |
+| `linkageFunctions` | `Record<string, Function>`                      | No       | `{}`         | Helper-aware linkage functions                                   |
+| `callbacks`        | `Record<string, Function>`                      | No       | `{}`         | Helper-aware callback registry used by validators, transforms, and `ui.callbackProps` |
 | `customFormats`    | `Record<string, Function>`                      | No       | `{}`         | Custom format validators                                         |
 | `layout`           | `'vertical' \| 'horizontal' \| 'inline'`        | No       | `'vertical'` | Form layout                                                      |
 | `labelWidth`       | `number \| string`                              | No       | -            | Label width (horizontal layout)                                  |
@@ -3213,7 +3441,7 @@ function EmployeeForm() {
         value: dept.id
       }));
     },
-    getEmployeeOptions: (formData: any) => {
+    getEmployeeOptions: ({ formData }: { formData: Record<string, any> }) => {
       const selectedDept = formData.department;
       if (!selectedDept) return [];
 

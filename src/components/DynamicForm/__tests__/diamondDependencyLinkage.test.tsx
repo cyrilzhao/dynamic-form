@@ -91,7 +91,7 @@ describe("菱形依赖联动测试", () => {
     };
 
     const linkageFunctions = {
-      calcShowCompany: (formData: any, context?: any) => {
+      calcShowCompany: ({ formData, context }: { formData: any; context?: any }) => {
         if (context?.arrayPath && context.arrayIndex !== undefined) {
           const arrayData = formData[context.arrayPath];
           const elementData = arrayData?.[context.arrayIndex];
@@ -99,7 +99,7 @@ describe("菱形依赖联动测试", () => {
         }
         return formData?.type === "work";
       },
-      calcShowDepartment: (formData: any, context?: any) => {
+      calcShowDepartment: ({ formData, context }: { formData: any; context?: any }) => {
         if (context?.arrayPath && context.arrayIndex !== undefined) {
           const arrayData = formData[context.arrayPath];
           const elementData = arrayData?.[context.arrayIndex];

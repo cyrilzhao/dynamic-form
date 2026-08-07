@@ -1,4 +1,5 @@
 import type { ExtendedJSONSchema, ValidatorRule } from "../types/schema";
+import { executeInlineScript } from "./executeInlineScript";
 
 // 通过 globalThis 访问 Function 构造器，避免静态分析误报
 const DynamicFn = globalThis["Function"] as FunctionConstructor; // trusted-dynamic-code
@@ -8,10 +9,11 @@ async function runValidator(
   value: any,
   formValues: Record<string, any>,
   callbacks: Record<string, (...args: any[]) => any>,
+  helpers: Record<string, any>,
 ): Promise<string | null> {
   if (rule.type === "script") {
     // 解析 callback 函数
-    let fn: ((value: any, formValues: Record<string, any>) => any) | undefined;
+    let fn: ((params: { value: any; formValues: Record<string, any>; helpers: Record<string, any> }) => any) | undefined;
 
     if (typeof rule.callback === "string") {
       // 从 callbacks 注册表获取函数
@@ -21,10 +23,20 @@ async function runValidator(
           ? `Callback function "${rule.callback}" not found`
           : "Validation error";
       }
-    } else if (rule.callback.type === "script" && rule.callback.code.trim()) {
-      // 执行内联 JavaScript 函数字符串
+    } else if (
+      typeof rule.callback !== "string" &&
+      rule.callback.type === "script" &&
+      rule.callback.code.trim()
+    ) {
+      // 执行内联 JavaScript 函数字符串，使用 executeInlineScript
+      const scriptCode = rule.callback.code; // 类型已收窄
       try {
-        fn = DynamicFn(`return (${rule.callback.code})`)();
+        fn = (params: { value: any; formValues: Record<string, any>; helpers: Record<string, any> }) =>
+          executeInlineScript({
+            code: scriptCode,
+            params: { value: params.value, formValues: params.formValues },
+            helpers: params.helpers,
+          });
       } catch (e) {
         return process.env.NODE_ENV !== "production"
           ? `Script error: ${(e as Error).message}`
@@ -37,9 +49,14 @@ async function runValidator(
     }
 
     try {
-      const result = await fn(value, formValues);
+      const result = await fn({ value, formValues, helpers });
       return result === null ? null : String(result);
     } catch (e) {
+      if (e instanceof SyntaxError) {
+        return process.env.NODE_ENV !== "production"
+          ? `Script error: ${e.message}`
+          : "Validation error";
+      }
       return process.env.NODE_ENV !== "production"
         ? `Validation error: ${(e as Error).message}`
         : "Validation failed";
@@ -57,6 +74,7 @@ export async function runAllFieldValidators(
   values: Record<string, any>,
   schema: ExtendedJSONSchema,
   callbacks: Record<string, (...args: any[]) => any>,
+  helpers: Record<string, any> = {},
 ): Promise<Record<string, string>> {
   const errors: Record<string, string> = {};
   const properties = schema.properties;
@@ -80,6 +98,7 @@ export async function runAllFieldValidators(
           values[fieldName],
           values,
           callbacks,
+          helpers,
         );
         if (error) {
           errors[fieldName] = error;

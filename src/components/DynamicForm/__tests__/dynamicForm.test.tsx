@@ -25,7 +25,8 @@ describe("DynamicForm", () => {
             callbackProps: {
               onFormat: {
                 type: "script",
-                code: `function(value, meta) {
+                code: `function({ args }) {
+                  const [value, meta] = args;
                   return value + "-" + meta.source;
                 }`,
               },
@@ -226,8 +227,8 @@ describe("DynamicForm", () => {
     };
 
     const callbacks = {
-      toStorageRate: (value: number) => value / 100,
-      toDisplayRate: (value: number) => value * 100,
+      toStorageRate: ({ value }: { value: number }) => value / 100,
+      toDisplayRate: ({ value }: { value: number }) => value * 100,
     };
 
     const { formRef, container } = renderDynamicForm({
@@ -264,8 +265,8 @@ describe("DynamicForm", () => {
     };
 
     const callbacks = {
-      toStorageRate: (value: number) => value / 100,
-      toDisplayRate: (value: number) => value * 100,
+      toStorageRate: ({ value }: { value: number }) => value / 100,
+      toDisplayRate: ({ value }: { value: number }) => value * 100,
     };
 
     const { formRef, container } = renderDynamicForm({
@@ -317,16 +318,16 @@ describe("DynamicForm", () => {
     };
 
     const callbacks = {
-      addressToStorage: (value: { street: string; ratio: number }) => ({
+      addressToStorage: ({ value }: { value: { street: string; ratio: number } }) => ({
         street: value.street,
         ratio: value.ratio / 10,
       }),
-      addressToDisplay: (value: { street: string; ratio: number }) => ({
+      addressToDisplay: ({ value }: { value: { street: string; ratio: number } }) => ({
         street: value.street,
         ratio: value.ratio * 10,
       }),
-      childToStorage: (value: number) => value / 100,
-      childToDisplay: (value: number) => value * 100,
+      childToStorage: ({ value }: { value: number }) => value / 100,
+      childToDisplay: ({ value }: { value: number }) => value * 100,
     };
 
     const { formRef, container } = renderDynamicForm({
@@ -388,12 +389,12 @@ describe("DynamicForm", () => {
     };
 
     const callbacks = {
-      linesToStorage: (value: Array<{ amount: number }>) =>
+      linesToStorage: ({ value }: { value: Array<{ amount: number }> }) =>
         value.map((item) => ({ amount: item.amount / 10 })),
-      linesToDisplay: (value: Array<{ amount: number }>) =>
+      linesToDisplay: ({ value }: { value: Array<{ amount: number }> }) =>
         value.map((item) => ({ amount: item.amount * 10 })),
-      childToStorage: (value: number) => value / 100,
-      childToDisplay: (value: number) => value * 100,
+      childToStorage: ({ value }: { value: number }) => value / 100,
+      childToDisplay: ({ value }: { value: number }) => value * 100,
     };
 
     const { formRef, container } = renderDynamicForm({
@@ -439,8 +440,8 @@ describe("DynamicForm", () => {
     };
 
     const callbacks = {
-      toRatio: (value: number) => value / 100,
-      toPercent: (value: number) => value * 100,
+      toRatio: ({ value }: { value: number }) => value / 100,
+      toPercent: ({ value }: { value: number }) => value * 100,
     };
 
     const { formRef, container } = renderDynamicForm({

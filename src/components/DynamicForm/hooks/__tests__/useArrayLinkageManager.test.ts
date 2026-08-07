@@ -406,7 +406,7 @@ describe("useArrayLinkageManager", () => {
 
       let multiplier = 2;
       const linkageFunctions = {
-        calculate: (formData: Record<string, any>) =>
+        calculate: ({ formData }: { formData: Record<string, any> }) =>
           formData.input * multiplier,
       };
 

@@ -13,7 +13,9 @@ import { FieldHelp } from "../components/FieldHelp";
 import { FieldRegistry } from "../core/FieldRegistry";
 import { useWidgets } from "../context/WidgetsContext";
 import { useCallbacks } from "../context/CallbacksContext";
+import { useHelpers } from "../context/HelpersContext";
 import { resolveTransformFn } from "../utils/resolveTransformFn";
+import { executeInlineScript } from "../utils/executeInlineScript";
 import type { CallbackPropRef, FieldConfig } from "../types/schema";
 import type { LinkageResult } from "../types/linkage";
 
@@ -44,6 +46,7 @@ export interface FormFieldProps {
 function resolveCallbackProps(
   callbackProps: Record<string, CallbackPropRef> | undefined,
   callbacks: Record<string, (...args: any[]) => any>,
+  helpers: Record<string, any>,
   widgetProps?: Record<string, any>,
 ): Record<string, (...args: any[]) => any> {
   if (!callbackProps) {
@@ -63,11 +66,14 @@ function resolveCallbackProps(
         hasWarned = true;
       }
     } else if (callbackRef.type === "script" && callbackRef.code.trim()) {
+      // 使用 executeInlineScript 执行内联脚本，支持 helpers
       try {
-        const compiled = DynamicFn(`return (${callbackRef.code})`)();
-        if (typeof compiled === "function") {
-          fn = compiled;
-        }
+        fn = (...args: any[]) =>
+          executeInlineScript({
+            code: callbackRef.code,
+            params: { args },
+            helpers,
+          });
       } catch (e) {
         if (process.env.NODE_ENV !== "production") {
           console.warn(
@@ -88,6 +94,18 @@ function resolveCallbackProps(
       }
       continue;
     }
+
+    // 包装函数以支持对象参数形式
+    const wrappedFn = (...args: any[]) => {
+      if (typeof callbackRef === "string") {
+        // 从 callbacks 获取的函数，使用对象参数调用
+        return fn!({ args, helpers });
+      } else {
+        // 内联脚本已经在上面处理了 helpers，直接调用
+        return fn!(...args);
+      }
+    };
+
     if (
       process.env.NODE_ENV !== "production" &&
       widgetProps &&
@@ -97,7 +115,7 @@ function resolveCallbackProps(
         `[DynamicForm] callbackProps key "${propName}" overrides widgetProps`,
       );
     }
-    result[propName] = fn;
+    result[propName] = wrappedFn;
   }
   return result;
 }
@@ -118,7 +136,8 @@ function resolveCallbackProps(
 interface WidgetWithTransformProps {
   controllerField: any;
   WidgetComponent: React.ComponentType<any>;
-  transformFn: (val: any) => any;
+  transformFn: (params: { value: any; helpers: Record<string, any> }) => any;
+  helpers: Record<string, any>;
   hideConvertedValue?: boolean;
   widgetProps: Record<string, any>;
 }
@@ -127,6 +146,7 @@ const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
   controllerField,
   WidgetComponent,
   transformFn,
+  helpers,
   hideConvertedValue = false,
   widgetProps,
 }) => {
@@ -138,7 +158,7 @@ const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
       const initial = controllerField.value;
       if (initial != null && initial !== "") {
         try {
-          return String(transformFn(initial));
+          return String(transformFn({ value: initial, helpers }));
         } catch {
           return null;
         }
@@ -167,14 +187,14 @@ const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
       val !== "" && val != null
         ? (() => {
             try {
-              return String(transformRef.current(val));
+              return String(transformRef.current({ value: val, helpers }));
             } catch {
               return null;
             }
           })()
         : null,
     );
-  }, [controllerField.value]);
+  }, [controllerField.value, helpers]);
 
   // 用户输入时：存储展示域值（不做转换），同时实时计算并展示转换后的预览
   // 存储展示域而非存储域的原因：使所有校验规则（min/max/pattern/custom validate）
@@ -183,13 +203,13 @@ const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
     setDisplayValue(val);
     let preview: any;
     try {
-      preview = transformRef.current(val);
+      preview = transformRef.current({ value: val, helpers });
     } catch {
       preview = undefined;
     }
     controllerFieldRef.current.onChange(val);
     setTransformedPreview(preview != null ? String(preview) : null);
-  }, []);
+  }, [helpers]);
 
   const handleBlur = useCallback((e: any) => {
     controllerFieldRef.current.onBlur(e);
@@ -235,9 +255,10 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
 }) => {
   const { control } = useFormContext();
 
-  // 从 Context 获取 widgets 和 callbacks
+  // 从 Context 获取 widgets、callbacks 和 helpers
   const widgets = useWidgets();
   const callbacks = useCallbacks();
+  const helpers = useHelpers();
 
   const resolvedWidget =
     field.widget === "checkbox" && field.type !== "boolean"
@@ -300,6 +321,7 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
   const resolvedCallbacks = resolveCallbackProps(
     field.schema?.ui?.callbackProps,
     callbacks,
+    helpers,
     widgetProps,
   );
 
@@ -355,11 +377,12 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
           return (
             <>
               <FormGroup intent={error ? "danger" : "none"}>
-                {transformFn ? (
+                {transformFn && transformConfig ? (
                   <WidgetWithTransform
                     controllerField={controllerField}
                     WidgetComponent={WidgetComponent}
                     transformFn={transformFn}
+                    helpers={helpers}
                     hideConvertedValue={transformConfig.hideConvertedValue}
                     widgetProps={commonWidgetProps}
                   />

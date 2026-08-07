@@ -40,6 +40,7 @@
     "axios": "^1.13.2",
     "lodash": "^4.17.21",
     "lucide-react": "^0.562.0",
+    "ofetch": "^1.5.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.69.0",
@@ -47,6 +48,7 @@
     "react-router-dom": "^7.11.0",
     "react-virtuoso": "^4.18.1",
     "reactflow": "^11.11.4",
+    "valibot": "^1.4.2",
     "zustand": "^5.0.9"
   },
   "devDependencies": {

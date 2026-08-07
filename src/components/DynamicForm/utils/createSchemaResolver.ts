@@ -117,9 +117,11 @@ export function createSchemaResolver(
       }
     >
   >,
+  helpersRef?: RefObject<Record<string, any>>,
 ): Resolver {
   return async (values) => {
     const linkageStates = linkageStatesRef?.current ?? {};
+    const helpers = helpersRef?.current ?? {};
 
     // 构建应用了 schema 联动的动态 schema
     let effectiveSchema = schema;
@@ -158,6 +160,7 @@ export function createSchemaResolver(
       values,
       schema,
       callbacks,
+      helpers,
     );
     const errors = { ...schemaErrors, ...fieldValidatorErrors };
 

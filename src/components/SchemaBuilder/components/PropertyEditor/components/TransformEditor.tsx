@@ -51,7 +51,11 @@ const handleTransformRefChange = ({
   callback: CallbackPropRef | undefined;
   onChange: (value: UIConfig["transform"]) => void;
 }) => {
-  onChange({ ...value, callback: callback ?? "" });
+  if (!callback) {
+    onChange(undefined);
+    return;
+  }
+  onChange({ ...value, callback });
 };
 
 const handleReverseTransformRefChange = ({
@@ -63,6 +67,9 @@ const handleReverseTransformRefChange = ({
   callback: CallbackPropRef | undefined;
   onChange: (value: UIConfig["transform"]) => void;
 }) => {
+  if (!value) {
+    return;
+  }
   onChange({ ...value, reverseCallback: callback });
 };
 

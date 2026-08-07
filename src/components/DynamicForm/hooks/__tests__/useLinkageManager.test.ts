@@ -170,7 +170,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        calculateTotal: (formData: Record<string, any>) => {
+        calculateTotal: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
           return formData.price * formData.quantity;
         },
       };
@@ -207,7 +207,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        asyncCalculate: async (formData: Record<string, any>) => {
+        asyncCalculate: async ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
           await new Promise((resolve) => setTimeout(resolve, 10));
           return formData.input * 2;
         },
@@ -370,7 +370,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        getSchema: (formData: Record<string, any>) => {
+        getSchema: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
           if (formData.fieldType === "number") {
             return { type: "number", minimum: 0 };
           }
@@ -517,7 +517,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        checkCondition: (formData: Record<string, any>) => formData.value > 10,
+        checkCondition: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => formData.value > 10,
       };
 
       const { result } = renderHook(() => {
@@ -580,7 +580,7 @@ describe("useLinkageManager", () => {
 
       let multiplier = 2;
       const linkageFunctions = {
-        calculate: (formData: Record<string, any>) =>
+        calculate: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) =>
           formData.input * multiplier,
       };
 
@@ -624,7 +624,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        expensiveCalculation: (formData: Record<string, any>) => {
+        expensiveCalculation: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
           callCount++;
           return formData.input * 2;
         },
@@ -680,8 +680,8 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        calcA: (formData: Record<string, any>) => formData.fieldB + 1,
-        calcB: (formData: Record<string, any>) => formData.fieldA + 1,
+        calcA: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => formData.fieldB + 1,
+        calcB: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => formData.fieldA + 1,
       };
 
       renderHook(() => {
@@ -714,7 +714,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        checkType: (formData: Record<string, any>, context: any) => {
+        checkType: ({ formData, context }: { formData: Record<string, any>; context: any; helpers: any }) => {
           capturedContext = context;
           return formData.contacts?.[0]?.type === "business";
         },
@@ -755,7 +755,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        calculate: (formData: Record<string, any>) => formData.input * 2,
+        calculate: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => formData.input * 2,
       };
 
       const { result } = renderHook(() => {
@@ -819,7 +819,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        getCityOptions: (formData: Record<string, any>) => {
+        getCityOptions: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
           if (formData.country === "China") {
             return [
               { label: "Beijing", value: "beijing" },
@@ -905,7 +905,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        getCityOptions: (formData: Record<string, any>) => {
+        getCityOptions: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
           if (formData.country === "China") {
             return [
               { label: "Beijing", value: "beijing" },
@@ -958,7 +958,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        checkDisabled: (formData: Record<string, any>) => !formData.agreed,
+        checkDisabled: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => !formData.agreed,
       };
 
       const { result } = renderHook(() => {
@@ -989,7 +989,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        checkReadonly: (formData: Record<string, any>) =>
+        checkReadonly: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) =>
           formData.verified === true,
       };
 
@@ -1023,7 +1023,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        calculateTotal: (formData: Record<string, any>) =>
+        calculateTotal: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) =>
           formData.price * formData.quantity,
       };
 
@@ -1112,7 +1112,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        slowCalculate: jest.fn((formData: Record<string, unknown>) => {
+        slowCalculate: jest.fn(({ formData }: { formData: Record<string, unknown> }) => {
           const trigger = Number(formData.trigger ?? 0);
           return deferred.promise.then(() => trigger * 10);
         }),
@@ -1161,7 +1161,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        asyncCalculate: async (formData: Record<string, any>) => {
+        asyncCalculate: async ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
           callCount++;
           const currentCall = callCount;
           // 模拟不同的延迟
@@ -1223,7 +1223,7 @@ describe("useLinkageManager", () => {
 
       const callOrder: number[] = [];
       const linkageFunctions = {
-        slowAsync: async (formData: Record<string, any>) => {
+        slowAsync: async ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
           const value = formData.trigger;
           callOrder.push(value);
           // 第一次调用延迟更长
@@ -1315,7 +1315,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        controlledAsync: async (formData: Record<string, any>) => {
+        controlledAsync: async ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
           callCount++;
           const value = formData.trigger;
           const currentCall = callCount;
@@ -1392,7 +1392,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        delayedAsync: async (formData: Record<string, any>) => {
+        delayedAsync: async ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
           callCount++;
           const currentCall = callCount;
           const value = formData.trigger;
@@ -1455,7 +1455,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        racingAsync: async (formData: Record<string, any>) => {
+        racingAsync: async ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
           callCount++;
           const currentCall = callCount;
           // 第一次调用延迟更长
@@ -1517,7 +1517,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        slowAsync: async (formData: Record<string, any>) => {
+        slowAsync: async ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
           await new Promise<void>((resolve) => {
             asyncResolvers.push(resolve);
             // 自动在短时间后解决
@@ -1589,7 +1589,7 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        calculate: async (formData: Record<string, any>) => {
+        calculate: async ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
           await new Promise((resolve) => setTimeout(resolve, 10));
           return formData.input * 2;
         },

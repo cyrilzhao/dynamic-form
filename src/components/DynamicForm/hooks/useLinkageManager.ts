@@ -24,6 +24,8 @@ import {
   LinkageOperationController,
   type LinkageRunToken,
 } from "../utils/linkageOperationController";
+import { useHelpers } from "../context/HelpersContext";
+import { executeInlineScript } from "../utils/executeInlineScript";
 
 // 用于执行动态脚本
 const DynamicFn = globalThis["Function"] as FunctionConstructor; // trusted-dynamic-code
@@ -192,6 +194,9 @@ export function useLinkageManager({
   operationController,
 }: LinkageManagerOptions) {
   const { watch, getValues, setValue } = form;
+
+  // 获取 helpers
+  const helpers = useHelpers();
 
   const ownOperationControllerRef = useRef(new LinkageOperationController());
   const controller = operationController ?? ownOperationControllerRef.current;
@@ -472,6 +477,7 @@ export function useLinkageManager({
             asyncSequenceManager,
             dependencyGraph: currentDependencyGraph,
             cache,
+            helpers,
             _caller: `processQueue(trigger=${task.fieldName})`,
           });
 
@@ -668,6 +674,7 @@ export function useLinkageManager({
         dependencyGraph: currentDependencyGraph,
         cache,
         skipSequenceCheck: true,
+        helpers,
         _caller: "refreshLinkage",
       });
       // 使用公共函数应用联动结果
@@ -768,6 +775,7 @@ async function evaluateLinkagesByLayers({
   dependencyGraph,
   cache,
   skipSequenceCheck = false,
+  helpers,
   _caller = "unknown",
 }: {
   fields: string[];
@@ -779,6 +787,7 @@ async function evaluateLinkagesByLayers({
   dependencyGraph: DependencyGraph;
   cache?: LinkageResultCache;
   skipSequenceCheck?: boolean;
+  helpers: Record<string, any>;
   _caller?: string;
 }): Promise<{
   states: Record<string, LinkageResult>;
@@ -818,6 +827,7 @@ async function evaluateLinkagesByLayers({
                 asyncSequenceManager,
                 cache,
                 skipSequenceCheck,
+                helpers,
               }),
             ),
           );
@@ -945,6 +955,7 @@ async function evaluateLinkage({
   asyncSequenceManager,
   cache,
   skipSequenceCheck = false,
+  helpers,
 }: {
   linkage: LinkageConfig;
   formData: Record<string, any>;
@@ -954,6 +965,7 @@ async function evaluateLinkage({
   asyncSequenceManager: AsyncSequenceManager;
   cache?: LinkageResultCache;
   skipSequenceCheck?: boolean;
+  helpers: Record<string, any>;
 }): Promise<LinkageResult> {
   // ✅ 缓存优化：检查是否启用缓存（默认禁用）
   const isCacheEnabled = linkage.enableCache === true;
@@ -985,7 +997,7 @@ async function evaluateLinkage({
 
   // 如果没有 when 条件，默认使用 fulfill
   const shouldFulfill = linkage.when
-    ? await evaluateCondition(linkage.when, formData, linkageFunctions, context)
+    ? await evaluateCondition(linkage.when, formData, linkageFunctions, context, helpers)
     : true;
 
   const effect = shouldFulfill ? linkage.fulfill : linkage.otherwise;
@@ -1017,18 +1029,25 @@ async function evaluateLinkage({
         // }
       }
     } else if (
+      typeof effect.function !== "string" &&
       effect.function.type === "script" &&
       effect.function.code.trim()
     ) {
-      // 内联脚本：使用 DynamicFn 执行
+      // 内联脚本：使用 executeInlineScript 执行，支持 helpers
+      const scriptCode = effect.function.code; // 类型已收窄
       try {
-        fn = DynamicFn(`return (${effect.function.code})`)() as LinkageFunction;
+        fn = (params: { formData: any; context: any; helpers: any }) =>
+          executeInlineScript({
+            code: scriptCode,
+            params: { formData: params.formData, context: params.context },
+            helpers: params.helpers,
+          });
       } catch (e) {
         if (process.env.NODE_ENV !== "production") {
           console.error("[evaluateLinkage] 脚本执行错误:", {
             fieldPath,
             error: (e as Error).message,
-            code: effect.function.code,
+            code: scriptCode,
           });
         }
       }
@@ -1043,8 +1062,8 @@ async function evaluateLinkage({
       const sequenceKey = `${fieldPath}:${linkage.type}`;
       const sequence = asyncSequenceManager.next(sequenceKey);
 
-      // 使用 await 支持异步函数，传递 context
-      const fnResult = await fn(formData, context);
+      // 使用 await 支持异步函数，传递对象参数（包含 helpers）
+      const fnResult = await fn({ formData, context, helpers });
 
       // 检查序列号是否仍然是最新的（防止竞态条件）
       // 注意：初始化阶段跳过序列号检查，因为不存在竞态条件
@@ -1115,13 +1134,14 @@ async function evaluateCondition(
   formData: Record<string, any>,
   linkageFunctions: Record<string, LinkageFunction>,
   context: LinkageFunctionContext,
+  helpers: Record<string, any>,
 ): Promise<boolean> {
   // 如果是字符串，尝试作为函数名调用
   if (typeof when === "string") {
     const fn = linkageFunctions[when];
     if (fn) {
-      // 使用 await 支持异步函数，传递 context
-      const result = await fn(formData, context);
+      // 使用 await 支持异步函数，传递对象参数（包含 helpers）
+      const result = await fn({ formData, context, helpers });
       return Boolean(result);
     }
     console.warn(`Linkage function "${when}" not found`);

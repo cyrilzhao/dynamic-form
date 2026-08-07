@@ -1,40 +1,40 @@
-import React, { forwardRef, useCallback, useMemo } from "react";
-import { useFormContext, useFieldArray, Controller } from "react-hook-form";
-import { Button, InputGroup } from "@blueprintjs/core";
-import { Trash2, Plus } from "lucide-react";
-import type { FieldWidgetProps } from "../types";
-import type { ExtendedJSONSchema } from "../types/schema";
-import { FieldRegistry } from "../core/FieldRegistry";
-import { SchemaParser } from "../core/SchemaParser";
-import "./KeyValueArrayWidget.scss";
+import { forwardRef, useCallback, useMemo } from 'react'
+import { useFormContext, useFieldArray, Controller } from 'react-hook-form'
+import { Button, InputGroup } from '@blueprintjs/core'
+import { Trash2, Plus } from 'lucide-react'
+import type { FieldWidgetProps } from '../types'
+import type { ExtendedJSONSchema } from '../types/schema'
+import { FieldRegistry } from '../core/FieldRegistry'
+import { SchemaParser } from '../core/SchemaParser'
+import './KeyValueArrayWidget.scss'
 
 /**
  * 根据 schema 确定使用的 widget
  */
 function determineWidget(schema: ExtendedJSONSchema): string {
   if (schema.ui?.widget) {
-    return schema.ui.widget;
+    return schema.ui.widget
   }
 
   switch (schema.type) {
-    case "string":
-      if (schema.format === "email") {
-        return "email";
+    case 'string':
+      if (schema.format === 'email') {
+        return 'email'
       }
-      if (schema.format === "uri") {
-        return "url";
+      if (schema.format === 'uri') {
+        return 'url'
       }
       if (schema.enum) {
-        return "select";
+        return 'select'
       }
-      return "text";
-    case "number":
-    case "integer":
-      return "number";
-    case "boolean":
-      return "switch";
+      return 'text'
+    case 'number':
+    case 'integer':
+      return 'number'
+    case 'boolean':
+      return 'switch'
     default:
-      return "text";
+      return 'text'
   }
 }
 
@@ -43,71 +43,71 @@ function determineWidget(schema: ExtendedJSONSchema): string {
  */
 function getDefaultValue(schema: ExtendedJSONSchema): any {
   if (schema.default !== undefined) {
-    return schema.default;
+    return schema.default
   }
 
   switch (schema.type) {
-    case "string":
-      return "";
-    case "number":
-    case "integer":
-      return 0;
-    case "boolean":
-      return false;
+    case 'string':
+      return ''
+    case 'number':
+    case 'integer':
+      return 0
+    case 'boolean':
+      return false
     default:
-      return "";
+      return ''
   }
 }
 
 export interface KeyValueArrayWidgetProps extends FieldWidgetProps {
   schema: ExtendedJSONSchema & {
-    type: "array";
-    items: ExtendedJSONSchema;
-  };
-  value?: any[];
-  onChange?: (value: any[]) => void;
-  disabled?: boolean;
-  readonly?: boolean;
+    type: 'array'
+    items: ExtendedJSONSchema
+  }
+  value?: any[]
+  onChange?: (value: any[]) => void
+  disabled?: boolean
+  readonly?: boolean
   /**
    * 键字段名称（默认：'key'）
    */
-  keyField?: string;
+  keyField?: string
   /**
    * 值字段名称（默认：'value'）
    */
-  valueField?: string;
+  valueField?: string
   /**
    * 键列标题（默认：'Key'）
    */
-  keyLabel?: string;
+  keyLabel?: string
   /**
    * 值列标题（默认：'Value'）
    */
-  valueLabel?: string;
+  valueLabel?: string
   /**
    * 键输入框占位符
    */
-  keyPlaceholder?: string;
+  keyPlaceholder?: string
   /**
    * 值输入框占位符
    */
-  valuePlaceholder?: string;
+  valuePlaceholder?: string
   /**
    * 添加按钮文本（默认：'Add'）
    */
-  addButtonText?: string;
+  addButtonText?: string
   /**
    * 空状态提示文本
    */
-  emptyText?: string;
+  emptyText?: string
   /**
    * 键字段是否必填（默认从 schema.items.required 推断）
    */
-  keyRequired?: boolean;
+  keyRequired?: boolean
   /**
    * 值字段是否必填（默认从 schema.items.required 推断）
    */
-  valueRequired?: boolean;
+  valueRequired?: boolean
 }
 
 /**
@@ -196,72 +196,72 @@ export const KeyValueArrayWidget = forwardRef<
       schema,
       disabled,
       readonly,
-      keyField = "key",
-      valueField = "value",
-      keyLabel = "Key",
-      valueLabel = "Value",
+      keyField = 'key',
+      valueField = 'value',
+      keyLabel = 'Key',
+      valueLabel = 'Value',
       keyPlaceholder,
       valuePlaceholder,
-      addButtonText = "Add",
+      addButtonText = 'Add',
       emptyText,
       keyRequired,
       valueRequired,
     },
-    ref,
+    ref
   ) => {
-    const { control } = useFormContext();
+    const { control } = useFormContext()
     const { fields, append, remove } = useFieldArray({
       control,
       name,
-    });
+    })
 
     // 从 schema.ui.widgetProps 中获取配置（优先级更高）
-    const widgetProps = schema.ui?.widgetProps || {};
-    const finalKeyField = widgetProps.keyField || keyField;
-    const finalValueField = widgetProps.valueField || valueField;
-    const finalKeyLabel = widgetProps.keyLabel || keyLabel;
-    const finalValueLabel = widgetProps.valueLabel || valueLabel;
+    const widgetProps = schema.ui?.widgetProps || {}
+    const finalKeyField = widgetProps.keyField || keyField
+    const finalValueField = widgetProps.valueField || valueField
+    const finalKeyLabel = widgetProps.keyLabel || keyLabel
+    const finalValueLabel = widgetProps.valueLabel || valueLabel
     const finalKeyPlaceholder =
-      widgetProps.keyPlaceholder || keyPlaceholder || finalKeyLabel;
+      widgetProps.keyPlaceholder || keyPlaceholder || finalKeyLabel
     const finalValuePlaceholder =
-      widgetProps.valuePlaceholder || valuePlaceholder || finalValueLabel;
-    const finalAddButtonText = widgetProps.addButtonText || addButtonText;
-    const finalEmptyText = widgetProps.emptyText || emptyText;
+      widgetProps.valuePlaceholder || valuePlaceholder || finalValueLabel
+    const finalAddButtonText = widgetProps.addButtonText || addButtonText
+    const finalEmptyText = widgetProps.emptyText || emptyText
 
     // 从 schema.items.required 推断字段是否必填
-    const itemsRequired = schema.items?.required || [];
+    const itemsRequired = schema.items?.required || []
     const finalKeyRequired =
       widgetProps.keyRequired ??
       keyRequired ??
-      itemsRequired.includes(finalKeyField);
+      itemsRequired.includes(finalKeyField)
     const finalValueRequired =
       widgetProps.valueRequired ??
       valueRequired ??
-      itemsRequired.includes(finalValueField);
+      itemsRequired.includes(finalValueField)
 
     // 获取 key 和 value 字段的 schema
     const itemProperties =
-      (schema.items as ExtendedJSONSchema)?.properties || {};
+      (schema.items as ExtendedJSONSchema)?.properties || {}
     const keySchema = itemProperties[finalKeyField] as
       | ExtendedJSONSchema
-      | undefined;
+      | undefined
     const valueSchema = itemProperties[finalValueField] as
       | ExtendedJSONSchema
-      | undefined;
+      | undefined
 
     // 根据 schema 确定使用的 widget
     const keyWidgetName = useMemo(
-      () => (keySchema ? determineWidget(keySchema) : "text"),
-      [keySchema],
-    );
+      () => (keySchema ? determineWidget(keySchema) : 'text'),
+      [keySchema]
+    )
     const valueWidgetName = useMemo(
-      () => (valueSchema ? determineWidget(valueSchema) : "text"),
-      [valueSchema],
-    );
+      () => (valueSchema ? determineWidget(valueSchema) : 'text'),
+      [valueSchema]
+    )
 
     // 获取 widget 组件
-    const KeyWidgetComponent = FieldRegistry.getWidget(keyWidgetName);
-    const ValueWidgetComponent = FieldRegistry.getWidget(valueWidgetName);
+    const KeyWidgetComponent = FieldRegistry.getWidget(keyWidgetName)
+    const ValueWidgetComponent = FieldRegistry.getWidget(valueWidgetName)
 
     // 生成验证规则
     const keyValidationRules = useMemo(
@@ -269,54 +269,51 @@ export const KeyValueArrayWidget = forwardRef<
         keySchema
           ? SchemaParser.getValidationRules(keySchema, finalKeyRequired)
           : {},
-      [keySchema, finalKeyRequired],
-    );
+      [keySchema, finalKeyRequired]
+    )
     const valueValidationRules = useMemo(
       () =>
         valueSchema
           ? SchemaParser.getValidationRules(valueSchema, finalValueRequired)
           : {},
-      [valueSchema, finalValueRequired],
-    );
+      [valueSchema, finalValueRequired]
+    )
 
     // 判断是否可以增删
-    const canAddRemove = !disabled && !readonly;
+    const canAddRemove = !disabled && !readonly
 
     // 获取最小/最大项数限制
-    const minItems = schema.minItems || 0;
-    const maxItems = schema.maxItems;
+    const minItems = schema.minItems || 0
+    const maxItems = schema.maxItems
 
     // 添加新项
     const handleAdd = useCallback(() => {
       const newItem = {
-        [finalKeyField]: keySchema ? getDefaultValue(keySchema) : "",
-        [finalValueField]: valueSchema ? getDefaultValue(valueSchema) : "",
-      };
-      append(newItem);
-    }, [finalKeyField, finalValueField, keySchema, valueSchema, append]);
+        [finalKeyField]: keySchema ? getDefaultValue(keySchema) : '',
+        [finalValueField]: valueSchema ? getDefaultValue(valueSchema) : '',
+      }
+      append(newItem)
+    }, [finalKeyField, finalValueField, keySchema, valueSchema, append])
 
     // 删除项
     const handleRemove = useCallback(
       (index: number) => {
-        remove(index);
+        remove(index)
       },
-      [remove],
-    );
+      [remove]
+    )
 
     // 判断是否可以删除
-    const canRemove = useCallback(
-      (index: number) => {
-        return canAddRemove && fields.length > minItems;
-      },
-      [canAddRemove, fields.length, minItems],
-    );
+    const canRemove = useCallback(() => {
+      return canAddRemove && fields.length > minItems
+    }, [canAddRemove, fields.length, minItems])
 
     // 判断是否可以添加
     const canAdd = useMemo(() => {
       return (
         canAddRemove && (maxItems === undefined || fields.length < maxItems)
-      );
-    }, [canAddRemove, maxItems, fields.length]);
+      )
+    }, [canAddRemove, maxItems, fields.length])
 
     return (
       <div ref={ref} className="key-value-array-widget">
@@ -357,7 +354,7 @@ export const KeyValueArrayWidget = forwardRef<
                             (value: any, i: number) => ({
                               label: keySchema?.enumNames?.[i] || String(value),
                               value,
-                            }),
+                            })
                           )}
                           {...(keySchema?.ui?.widgetProps || {})}
                         />
@@ -367,7 +364,7 @@ export const KeyValueArrayWidget = forwardRef<
                           placeholder={finalKeyPlaceholder}
                           disabled={disabled}
                           readOnly={readonly}
-                          intent={fieldState.error ? "danger" : "none"}
+                          intent={fieldState.error ? 'danger' : 'none'}
                         />
                       )
                     }
@@ -398,7 +395,7 @@ export const KeyValueArrayWidget = forwardRef<
                               label:
                                 valueSchema?.enumNames?.[i] || String(value),
                               value,
-                            }),
+                            })
                           )}
                           {...(valueSchema?.ui?.widgetProps || {})}
                         />
@@ -408,7 +405,7 @@ export const KeyValueArrayWidget = forwardRef<
                           placeholder={finalValuePlaceholder}
                           disabled={disabled}
                           readOnly={readonly}
-                          intent={fieldState.error ? "danger" : "none"}
+                          intent={fieldState.error ? 'danger' : 'none'}
                         />
                       )
                     }
@@ -420,7 +417,7 @@ export const KeyValueArrayWidget = forwardRef<
                   type="button"
                   className="delete-btn"
                   onClick={() => handleRemove(index)}
-                  disabled={!canRemove(index)}
+                  disabled={!canRemove()}
                   title="Remove"
                 >
                   <Trash2 size={14} />
@@ -436,14 +433,14 @@ export const KeyValueArrayWidget = forwardRef<
             icon={<Plus size={14} />}
             onClick={handleAdd}
             disabled={!canAdd}
-            style={{ marginTop: fields.length > 0 ? "10px" : "0" }}
+            style={{ marginTop: fields.length > 0 ? '10px' : '0' }}
           >
             {finalAddButtonText}
           </Button>
         )}
       </div>
-    );
-  },
-);
+    )
+  }
+)
 
-KeyValueArrayWidget.displayName = "KeyValueArrayWidget";
+KeyValueArrayWidget.displayName = 'KeyValueArrayWidget'

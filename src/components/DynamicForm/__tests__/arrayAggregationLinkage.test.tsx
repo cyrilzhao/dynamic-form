@@ -47,7 +47,7 @@ describe("数组聚合联动测试", () => {
     };
 
     const linkageFunctions = {
-      calculateTotal: (formData: any) => {
+      calculateTotal: ({ formData }: { formData: any }) => {
         const items = formData.items || [];
         return items.reduce((sum: number, item: any) => {
           return sum + (item.price || 0) * (item.quantity || 0);
@@ -116,7 +116,7 @@ describe("数组聚合联动测试", () => {
     };
 
     const linkageFunctions = {
-      calculateTotal: (formData: any) => {
+      calculateTotal: ({ formData }: { formData: any }) => {
         const items = formData.items || [];
         return items.reduce((sum: number, item: any) => {
           return sum + (item.price || 0) * (item.quantity || 0);

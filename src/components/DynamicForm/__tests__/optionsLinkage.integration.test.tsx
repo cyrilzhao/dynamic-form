@@ -87,7 +87,7 @@ describe("options 联动集成测试", () => {
     };
 
     const linkageFunctions = {
-      getCities: (formData: Record<string, unknown>) =>
+      getCities: ({ formData }: { formData: Record<string, unknown> }) =>
         formData.country === "us"
           ? [
               { label: "New York", value: "ny" },

@@ -114,6 +114,9 @@ export interface LinkageFunctionContext {
  * 联动函数签名（支持同步和异步函数）
  */
 export type LinkageFunction = (
-  formData: Record<string, any>,
-  context?: LinkageFunctionContext,
+  params: {
+    formData: Record<string, any>;
+    context: LinkageFunctionContext;
+    helpers: Record<string, any>;
+  },
 ) => any | Promise<any>;
