@@ -1,16 +1,13 @@
 import React, { useState } from 'react'
 import {
   Button,
-  FormGroup,
-  InputGroup,
   Card,
   Tag,
   Callout,
   Divider,
 } from '@blueprintjs/core'
-import { CodeEditor } from '../../../../CodeEditor'
-import { Select } from '../../../../Select'
-import type { ValidatorRule } from '../../../../DynamicForm/types/schema'
+import { FunctionRefEditor } from './FunctionRefEditor'
+import type { ValidatorRule, CallbackPropRef } from '../../../../DynamicForm/types/schema'
 
 interface FieldValidatorsEditorProps {
   value?: ValidatorRule[]
@@ -41,77 +38,47 @@ async function({ value, formValues, helpers }) {
   return null;
 }`
 
-type CallbackMode = 'function-name' | 'inline-script'
-
 export const FieldValidatorsEditor: React.FC<FieldValidatorsEditorProps> = ({
   value = [],
   onChange,
   disabled,
 }) => {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
-  const [editingValidator, setEditingValidator] =
-    useState<ValidatorRule | null>(null)
+  const [editingCallback, setEditingCallback] = useState<CallbackPropRef | undefined>()
   const [isNewValidator, setIsNewValidator] = useState(false)
 
-  // 编辑状态
-  const [callbackMode, setCallbackMode] =
-    useState<CallbackMode>('inline-script')
-  const [functionName, setFunctionName] = useState('')
-  const [scriptCode, setScriptCode] = useState(DEFAULT_SCRIPT_TEMPLATE)
-
   const resetEditingState = () => {
-    setFunctionName('')
-    setScriptCode(DEFAULT_SCRIPT_TEMPLATE)
-    setCallbackMode('inline-script')
-  }
-
-  const loadValidatorToEdit = (validator: ValidatorRule) => {
-    if (typeof validator.callback === 'string') {
-      setCallbackMode('function-name')
-      setFunctionName(validator.callback)
-    } else {
-      setCallbackMode('inline-script')
-      setScriptCode(validator.callback.code)
-    }
+    setEditingCallback(undefined)
   }
 
   const handleAdd = () => {
     const newIndex = value.length
-    const newValidator: ValidatorRule = {
-      type: 'script',
-      callback: { type: 'script', code: DEFAULT_SCRIPT_TEMPLATE },
-    }
-    setEditingValidator(newValidator)
+    setEditingCallback({ type: 'script', code: DEFAULT_SCRIPT_TEMPLATE })
     setIsNewValidator(true)
     setExpandedIndex(newIndex)
-    resetEditingState()
   }
 
   const handleEdit = (index: number) => {
     const validator = value[index]
-    setEditingValidator({ ...validator })
+    setEditingCallback(validator.callback)
     setIsNewValidator(false)
     setExpandedIndex(index)
-    loadValidatorToEdit(validator)
   }
 
   const handleSave = () => {
-    if (!editingValidator) return
+    if (!editingCallback) return
 
-    let validatorToSave: ValidatorRule
+    const callback = typeof editingCallback === 'string'
+      ? editingCallback.trim()
+      : { type: 'script' as const, code: editingCallback.code.trim() }
 
-    if (callbackMode === 'function-name') {
-      if (!functionName.trim()) return
-      validatorToSave = {
-        type: 'script',
-        callback: functionName.trim(),
-      }
-    } else {
-      if (!scriptCode.trim()) return
-      validatorToSave = {
-        type: 'script',
-        callback: { type: 'script', code: scriptCode.trim() },
-      }
+    if ((typeof callback === 'string' && !callback) || (typeof callback !== 'string' && !callback.code)) {
+      return
+    }
+
+    const validatorToSave: ValidatorRule = {
+      type: 'script',
+      callback,
     }
 
     if (isNewValidator) {
@@ -122,31 +89,24 @@ export const FieldValidatorsEditor: React.FC<FieldValidatorsEditorProps> = ({
       onChange(newValue)
     }
 
-    setEditingValidator(null)
+    setEditingCallback(undefined)
     setIsNewValidator(false)
     setExpandedIndex(null)
-    resetEditingState()
   }
 
   const handleCancel = () => {
-    setEditingValidator(null)
+    setEditingCallback(undefined)
     setIsNewValidator(false)
     setExpandedIndex(null)
-    resetEditingState()
   }
 
   const handleRemove = (index: number) => {
     onChange(value.filter((_, i) => i !== index))
     if (expandedIndex === index) {
-      setEditingValidator(null)
+      setEditingCallback(undefined)
       setIsNewValidator(false)
       setExpandedIndex(null)
-      resetEditingState()
     }
-  }
-
-  const handleModeChange = (newMode: CallbackMode) => {
-    setCallbackMode(newMode)
   }
 
   const renderValidatorSummary = (validator: ValidatorRule) => {
@@ -183,7 +143,7 @@ export const FieldValidatorsEditor: React.FC<FieldValidatorsEditorProps> = ({
   }
 
   const renderEditForm = () => {
-    if (!editingValidator) return null
+    if (!editingCallback) return null
 
     return (
       <div
@@ -194,59 +154,19 @@ export const FieldValidatorsEditor: React.FC<FieldValidatorsEditorProps> = ({
           gap: 12,
         }}
       >
-        <FormGroup label="Callback Mode">
-          <Select
-            value={callbackMode}
-            onChange={(value) => handleModeChange(value as CallbackMode)}
-            disabled={disabled}
-            options={[
-              {
-                label: 'Function Name (from callbacks registry)',
-                value: 'function-name',
-              },
-              { label: 'Inline Script', value: 'inline-script' },
-            ]}
-          />
-        </FormGroup>
-
-        {callbackMode === 'function-name' && (
-          <FormGroup
-            label="Function Name"
-            helperText="Function from DynamicForm callbacks prop. Signature: (value, formValues) => string | null"
-          >
-            <InputGroup
-              value={functionName}
-              onChange={(e) => setFunctionName(e.target.value)}
-              placeholder="validateUsername"
-              disabled={disabled}
-            />
-          </FormGroup>
-        )}
-
-        {callbackMode === 'inline-script' && (
-          <>
-            <Callout
-              intent="warning"
-              icon="warning-sign"
-              style={{ fontSize: 12 }}
-            >
-              Only use in trusted internal environments. The code runs in the
-              browser.
-            </Callout>
-            <FormGroup
-              label="Validation Code"
-              helperText="Complete function receiving (value, formValues). Return null (valid) or error message string (invalid)."
-            >
-              <CodeEditor
-                value={scriptCode}
-                language="javascript"
-                config={{ initialMode: 'preview', previewLines: 6 }}
-                onChange={(code) => setScriptCode(code)}
-                disabled={disabled}
-              />
-            </FormGroup>
-          </>
-        )}
+        <FunctionRefEditor
+          value={editingCallback}
+          onChange={setEditingCallback}
+          disabled={disabled}
+          modeLabel="Callback Mode"
+          functionNameLabel="Function Name"
+          functionNameHelperText="Function from DynamicForm callbacks prop. Signature: ({ value, formValues, helpers }) => string | null | Promise<string | null>."
+          functionNamePlaceholder="validateUsername"
+          scriptLabel="Validation Script"
+          scriptHelperText="Complete JavaScript function. Return null if valid, error message string if invalid."
+          scriptTemplate={DEFAULT_SCRIPT_TEMPLATE}
+          previewLines={6}
+        />
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <Button text="Cancel" onClick={handleCancel} disabled={disabled} />
@@ -256,9 +176,10 @@ export const FieldValidatorsEditor: React.FC<FieldValidatorsEditorProps> = ({
             onClick={handleSave}
             disabled={
               disabled ||
-              (callbackMode === 'function-name'
-                ? !functionName.trim()
-                : !scriptCode.trim())
+              !editingCallback ||
+              (typeof editingCallback === 'string'
+                ? !editingCallback.trim()
+                : !editingCallback.code.trim())
             }
           />
         </div>

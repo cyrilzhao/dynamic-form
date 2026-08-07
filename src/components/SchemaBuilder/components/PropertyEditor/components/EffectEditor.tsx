@@ -1,18 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import {
-  FormGroup,
-  InputGroup,
   Switch,
   Card,
   Elevation,
   Button,
   Tag,
-  Callout,
 } from '@blueprintjs/core';
 import { Select } from '../../../../Select';
 import type { LinkageEffect, LinkageType } from '../../../../DynamicForm/types/linkage';
 import { ObjectEditor } from '../../../../ObjectEditor';
-import { CodeEditor } from '../../../../CodeEditor';
+import { FunctionRefEditor } from './FunctionRefEditor';
 
 interface EffectEditorProps {
   value?: LinkageEffect;
@@ -24,56 +21,65 @@ interface EffectEditorProps {
 }
 
 type ConfigMode = 'dynamic' | 'static';
-type FunctionMode = 'function-name' | 'inline-script';
 
 // 默认的内联脚本模板
 const getDefaultScriptTemplate = (linkageType: LinkageType): string => {
   const examples: Record<LinkageType, string> = {
     visibility: `/**
  * Calculate visibility dynamically
- * @param {object} formData - Current form values
- * @param {object} context - Linkage context (fieldPath, arrayIndex, etc.)
+ * @param {object} params - Parameters object
+ * @param {object} params.formData - Current form values
+ * @param {object} params.context - Linkage context (fieldPath, arrayIndex, externalData, etc.)
+ * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)
  * @returns {boolean} - true to show, false to hide
  */
-function(formData, context) {
+function({ formData, context, helpers }) {
   // Example: show field if another field has value
   return !!formData.someField;
 }`,
     disabled: `/**
  * Calculate disabled state dynamically
- * @param {object} formData - Current form values
- * @param {object} context - Linkage context
+ * @param {object} params - Parameters object
+ * @param {object} params.formData - Current form values
+ * @param {object} params.context - Linkage context
+ * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)
  * @returns {boolean} - true to disable, false to enable
  */
-function(formData, context) {
+function({ formData, context, helpers }) {
   return false;
 }`,
     readonly: `/**
  * Calculate readonly state dynamically
- * @param {object} formData - Current form values
- * @param {object} context - Linkage context
+ * @param {object} params - Parameters object
+ * @param {object} params.formData - Current form values
+ * @param {object} params.context - Linkage context
+ * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)
  * @returns {boolean} - true for readonly, false for editable
  */
-function(formData, context) {
+function({ formData, context, helpers }) {
   return false;
 }`,
     value: `/**
  * Calculate field value dynamically
- * @param {object} formData - Current form values
- * @param {object} context - Linkage context
+ * @param {object} params - Parameters object
+ * @param {object} params.formData - Current form values
+ * @param {object} params.context - Linkage context
+ * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)
  * @returns {any} - The calculated value
  */
-async function(formData, context) {
+async function({ formData, context, helpers }) {
   // Example: calculate sum
   return (formData.price || 0) * (formData.quantity || 1);
 }`,
     options: `/**
  * Generate dynamic options
- * @param {object} formData - Current form values
- * @param {object} context - Linkage context
+ * @param {object} params - Parameters object
+ * @param {object} params.formData - Current form values
+ * @param {object} params.context - Linkage context
+ * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)
  * @returns {Array<{label: string, value: any}>} - Options array
  */
-async function(formData, context) {
+async function({ formData, context, helpers }) {
   // Example: fetch from API or calculate based on other fields
   return [
     { label: 'Option 1', value: 'opt1' },
@@ -82,11 +88,13 @@ async function(formData, context) {
 }`,
     schema: `/**
  * Generate dynamic schema
- * @param {object} formData - Current form values
- * @param {object} context - Linkage context
+ * @param {object} params - Parameters object
+ * @param {object} params.formData - Current form values
+ * @param {object} params.context - Linkage context
+ * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)
  * @returns {object} - JSON Schema object
  */
-async function(formData, context) {
+async function({ formData, context, helpers }) {
   return {
     type: 'string',
     title: 'Dynamic Field',
@@ -118,35 +126,10 @@ export const EffectEditor: React.FC<EffectEditorProps> = ({
   };
 
   const [configMode, setConfigMode] = useState<ConfigMode>(getCurrentMode);
-  const [functionMode, setFunctionMode] = useState<FunctionMode>('function-name');
-  const [functionName, setFunctionName] = useState('');
-  const [scriptCode, setScriptCode] = useState(getDefaultScriptTemplate(linkageType));
-
-  // 当 linkageType 变化时更新模板（仅在 inline-script 模式且使用默认模板时）
-  useEffect(() => {
-    const newTemplate = getDefaultScriptTemplate(linkageType);
-    // 如果当前代码为空或者是旧的默认模板格式，则更新为新模板
-    if (!scriptCode.trim() || scriptCode.includes('function(')) {
-      setScriptCode(newTemplate);
-      // 如果当前正在使用 inline-script 模式，同步更新 value
-      if (configMode === 'dynamic' && functionMode === 'inline-script' && value) {
-        onChange({ ...value, function: { type: 'script', code: newTemplate } });
-      }
-    }
-  }, [linkageType]);
 
   // 当 value 变化时同步状态
   useEffect(() => {
     setConfigMode(getCurrentMode());
-    if (value?.function) {
-      if (typeof value.function === 'string') {
-        setFunctionMode('function-name');
-        setFunctionName(value.function);
-      } else {
-        setFunctionMode('inline-script');
-        setScriptCode(value.function.code);
-      }
-    }
   }, [value]);
 
   const handleClear = () => {
@@ -175,21 +158,8 @@ export const EffectEditor: React.FC<EffectEditorProps> = ({
     setConfigMode(newMode);
 
     if (newMode === 'dynamic') {
-      // 切换到 dynamic 模式：保留现有值，添加 function 字段
-      const newValue: LinkageEffect = { ...value };
-
-      // 移除与 function 互斥的静态字段
-      delete newValue.state;
-      delete newValue.value;
-      delete newValue.options;
-      delete newValue.schema;
-
-      // 设置 function
-      if (functionMode === 'function-name') {
-        newValue.function = functionName || '';
-      } else {
-        newValue.function = { type: 'script', code: scriptCode };
-      }
+      // 切换到 dynamic 模式：移除静态字段，添加空的 function
+      const newValue: LinkageEffect = { function: '' };
       onChange(newValue);
     } else {
       // 切换到 static 模式：移除 function，设置默认静态值
@@ -262,12 +232,6 @@ export const EffectEditor: React.FC<EffectEditorProps> = ({
           value={value}
           onChange={onChange}
           disabled={disabled}
-          functionMode={functionMode}
-          setFunctionMode={setFunctionMode}
-          functionName={functionName}
-          setFunctionName={setFunctionName}
-          scriptCode={scriptCode}
-          setScriptCode={setScriptCode}
         />
       )}
 
@@ -291,12 +255,6 @@ interface DynamicModeConfigProps {
   value: LinkageEffect;
   onChange: (value: LinkageEffect) => void;
   disabled?: boolean;
-  functionMode: FunctionMode;
-  setFunctionMode: (mode: FunctionMode) => void;
-  functionName: string;
-  setFunctionName: (name: string) => void;
-  scriptCode: string;
-  setScriptCode: (code: string) => void;
 }
 
 const DynamicModeConfig: React.FC<DynamicModeConfigProps> = ({
@@ -304,81 +262,29 @@ const DynamicModeConfig: React.FC<DynamicModeConfigProps> = ({
   value,
   onChange,
   disabled,
-  functionMode,
-  setFunctionMode,
-  functionName,
-  setFunctionName,
-  scriptCode,
-  setScriptCode,
 }) => {
-  const handleFunctionModeChange = (newMode: FunctionMode) => {
-    setFunctionMode(newMode);
-    // 更新 value
-    if (newMode === 'function-name') {
-      onChange({ ...value, function: functionName || '' });
-    } else {
-      onChange({ ...value, function: { type: 'script', code: scriptCode } });
+  const handleFunctionRefChange = (functionRef: string | { type: 'script'; code: string } | undefined) => {
+    if (!functionRef) {
+      onChange({ ...value, function: '' });
+      return;
     }
-  };
-
-  const handleFunctionNameChange = (name: string) => {
-    setFunctionName(name);
-    onChange({ ...value, function: name });
-  };
-
-  const handleScriptCodeChange = (code: string) => {
-    setScriptCode(code);
-    onChange({ ...value, function: { type: 'script', code } });
+    onChange({ ...value, function: functionRef });
   };
 
   return (
-    <>
-      <FormGroup label="Function Type">
-        <Select
-          value={functionMode}
-          onChange={(value) => handleFunctionModeChange(value as FunctionMode)}
-          disabled={disabled}
-          options={[
-            { label: 'Function Name (from callbacks registry)', value: 'function-name' },
-            { label: 'Inline Script', value: 'inline-script' },
-          ]}
-        />
-      </FormGroup>
-
-      {functionMode === 'function-name' && (
-        <FormGroup
-          label="Function Name"
-          helperText="Function from DynamicForm linkageFunctions prop"
-        >
-          <InputGroup
-            value={functionName}
-            onChange={(e) => handleFunctionNameChange(e.target.value)}
-            placeholder="e.g., calculateDynamic"
-            disabled={disabled}
-          />
-        </FormGroup>
-      )}
-
-      {functionMode === 'inline-script' && (
-        <>
-          <Callout intent="warning" icon="warning-sign" style={{ fontSize: 12, marginBottom: 12 }}>
-            Only use in trusted internal environments. The code runs in the browser.
-          </Callout>
-          <FormGroup
-            label="Function Code"
-            helperText="Complete function receiving (formData, context). Return the calculated result."
-          >
-            <CodeEditor
-              value={scriptCode}
-              language="javascript"
-              config={{ initialMode: 'preview', previewLines: 6 }}
-              onChange={handleScriptCodeChange}
-              disabled={disabled}
-            />
-          </FormGroup>
-        </>
-      )}
-    </>
+    <FunctionRefEditor
+      value={value.function}
+      onChange={handleFunctionRefChange}
+      disabled={disabled}
+      modeLabel="Function Type"
+      functionNameLabel="Function Name"
+      functionNameHelperText="Function from DynamicForm linkageFunctions prop. Signature: ({ formData, context, helpers }) => result."
+      functionNamePlaceholder="e.g., calculateDynamic"
+      scriptLabel="Linkage Function Script"
+      scriptHelperText="Complete JavaScript function receiving { formData, context, helpers }. Return the calculated result."
+      scriptTemplate={getDefaultScriptTemplate(linkageType)}
+      previewLines={6}
+    />
   );
 };
 
