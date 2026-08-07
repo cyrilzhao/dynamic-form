@@ -1,7 +1,7 @@
 /**
  * 执行 inline script 工具函数
  *
- * 支持在 inline script 中使用 helpers（如 ofetch、lodash、valibot 等）
+ * 支持在 inline script 中使用 helpers（如 ofetch、lodash、zod 等）
  *
  * @param code - JavaScript 函数代码
  * @param params - 参数对象

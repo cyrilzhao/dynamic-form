@@ -15,9 +15,9 @@ describe('Helpers 系统', () => {
       expect(typeof builtInHelpers._.map).toBe('function');
     });
 
-    it('应该包含 valibot', () => {
-      expect(builtInHelpers.v).toBeDefined();
-      expect(typeof builtInHelpers.v.string).toBe('function');
+    it('应该包含 zod', () => {
+      expect(builtInHelpers.z).toBeDefined();
+      expect(typeof builtInHelpers.z.string).toBe('function');
     });
   });
 

@@ -23,7 +23,7 @@ const DEFAULT_SCRIPT_TEMPLATE = `/**
  * @param {object} params - Parameters object
  * @param {any} params.value - Current field value
  * @param {object} params.formValues - Entire form data object
- * @param {object} params.helpers - Helper utilities (ofetch, lodash, valibot, etc.)
+ * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)
  * @returns {string|null|Promise<string|null>} - null if valid, error message string if invalid
  */
 async function({ value, formValues, helpers }) {

@@ -16,7 +16,7 @@ const TRANSFORM_SCRIPT_TEMPLATE = `/**
  * Transform display value into stored form value.
  * @param {object} params - Parameters object
  * @param {any} params.value - Value from the widget/input domain
- * @param {object} params.helpers - Helper utilities (ofetch, lodash, valibot, etc.)
+ * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)
  * @returns {any} Stored value written to form data
  *
  * Example: convert percentage input 96 to decimal 0.96.
@@ -33,7 +33,7 @@ const REVERSE_TRANSFORM_SCRIPT_TEMPLATE = `/**
  * Transform stored form value back into display value.
  * @param {object} params - Parameters object
  * @param {any} params.value - Stored value from form data
- * @param {object} params.helpers - Helper utilities (ofetch, lodash, valibot, etc.)
+ * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)
  * @returns {any} Display value shown by the widget/input
  *
  * Example: convert stored decimal 0.96 back to percentage input 96.

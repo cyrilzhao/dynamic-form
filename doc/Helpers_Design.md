@@ -75,7 +75,7 @@ DynamicForm 目前支持 inline script 功能，允许用户在以下场景使�
 ### 2.1 核心目标
 
 1. 支持异步操作：允许 inline script 和 callbacks 调用异步 API
-2. 提供工具能力：内置常用工具库、请求工具和校验工具（ofetch、lodash、Valibot 等）
+2. 提供工具能力：内置常用工具库、请求工具和校验工具（ofetch、lodash、Zod 等）
 3. 支持自定义扩展：允许用户注入自定义依赖和业务逻辑
 4. 保持向后兼容：不破坏现有 API 和使用方式
 5. 类型安全：提供完整的 TypeScript 类型定义
@@ -163,7 +163,7 @@ interface DynamicFormProps {
    * 内置 helpers:
    * - ofetch: 跨浏览器和 Node.js 环境的请求能力
    * - _: lodash 完整功能
-   * - v: Valibot 校验工具
+   * - v: Zod 校验工具
    *
    * 用户可以注入自定义 helpers，会与内置 helpers 合并
    *
@@ -191,7 +191,7 @@ DynamicForm 内部默认提供以下 helpers：
 ```typescript
 import { ofetch } from 'ofetch';
 import _ from 'lodash';
-import * as v from 'valibot';
+import * as v from 'zod';
 
 // 内置 helpers
 const builtInHelpers = {
@@ -227,16 +227,16 @@ const builtInHelpers = {
   _,
 
   /**
-   * Valibot 校验工具
+   * Zod 校验工具
    * 提供轻量、类型友好的运行时校验能力
    *
    * @example
    * ```typescript
-   * const emailSchema = helpers.v.pipe(
-   *   helpers.v.string(),
-   *   helpers.v.email()
+   * const emailSchema = helpers.z.pipe(
+   *   helpers.z.string(),
+   *   helpers.z.email()
    * );
-   * helpers.v.safeParse(emailSchema, 'test@example.com')
+   * helpers.z.safeParse(emailSchema, 'test@example.com')
    * ```
    */
   v,
@@ -351,12 +351,12 @@ const callbacks = {
   // ✅ 使用对象参数
   validateUsername: async ({ value, formValues, helpers }) => {
     if (!value) return 'Username is required';
-    // 使用 Valibot 验证格式
-    const usernameSchema = helpers.v.pipe(
-      helpers.v.string(),
-      helpers.v.regex(/^[a-zA-Z0-9]+$/)
+    // 使用 Zod 验证格式
+    const usernameSchema = helpers.z.pipe(
+      helpers.z.string(),
+      helpers.z.regex(/^[a-zA-Z0-9]+$/)
     );
-    const usernameResult = helpers.v.safeParse(usernameSchema, value);
+    const usernameResult = helpers.z.safeParse(usernameSchema, value);
     if (!usernameResult.success) {
       return 'Username must contain only letters and numbers';
     }
@@ -463,11 +463,11 @@ const callbacks = {
     const [file] = args; // 解构原始参数
 
     // 验证文件
-    const imageMimeSchema = helpers.v.pipe(
-      helpers.v.string(),
-      helpers.v.regex(/^image\//)
+    const imageMimeSchema = helpers.z.pipe(
+      helpers.z.string(),
+      helpers.z.regex(/^image\//)
     );
-    const mimeResult = helpers.v.safeParse(imageMimeSchema, file.type);
+    const mimeResult = helpers.z.safeParse(imageMimeSchema, file.type);
     if (!mimeResult.success) {
       throw new Error('Only images are allowed');
     }
@@ -747,12 +747,12 @@ const schema = {
             code: `async function({ value, formValues, helpers }) {
               if (!value) return null;
 
-              // 使用 Valibot 验证格式
-              const usernameSchema = helpers.v.pipe(
-                helpers.v.string(),
-                helpers.v.regex(/^[a-zA-Z0-9]+$/)
+              // 使用 Zod 验证格式
+              const usernameSchema = helpers.z.pipe(
+                helpers.z.string(),
+                helpers.z.regex(/^[a-zA-Z0-9]+$/)
               );
-              const usernameResult = helpers.v.safeParse(usernameSchema, value);
+              const usernameResult = helpers.z.safeParse(usernameSchema, value);
               if (!usernameResult.success) {
                 return 'Username must contain only letters and numbers';
               }
@@ -889,7 +889,7 @@ function App() {
 
 1. **依赖注入限制**
    - ✅ 只有通过 helpers 显式注入的依赖才能访问
-   - ✅ 默认只内置 ofetch、lodash、Valibot 等明确依赖
+   - ✅ 默认只内置 ofetch、lodash、Zod 等明确依赖
    - ✅ 用户可以通过覆盖 helpers 控制具体暴露哪些能力
 
 2. **执行边界**
@@ -954,7 +954,7 @@ function App() {
 
 2. ✅ **定义内置 Helpers**
    - 集成 lodash
-   - 集成 Valibot
+   - 集成 Zod
    - 集成 ofetch，提供跨浏览器和 Node.js 环境的一致请求能力
    - 添加完整的 TypeScript 类型定义
 
@@ -1106,7 +1106,7 @@ function App() {
 Helpers 系统为 DynamicForm 提供了强大的扩展能力，使得 inline script 和 callbacks 可以：
 
 1. **异步操作**：调用 API、执行异步验证等
-2. **工具库支持**：使用 ofetch、lodash、Valibot 等常用库
+2. **工具库支持**：使用 ofetch、lodash、Zod 等常用库
 3. **自定义扩展**：注入业务逻辑和自定义工具函数
 4. **类型安全**：完整的 TypeScript 类型定义
 5. **向后兼容**：不破坏现有代码

@@ -150,7 +150,7 @@ export interface DynamicFormProps {
    * 内置 helpers:
    * - ofetch: 跨浏览器和 Node.js 环境的请求能力
    * - _: lodash 完整功能
-   * - v: Valibot 校验工具
+   * - z: Zod 校验工具
    *
    * 用户可以注入自定义 helpers，会与内置 helpers 合并
    *

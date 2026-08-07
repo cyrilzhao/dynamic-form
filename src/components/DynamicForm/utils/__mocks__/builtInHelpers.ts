@@ -1,5 +1,5 @@
 import _ from 'lodash';
-import * as v from 'valibot';
+import * as z from 'zod';
 import type { BuiltInHelpers } from '../../types/helpers';
 
 // Mock ofetch for testing
@@ -15,5 +15,5 @@ const mockOfetch = async (url: string, options?: any) => {
 export const builtInHelpers: BuiltInHelpers = {
   ofetch: mockOfetch as any,
   _,
-  v,
+  z,
 };

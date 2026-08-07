@@ -5,7 +5,7 @@ import React, { createContext, useContext, useMemo } from 'react';
  * 用于在整个表单树中共享 helpers（工具函数和依赖）
  *
  * helpers 包括：
- * - 内置 helpers（ofetch、lodash、valibot 等）
+ * - 内置 helpers（ofetch、lodash、zod 等）
  * - 用户自定义 helpers
  */
 export interface HelpersContextValue {

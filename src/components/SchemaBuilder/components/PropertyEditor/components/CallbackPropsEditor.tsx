@@ -25,7 +25,7 @@ const DEFAULT_SCRIPT_TEMPLATE = `/**
  * The widget decides which arguments are passed to this function.
  * @param {object} params - Parameters object
  * @param {any[]} params.args - Arguments provided by the widget
- * @param {object} params.helpers - Helper utilities (ofetch, lodash, valibot, etc.)
+ * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)
  * @returns {any|Promise<any>} Value expected by the widget callback contract
  *
  * Example: return the first argument unchanged.

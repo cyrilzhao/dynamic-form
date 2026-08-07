@@ -31,7 +31,7 @@ DynamicForm is a powerful, configuration-driven form component built on top of `
 - **Validation**: Automatic validation based on JSON Schema rules
 - **High Performance**: Built on react-hook-form's uncontrolled components
 - **Extensible**: Support for custom widgets and validation rules
-- **Inline Script Helpers**: Built-in `ofetch`, Lodash, and Valibot helpers for trusted inline scripts
+- **Inline Script Helpers**: Built-in `ofetch`, Lodash, and Zod helpers for trusted inline scripts
 - **UI Linkage**: Dynamic field visibility, disabled states, and computed values
 - **Nested Forms**: Support for nested objects and arrays
 - **Field Path Flattening**: Simplify deeply nested parameter display
@@ -51,7 +51,7 @@ DynamicForm is a powerful, configuration-driven form component built on top of `
 npm install react-hook-form
 npm install ajv ajv-formats
 npm install @types/json-schema
-npm install ofetch lodash valibot
+npm install ofetch lodash zod
 ```
 
 ### Optional Dependencies
@@ -223,7 +223,7 @@ DynamicForm provides these helpers by default:
 | ------ | ----------- | ------- |
 | `helpers.ofetch` | Cross-browser and Node.js request utility based on `ofetch` | `await helpers.ofetch('/api/users')` |
 | `helpers._` | Lodash utilities | `helpers._.sumBy(items, 'price')` |
-| `helpers.v` | Valibot runtime validation utilities | `helpers.v.safeParse(schema, value)` |
+| `helpers.z` | Zod runtime validation utilities | `helpers.z.string().parse(value)` |
 
 ### Custom Helpers
 
@@ -319,7 +319,7 @@ All helper-aware functions use an object parameter:
 
 `ui.transform` is intentionally synchronous. Use value linkages for asynchronous computed values.
 
-### Validation with Valibot
+### Validation with Zod
 
 ```typescript
 {
@@ -334,13 +334,11 @@ All helper-aware functions use an object parameter:
           code: `function({ value, helpers }) {
             if (!value) return 'Username is required';
 
-            const schema = helpers.v.pipe(
-              helpers.v.string(),
-              helpers.v.minLength(3),
-              helpers.v.regex(/^[a-zA-Z0-9_]+$/)
-            );
+            const schema = helpers.z.string()
+              .min(3)
+              .regex(/^[a-zA-Z0-9_]+$/);
 
-            const result = helpers.v.safeParse(schema, value);
+            const result = schema.safeParse(value);
             return result.success
               ? null
               : 'Username must be at least 3 characters and contain only letters, numbers, or underscores';
@@ -425,12 +423,10 @@ const linkageFunctions = {
         type: 'script',
         code: `async function({ args, helpers }) {
           const [file] = args;
-          const mimeSchema = helpers.v.pipe(
-            helpers.v.string(),
-            helpers.v.regex(/^image\\//)
-          );
+          const mimeSchema = helpers.z.string()
+            .regex(/^image\//);
 
-          if (!helpers.v.safeParse(mimeSchema, file.type).success) {
+          if (!mimeSchema.safeParse(file.type).success) {
             throw new Error('Only images are allowed');
           }
 
@@ -1214,12 +1210,10 @@ const validateUsername = ({ value, helpers }: {
   helpers: Record<string, any>;
 }) => {
   if (!value) return 'Username is required';
-  const schema = helpers.v.pipe(
-    helpers.v.string(),
-    helpers.v.minLength(3),
-    helpers.v.regex(/^[a-zA-Z0-9_]+$/)
-  );
-  const result = helpers.v.safeParse(schema, value);
+  const schema = helpers.z.string()
+    .min(3)
+    .regex(/^[a-zA-Z0-9_]+$/);
+  const result = schema.safeParse(value);
   return result.success
     ? null
     : 'Username must be at least 3 characters and contain only letters, numbers, or underscores';
@@ -1354,11 +1348,9 @@ const schema: ExtendedJSONSchema = {
                 if (!value) return null; // Optional field
                 
                 // Example: validate coupon format
-                const schema = helpers.v.pipe(
-                  helpers.v.string(),
-                  helpers.v.regex(/^[A-Z0-9]{6,10}$/)
-                );
-                if (!helpers.v.safeParse(schema, value).success) {
+                const schema = helpers.z.string()
+                  .regex(/^[A-Z0-9]{6,10}$/);
+                if (!schema.safeParse(value).success) {
                   return 'Invalid coupon format (6-10 uppercase letters/numbers)';
                 }
                 return null;

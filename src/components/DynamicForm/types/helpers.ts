@@ -1,5 +1,5 @@
 import type { ofetch } from 'ofetch';
-import type * as v from 'valibot';
+import type * as z from 'zod';
 import type _ from 'lodash';
 
 /**
@@ -8,7 +8,7 @@ import type _ from 'lodash';
  * DynamicForm 默认提供以下 helpers：
  * - ofetch: 异步请求能力
  * - _: lodash 完整功能
- * - v: Valibot 校验工具
+ * - z: Zod 校验工具
  */
 export interface BuiltInHelpers {
   /**
@@ -27,10 +27,10 @@ export interface BuiltInHelpers {
   _: typeof _;
 
   /**
-   * Valibot 校验工具
-   * 提供轻量、类型友好的运行时校验能力
+   * Zod 校验工具
+   * 提供强大的类型安全运行时校验能力
    */
-  v: typeof v;
+  z: typeof z;
 }
 
 /**
