@@ -26,12 +26,20 @@ const DEFAULT_SCRIPT_TEMPLATE = `/**
  * @param {object} params - Parameters object
  * @param {any[]} params.args - Arguments provided by the widget
  * @param {object} params.helpers - Helper utilities (ofetch, lodash, valibot, etc.)
- * @returns {any} Value expected by the widget callback contract
+ * @returns {any|Promise<any>} Value expected by the widget callback contract
  *
  * Example: return the first argument unchanged.
  */
-function({ args, helpers }) {
+async function({ args, helpers }) {
   const [value] = args;
+
+  // Example: upload file to server
+  // const [file] = args;
+  // const result = await helpers.ofetch('/api/upload', {
+  //   method: 'POST',
+  //   body: formData,
+  // });
+  // return result.url;
 
   return value;
 }`;

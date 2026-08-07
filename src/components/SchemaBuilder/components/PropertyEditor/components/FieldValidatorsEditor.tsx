@@ -24,12 +24,19 @@ const DEFAULT_SCRIPT_TEMPLATE = `/**
  * @param {any} params.value - Current field value
  * @param {object} params.formValues - Entire form data object
  * @param {object} params.helpers - Helper utilities (ofetch, lodash, valibot, etc.)
- * @returns {string|null} - null if valid, error message string if invalid
+ * @returns {string|null|Promise<string|null>} - null if valid, error message string if invalid
  */
-function({ value, formValues, helpers }) {
+async function({ value, formValues, helpers }) {
   if (!value) {
     return 'This field is required';
   }
+
+  // Example: async validation with API
+  // const result = await helpers.ofetch('/api/validate', {
+  //   method: 'POST',
+  //   body: { value },
+  // });
+  // return result.valid ? null : result.error;
 
   return null;
 }`
