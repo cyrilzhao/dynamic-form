@@ -113,7 +113,7 @@ export const TransformEditor: React.FC<TransformEditorProps> = ({
             disabled={disabled}
             modeLabel="Callback Mode"
             functionNameLabel="Function Name"
-            functionNameHelperText="Function from DynamicForm callbacks prop. Signature: (value) => storedValue."
+            functionNameHelperText="Function from DynamicForm callbacks prop. Signature: ({ value, helpers }) => storedValue."
             functionNamePlaceholder="e.g. percentToDecimal"
             scriptLabel="Transform Script"
             scriptHelperText="Complete JavaScript function receiving value. Return the stored-domain value."
@@ -133,7 +133,7 @@ export const TransformEditor: React.FC<TransformEditorProps> = ({
             disabled={disabled}
             modeLabel="Callback Mode"
             functionNameLabel="Function Name"
-            functionNameHelperText="Function from DynamicForm callbacks prop. Signature: (value) => inputValue."
+            functionNameHelperText="Function from DynamicForm callbacks prop. Signature: ({ value, helpers }) => inputValue."
             functionNamePlaceholder="e.g. decimalToPercent"
             scriptLabel="Reverse Transform Script"
             scriptHelperText="Complete JavaScript function receiving stored value. Return the input-domain value."
