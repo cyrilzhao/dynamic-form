@@ -1838,6 +1838,10 @@ fulfill: {
 
 **Dynamic Linkage** - Function-based computation:
 
+Dynamic linkage supports both registered function names and trusted inline scripts.
+
+**Form 1: Function name reference**
+
 ```typescript
 fulfill: {
   function: 'myLinkageFunction'
@@ -1851,6 +1855,39 @@ const linkageFunctions = {
   }
 };
 ```
+
+**Form 2: Inline script**
+
+```typescript
+fulfill: {
+  function: {
+    type: 'script',
+    code: `function(formData, context) {
+      return (formData.price || 0) * (formData.quantity || 0);
+    }`,
+  },
+}
+```
+
+Inline linkage scripts must be complete JavaScript functions. They receive:
+
+- `formData` - Current form values
+- `context` - Linkage context, including `fieldPath`, array metadata, and `externalData` from `linkageContext`
+
+The return value is applied according to the linkage type:
+
+| Linkage Type | Inline Script Return Value                       |
+| ------------ | ------------------------------------------------ |
+| `value`      | Assigned to the target field value               |
+| `options`    | Used as the target field options array           |
+| `schema`     | Used as the dynamic schema result                |
+| `visibility` | Converted to boolean and assigned to `visible`   |
+| `disabled`   | Converted to boolean and assigned to `disabled`  |
+| `readonly`   | Converted to boolean and assigned to `readonly`  |
+
+The same `function` forms can also be used in `otherwise` effects.
+
+⚠️ **Security note**: Inline linkage scripts use dynamic function execution in the browser. Only use them with trusted schema sources. Never accept inline scripts from untrusted user input.
 
 Use static linkage for simple, predetermined values. Use dynamic linkage when the result depends on complex logic or multiple field values.
 
