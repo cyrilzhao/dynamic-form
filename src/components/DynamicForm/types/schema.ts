@@ -135,9 +135,9 @@ export interface UIConfig {
    * - hideConvertedValue：是否隐藏字段下方转换后的值，默认不隐藏
    */
   transform?: {
-    // 可以是 callbacks 注册表中的函数名（string），也可以是内联 JS 函数体（ScriptTransform）
-    callback: string | { type: "script"; code: string };
-    reverseCallback?: string | { type: "script"; code: string };
+    // 可以是 callbacks 注册表中的函数名（string），也可以是内联完整 JS 函数（CallbackPropRef）
+    callback: CallbackPropRef;
+    reverseCallback?: CallbackPropRef;
     hideConvertedValue?: boolean;
   };
 }

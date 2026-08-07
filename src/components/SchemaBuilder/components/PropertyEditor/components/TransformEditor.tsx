@@ -1,129 +1,137 @@
-import React, { useState } from 'react'
-import { Button, FormGroup, InputGroup, Callout } from '@blueprintjs/core'
-import { Select } from '../../../../Select'
-import { CodeEditor } from '../../../../CodeEditor'
-import type { UIConfig } from '../../../../DynamicForm/types/schema'
-
-type TransformRef = string | { type: 'script'; code: string }
+import React from "react";
+import { Button, Card } from "@blueprintjs/core";
+import { FunctionRefEditor } from "./FunctionRefEditor";
+import type {
+  CallbackPropRef,
+  UIConfig,
+} from "../../../../DynamicForm/types/schema";
 
 interface TransformEditorProps {
-  value?: UIConfig['transform']
-  onChange: (value: UIConfig['transform']) => void
-  disabled?: boolean
+  value?: UIConfig["transform"];
+  onChange: (value: UIConfig["transform"]) => void;
+  disabled?: boolean;
 }
 
-function TransformFnEditor({
-  label,
-  value,
-  onChange,
-  disabled,
-  placeholder,
-}: {
-  label: string
-  value: TransformRef | undefined
-  onChange: (v: TransformRef | undefined) => void
-  disabled?: boolean
-  placeholder: string
-}) {
-  const isScript = value != null && typeof value !== 'string'
-  const [mode, setMode] = useState<'callback' | 'script'>(
-    isScript ? 'script' : 'callback'
-  )
-
-  const handleModeChange = (newMode: 'callback' | 'script') => {
-    setMode(newMode)
-    onChange(undefined)
+const TRANSFORM_SCRIPT_TEMPLATE = `/**
+ * Transform display value into stored form value.
+ * @param {any} value - Value from the widget/input domain
+ * @returns {any} Stored value written to form data
+ *
+ * Example: convert percentage input 96 to decimal 0.96.
+ */
+function(value) {
+  if (value == null || value === '') {
+    return value;
   }
 
-  return (
-    <div style={{ marginBottom: 12 }}>
-      <FormGroup label={label} style={{ marginBottom: 4 }}>
-        <Select
-          style={{
-            marginTop: '10px',
-          }}
-          value={mode}
-          onChange={(value) => handleModeChange(value as 'callback' | 'script')}
-          disabled={disabled}
-          options={[
-            {
-              label: 'Callback name (from callbacks registry)',
-              value: 'callback',
-            },
-            { label: 'Inline JS script', value: 'script' },
-          ]}
-        />
+  return Number(value) / 100;
+}`;
 
-        {mode === 'callback' ? (
-          <InputGroup
-            value={typeof value === 'string' ? value : ''}
-            onChange={(e) => onChange(e.target.value || undefined)}
-            placeholder={placeholder}
-            disabled={disabled}
-          />
-        ) : (
-          <>
-            <Callout
-              intent="warning"
-              icon="warning-sign"
-              style={{ fontSize: 12, marginBottom: 4 }}
-            >
-              Only use in trusted internal environments. Code runs in the
-              browser.
-            </Callout>
-            <CodeEditor
-              value={
-                isScript ? (value as { type: 'script'; code: string }).code : ''
-              }
-              language="javascript"
-              config={{ initialMode: 'preview', previewLines: 4 }}
-              onChange={(code) =>
-                onChange(code ? { type: 'script', code } : undefined)
-              }
-              disabled={disabled}
-            />
-          </>
-        )}
-      </FormGroup>
-    </div>
-  )
-}
+const REVERSE_TRANSFORM_SCRIPT_TEMPLATE = `/**
+ * Transform stored form value back into display value.
+ * @param {any} value - Stored value from form data
+ * @returns {any} Display value shown by the widget/input
+ *
+ * Example: convert stored decimal 0.96 back to percentage input 96.
+ */
+function(value) {
+  if (value == null || value === '') {
+    return value;
+  }
+
+  return Number(value) * 100;
+}`;
+
+const handleTransformRefChange = ({
+  value,
+  callback,
+  onChange,
+}: {
+  value: UIConfig["transform"];
+  callback: CallbackPropRef | undefined;
+  onChange: (value: UIConfig["transform"]) => void;
+}) => {
+  onChange({ ...value, callback: callback ?? "" });
+};
+
+const handleReverseTransformRefChange = ({
+  value,
+  callback,
+  onChange,
+}: {
+  value: UIConfig["transform"];
+  callback: CallbackPropRef | undefined;
+  onChange: (value: UIConfig["transform"]) => void;
+}) => {
+  onChange({ ...value, reverseCallback: callback });
+};
 
 export const TransformEditor: React.FC<TransformEditorProps> = ({
   value,
   onChange,
   disabled,
 }) => {
-  const enabled = value != null
+  const enabled = value != null;
 
-  const handleEnable = () => onChange({ callback: '' })
+  const handleEnable = () => onChange({ callback: "" });
 
-  const handleDisable = () => onChange(undefined)
+  const handleDisable = () => onChange(undefined);
 
   if (!enabled) {
     return (
-      <Button icon="add" onClick={handleEnable} disabled={disabled}>
-        Add Transform
-      </Button>
-    )
+      <Button
+        icon="add"
+        text="Add Transform"
+        intent="primary"
+        fill
+        onClick={handleEnable}
+        disabled={disabled}
+      />
+    );
   }
 
   return (
-    <div>
-      <TransformFnEditor
-        label="callback (input domain → stored domain)"
-        value={value.callback}
-        onChange={(cb) => onChange({ ...value, callback: cb ?? '' })}
-        disabled={disabled}
-        placeholder="e.g. percentToDecimal"
-      />
-      <TransformFnEditor
-        label="reverseCallback (stored domain → input domain, optional)"
-        value={value.reverseCallback}
-        onChange={(rc) => onChange({ ...value, reverseCallback: rc })}
-        disabled={disabled}
-        placeholder="e.g. decimalToPercent"
-      />
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <Card style={{ padding: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <FunctionRefEditor
+            value={value.callback}
+            onChange={(callback) =>
+              handleTransformRefChange({ value, callback, onChange })
+            }
+            disabled={disabled}
+            modeLabel="Callback Mode"
+            functionNameLabel="Function Name"
+            functionNameHelperText="Function from DynamicForm callbacks prop. Signature: (value) => storedValue."
+            functionNamePlaceholder="e.g. percentToDecimal"
+            scriptLabel="Transform Script"
+            scriptHelperText="Complete JavaScript function receiving value. Return the stored-domain value."
+            scriptTemplate={TRANSFORM_SCRIPT_TEMPLATE}
+            previewLines={5}
+          />
+        </div>
+      </Card>
+
+      <Card style={{ padding: 10 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <FunctionRefEditor
+            value={value.reverseCallback}
+            onChange={(callback) =>
+              handleReverseTransformRefChange({ value, callback, onChange })
+            }
+            disabled={disabled}
+            modeLabel="Callback Mode"
+            functionNameLabel="Function Name"
+            functionNameHelperText="Function from DynamicForm callbacks prop. Signature: (value) => inputValue."
+            functionNamePlaceholder="e.g. decimalToPercent"
+            scriptLabel="Reverse Transform Script"
+            scriptHelperText="Complete JavaScript function receiving stored value. Return the input-domain value."
+            scriptTemplate={REVERSE_TRANSFORM_SCRIPT_TEMPLATE}
+            previewLines={5}
+          />
+        </div>
+      </Card>
+
       <Button
         small
         icon="trash"
@@ -134,5 +142,5 @@ export const TransformEditor: React.FC<TransformEditorProps> = ({
         Remove Transform
       </Button>
     </div>
-  )
-}
+  );
+};

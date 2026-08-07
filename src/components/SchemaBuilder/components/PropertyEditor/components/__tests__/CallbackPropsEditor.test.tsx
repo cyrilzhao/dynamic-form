@@ -41,7 +41,19 @@ jest.mock("../../../../../Select", () => ({
 }));
 
 jest.mock("../../../../../CodeEditor", () => ({
-  CodeEditor: () => <textarea aria-label="code-editor" />,
+  CodeEditor: ({
+    value,
+    onChange,
+  }: {
+    value: string;
+    onChange: (value: string) => void;
+  }) => (
+    <textarea
+      aria-label="code-editor"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  ),
 }));
 
 describe("CallbackPropsEditor", () => {
@@ -90,5 +102,18 @@ describe("CallbackPropsEditor", () => {
     expect(
       screen.getByText(/callbacks=\{\{ uploadFile \}\}/i),
     ).toBeInTheDocument();
+  });
+
+  it("inline script 应该使用带说明和示例的 widget callback 模板", () => {
+    render(<CallbackPropsEditor onChange={jest.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Callback Prop" }));
+
+    const code = screen.getByLabelText("code-editor") as HTMLTextAreaElement;
+    expect(code.value).toContain("Widget callback prop");
+    expect(code.value).toContain("@param {...any} args");
+    expect(code.value).toContain("@returns {any}");
+    expect(code.value).toContain("return the first argument unchanged");
+    expect(code.value).toContain("function(...args)");
   });
 });

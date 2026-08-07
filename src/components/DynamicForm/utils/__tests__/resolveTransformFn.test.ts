@@ -30,7 +30,9 @@ describe("resolveTransformFn", () => {
     const fn = resolveTransformFn(
       {
         type: "script",
-        code: "return value == null ? value : value.trim().toUpperCase();",
+        code: `function(value) {
+          return value == null ? value : value.trim().toUpperCase();
+        }`,
       },
       {},
     );
@@ -40,7 +42,7 @@ describe("resolveTransformFn", () => {
     expect(fn?.(null)).toBeNull();
   });
 
-  it("script 可以访问 Function 参数 value 但不依赖 callbacks", () => {
+  it("script 完整函数可以访问 value 参数但不依赖 callbacks", () => {
     const callbacks = {
       unused: jest.fn(() => "unused"),
     };
@@ -48,7 +50,9 @@ describe("resolveTransformFn", () => {
     const fn = resolveTransformFn(
       {
         type: "script",
-        code: "return { stored: value * 2 };",
+        code: `function(value) {
+          return { stored: value * 2 };
+        }`,
       },
       callbacks,
     );
@@ -67,7 +71,7 @@ describe("resolveTransformFn", () => {
     const fn = resolveTransformFn(
       {
         type: "script",
-        code: "return value + ;",
+        code: "function(value) { return value + ; }",
       },
       {},
     );
@@ -79,12 +83,24 @@ describe("resolveTransformFn", () => {
     const fn = resolveTransformFn(
       {
         type: "script",
-        code: "throw new Error('boom');",
+        code: "function(value) { throw new Error('boom'); }",
       },
       {},
     );
 
     expect(fn).toBeDefined();
     expect(() => fn?.("value")).toThrow("boom");
+  });
+
+  it("script 为函数体时应该返回 undefined", () => {
+    const fn = resolveTransformFn(
+      {
+        type: "script",
+        code: "return value / 100;",
+      },
+      {},
+    );
+
+    expect(fn).toBeUndefined();
   });
 });

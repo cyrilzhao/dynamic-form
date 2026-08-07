@@ -2,22 +2,17 @@ import React, { useState } from "react";
 import {
   Button,
   Card,
-  Callout,
-  Divider,
   FormGroup,
   Icon,
   InputGroup,
   Tag,
   Tooltip,
 } from "@blueprintjs/core";
-import { Select } from "../../../../Select";
-import { CodeEditor } from "../../../../CodeEditor";
+import { FunctionRefEditor } from "./FunctionRefEditor";
 import type {
   CallbackPropRef,
   UIConfig,
 } from "../../../../DynamicForm/types/schema";
-
-type CallbackMode = "function-name" | "inline-script";
 
 interface CallbackPropsEditorProps {
   value?: UIConfig["callbackProps"];
@@ -25,7 +20,17 @@ interface CallbackPropsEditorProps {
   disabled?: boolean;
 }
 
-const DEFAULT_SCRIPT_TEMPLATE = `function(value) {
+const DEFAULT_SCRIPT_TEMPLATE = `/**
+ * Widget callback prop.
+ * The widget decides which arguments are passed to this function.
+ * @param {...any} args - Arguments provided by the widget
+ * @returns {any} Value expected by the widget callback contract
+ *
+ * Example: return the first argument unchanged.
+ */
+function(...args) {
+  const [value] = args;
+
   return value;
 }`;
 
@@ -105,16 +110,11 @@ export const CallbackPropsEditor: React.FC<CallbackPropsEditorProps> = ({
   );
   const [isNewCallback, setIsNewCallback] = useState(false);
 
-  const isScript = editingRef != null && typeof editingRef !== "string";
-  const [callbackMode, setCallbackMode] =
-    useState<CallbackMode>("inline-script");
-
   const resetEditingState = () => {
     setEditingName("");
     setEditingRef(undefined);
     setEditingOriginalName(null);
     setIsNewCallback(false);
-    setCallbackMode("inline-script");
   };
 
   const handleAdd = () => {
@@ -122,7 +122,6 @@ export const CallbackPropsEditor: React.FC<CallbackPropsEditorProps> = ({
     setEditingRef({ type: "script", code: DEFAULT_SCRIPT_TEMPLATE });
     setEditingOriginalName(null);
     setIsNewCallback(true);
-    setCallbackMode("inline-script");
   };
 
   const handleEdit = ({
@@ -136,9 +135,6 @@ export const CallbackPropsEditor: React.FC<CallbackPropsEditorProps> = ({
     setEditingRef(ref);
     setEditingOriginalName(propName);
     setIsNewCallback(false);
-    setCallbackMode(
-      typeof ref === "string" ? "function-name" : "inline-script",
-    );
   };
 
   const handleRemove = (propName: string) => {
@@ -148,15 +144,6 @@ export const CallbackPropsEditor: React.FC<CallbackPropsEditorProps> = ({
     if (editingOriginalName === propName) {
       resetEditingState();
     }
-  };
-
-  const handleModeChange = (newMode: CallbackMode) => {
-    setCallbackMode(newMode);
-    setEditingRef(
-      newMode === "function-name"
-        ? ""
-        : { type: "script", code: DEFAULT_SCRIPT_TEMPLATE },
-    );
   };
 
   const handleSave = () => {
@@ -224,58 +211,18 @@ export const CallbackPropsEditor: React.FC<CallbackPropsEditorProps> = ({
           />
         </FormGroup>
 
-        <FormGroup label={callbackModeLabel}>
-          <Select
-            aria-label="Callback Mode"
-            value={callbackMode}
-            onChange={(value) => handleModeChange(value as CallbackMode)}
-            disabled={disabled}
-            options={[
-              {
-                label: "Function Name (from callbacks registry)",
-                value: "function-name",
-              },
-              { label: "Inline Script", value: "inline-script" },
-            ]}
-          />
-        </FormGroup>
-
-        {callbackMode === "function-name" ? (
-          <FormGroup
-            label={functionNameLabel}
-            helperText="Function from DynamicForm callbacks prop."
-          >
-            <InputGroup
-              value={typeof editingRef === "string" ? editingRef : ""}
-              onChange={(e) => setEditingRef(e.target.value)}
-              placeholder="handleUpload"
-              disabled={disabled}
-            />
-          </FormGroup>
-        ) : (
-          <>
-            <Callout
-              intent="warning"
-              icon="warning-sign"
-              style={{ fontSize: 12 }}
-            >
-              Only use in trusted internal environments. The code runs in the
-              browser.
-            </Callout>
-            <FormGroup
-              label="Callback Script"
-              helperText="Complete JavaScript function. The widget decides which arguments are passed."
-            >
-              <CodeEditor
-                value={isScript ? editingRef.code : DEFAULT_SCRIPT_TEMPLATE}
-                language="javascript"
-                config={{ initialMode: "preview", previewLines: 5 }}
-                onChange={(code) => setEditingRef({ type: "script", code })}
-                disabled={disabled}
-              />
-            </FormGroup>
-          </>
-        )}
+        <FunctionRefEditor
+          value={editingRef}
+          onChange={setEditingRef}
+          disabled={disabled}
+          modeLabel={callbackModeLabel}
+          functionNameLabel={functionNameLabel}
+          functionNameHelperText="Function from DynamicForm callbacks prop."
+          functionNamePlaceholder="handleUpload"
+          scriptLabel="Callback Script"
+          scriptHelperText="Complete JavaScript function. The widget decides which arguments are passed."
+          scriptTemplate={DEFAULT_SCRIPT_TEMPLATE}
+        />
 
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <Button
@@ -296,11 +243,6 @@ export const CallbackPropsEditor: React.FC<CallbackPropsEditorProps> = ({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <Callout intent="primary" icon="info-sign">
-        Callback props are resolved as functions and override same-named
-        widgetProps.
-      </Callout>
-
       {entries.map(([propName, ref]) => (
         <Card key={propName} style={{ padding: 10 }}>
           <div
@@ -337,8 +279,6 @@ export const CallbackPropsEditor: React.FC<CallbackPropsEditorProps> = ({
       ))}
 
       {(isNewCallback || editingOriginalName != null) && renderEditForm()}
-
-      <Divider />
 
       <Button
         icon="add"

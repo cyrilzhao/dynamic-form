@@ -2324,12 +2324,12 @@ ui: {
   transform: {
     callback: {
       type: 'script',
-      code: string            // JavaScript expression, e.g. 'return value / 100'
+      code: string            // Complete JavaScript function, e.g. 'function(value) { return value / 100; }'
                               // receives `value` parameter, must return transformed value
     },
     reverseCallback?: {
       type: 'script',
-      code: string            // JavaScript expression for reverse transform
+      code: string            // Complete JavaScript function for reverse transform
     }
   }
 }
@@ -2415,14 +2415,14 @@ const schema: ExtendedJSONSchema = {
         widget: 'number',
         placeholder: 'Enter percentage, e.g. 96',
         transform: {
-          // Inline JavaScript code - no callbacks registry needed
+          // Inline JavaScript function - no callbacks registry needed
           callback: {
             type: 'script',
-            code: 'return value / 100',  // value parameter is automatically provided
+            code: 'function(value) { return value / 100; }',
           },
           reverseCallback: {
             type: 'script',
-            code: 'return value * 100',
+            code: 'function(value) { return value * 100; }',
           },
         },
       },

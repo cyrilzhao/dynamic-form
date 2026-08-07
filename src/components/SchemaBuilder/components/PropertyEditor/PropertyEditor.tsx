@@ -1291,6 +1291,14 @@ export const PropertyEditor: React.FC = () => {
                         })}
                         helperText="Function props resolved at render time. These override same-named widgetProps."
                       >
+                        <Callout
+                          intent="primary"
+                          icon="info-sign"
+                          style={{ marginBottom: 12 }}
+                        >
+                          Callback props are resolved as functions and override
+                          same-named widgetProps.
+                        </Callout>
                         <CallbackPropsEditor
                           value={currentNode.ui?.callbackProps}
                           onChange={(val) =>
@@ -1956,6 +1964,14 @@ export const PropertyEditor: React.FC = () => {
                         ],
                       })}
                     >
+                      <Callout
+                        intent="primary"
+                        icon="info-sign"
+                        style={{ marginBottom: 12 }}
+                      >
+                        Transform functions convert between the value users
+                        type and the value stored in form data.
+                      </Callout>
                       <TransformEditor
                         value={currentNode.ui?.transform}
                         onChange={(transform) =>

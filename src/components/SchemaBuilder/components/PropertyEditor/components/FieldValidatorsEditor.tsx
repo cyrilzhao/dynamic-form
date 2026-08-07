@@ -45,7 +45,8 @@ export const FieldValidatorsEditor: React.FC<FieldValidatorsEditorProps> = ({
   const [isNewValidator, setIsNewValidator] = useState(false)
 
   // 编辑状态
-  const [callbackMode, setCallbackMode] = useState<CallbackMode>('inline-script')
+  const [callbackMode, setCallbackMode] =
+    useState<CallbackMode>('inline-script')
   const [functionName, setFunctionName] = useState('')
   const [scriptCode, setScriptCode] = useState(DEFAULT_SCRIPT_TEMPLATE)
 
@@ -190,7 +191,10 @@ export const FieldValidatorsEditor: React.FC<FieldValidatorsEditorProps> = ({
             onChange={(value) => handleModeChange(value as CallbackMode)}
             disabled={disabled}
             options={[
-              { label: 'Function Name (from callbacks registry)', value: 'function-name' },
+              {
+                label: 'Function Name (from callbacks registry)',
+                value: 'function-name',
+              },
               { label: 'Inline Script', value: 'inline-script' },
             ]}
           />
@@ -258,7 +262,8 @@ export const FieldValidatorsEditor: React.FC<FieldValidatorsEditorProps> = ({
       <Callout intent="primary" icon="info-sign">
         <strong>Custom Field Validators</strong>
         <p style={{ marginTop: 8, marginBottom: 0, fontSize: 13 }}>
-          Add custom validation rules for this field. Validators can be reusable functions or inline scripts.
+          Add custom validation rules for this field. Validators can be reusable
+          functions or inline scripts.
         </p>
       </Callout>
 
@@ -303,7 +308,9 @@ export const FieldValidatorsEditor: React.FC<FieldValidatorsEditorProps> = ({
           </div>
 
           {expandedIndex !== index && (
-            <div style={{ marginTop: 8 }}>{renderValidatorSummary(validator)}</div>
+            <div style={{ marginTop: 8 }}>
+              {renderValidatorSummary(validator)}
+            </div>
           )}
 
           {expandedIndex === index && !isNewValidator && renderEditForm()}
