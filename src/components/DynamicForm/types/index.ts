@@ -141,7 +141,39 @@ export interface DynamicFormProps {
   widgets?: Record<string, React.ComponentType<any>>;
   linkageFunctions?: Record<string, LinkageFunction>; // 联动函数（详见 UI_LINKAGE_DESIGN.md）
   linkageContext?: Record<string, any>; // 联动函数的外部上下文数据（如页面级 state、API 数据等）
-  callbacks?: Record<string, (...args: any[]) => any>; // Widget 回调函数注册表（配合 schema ui.callbackProps 使用）
+  /**
+   * 回调函数注册表，用于 Widget callbacks、Transform、Validators
+   *
+   * 所有 callback 函数都使用对象解构参数形式，并自动注入 helpers：
+   * - Widget callbacks: `({ args, helpers }) => any` - args 为 Widget 传递的参数数组
+   * - Transform callbacks: `({ value, helpers }) => any` - value 为待转换的值
+   * - Validator callbacks: `({ value, formValues, helpers }) => any | Promise<any>` - 返回 null（有效）或错误信息字符串
+   *
+   * @example
+   * ```tsx
+   * const callbacks = {
+   *   // Widget callback
+   *   handleUpload: async ({ args, helpers }) => {
+   *     const [file] = args;
+   *     const result = await helpers.ofetch('/api/upload', {
+   *       method: 'POST',
+   *       body: file,
+   *     });
+   *     return result.url;
+   *   },
+   *   // Transform callback
+   *   percentToDecimal: ({ value, helpers }) => Number(value) / 100,
+   *   // Validator callback
+   *   validateEmail: async ({ value, formValues, helpers }) => {
+   *     if (!value) return 'Email is required';
+   *     const schema = helpers.z.string().email();
+   *     const result = schema.safeParse(value);
+   *     return result.success ? null : 'Invalid email format';
+   *   },
+   * };
+   * ```
+   */
+  callbacks?: Record<string, (...args: any[]) => any>;
   customFormats?: Record<string, (value: string) => boolean>; // 自定义格式验证器
 
   /**
