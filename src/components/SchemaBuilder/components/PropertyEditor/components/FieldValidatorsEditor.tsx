@@ -20,11 +20,13 @@ interface FieldValidatorsEditorProps {
 
 const DEFAULT_SCRIPT_TEMPLATE = `/**
  * Custom field validator
- * @param {any} value - Current field value
- * @param {object} formValues - Entire form data object
+ * @param {object} params - Parameters object
+ * @param {any} params.value - Current field value
+ * @param {object} params.formValues - Entire form data object
+ * @param {object} params.helpers - Helper utilities (ofetch, lodash, valibot, etc.)
  * @returns {string|null} - null if valid, error message string if invalid
  */
-function(value, formValues) {
+function({ value, formValues, helpers }) {
   if (!value) {
     return 'This field is required';
   }

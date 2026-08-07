@@ -14,12 +14,14 @@ interface TransformEditorProps {
 
 const TRANSFORM_SCRIPT_TEMPLATE = `/**
  * Transform display value into stored form value.
- * @param {any} value - Value from the widget/input domain
+ * @param {object} params - Parameters object
+ * @param {any} params.value - Value from the widget/input domain
+ * @param {object} params.helpers - Helper utilities (ofetch, lodash, valibot, etc.)
  * @returns {any} Stored value written to form data
  *
  * Example: convert percentage input 96 to decimal 0.96.
  */
-function(value) {
+function({ value, helpers }) {
   if (value == null || value === '') {
     return value;
   }
@@ -29,12 +31,14 @@ function(value) {
 
 const REVERSE_TRANSFORM_SCRIPT_TEMPLATE = `/**
  * Transform stored form value back into display value.
- * @param {any} value - Stored value from form data
+ * @param {object} params - Parameters object
+ * @param {any} params.value - Stored value from form data
+ * @param {object} params.helpers - Helper utilities (ofetch, lodash, valibot, etc.)
  * @returns {any} Display value shown by the widget/input
  *
  * Example: convert stored decimal 0.96 back to percentage input 96.
  */
-function(value) {
+function({ value, helpers }) {
   if (value == null || value === '') {
     return value;
   }

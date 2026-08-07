@@ -23,12 +23,14 @@ interface CallbackPropsEditorProps {
 const DEFAULT_SCRIPT_TEMPLATE = `/**
  * Widget callback prop.
  * The widget decides which arguments are passed to this function.
- * @param {...any} args - Arguments provided by the widget
+ * @param {object} params - Parameters object
+ * @param {any[]} params.args - Arguments provided by the widget
+ * @param {object} params.helpers - Helper utilities (ofetch, lodash, valibot, etc.)
  * @returns {any} Value expected by the widget callback contract
  *
  * Example: return the first argument unchanged.
  */
-function(...args) {
+function({ args, helpers }) {
   const [value] = args;
 
   return value;
