@@ -225,24 +225,85 @@ DynamicForm provides these helpers by default:
 | `helpers._` | Lodash utilities | `helpers._.sumBy(items, 'price')` |
 | `helpers.v` | Valibot runtime validation utilities | `helpers.v.safeParse(schema, value)` |
 
-You can override or extend helpers through the `helpers` prop:
+### Custom Helpers
+
+Use the `helpers` prop to add application-specific utilities. DynamicForm merges them with the built-in helpers:
 
 ```typescript
+const mergedHelpers = {
+  ...builtInHelpers,
+  ...userHelpers,
+};
+```
+
+User-provided helpers take priority, so you can override a built-in helper when needed. Keep the `helpers` object stable with `useMemo` to avoid unnecessary recalculation and rerenders.
+
+```typescript
+import React, { useMemo } from 'react';
 import { ofetch } from 'ofetch';
 import dayjs from 'dayjs';
 
-const helpers = {
-  ofetch: ofetch.create({
-    baseURL: '/api',
-  }),
-  dayjs,
-};
+function App({ token }: { token: string }) {
+  const helpers = useMemo(() => ({
+    // Override the built-in ofetch with an app-specific instance
+    ofetch: ofetch.create({
+      baseURL: '/api',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }),
 
-<DynamicForm
-  schema={schema}
-  helpers={helpers}
-  onSubmit={handleSubmit}
-/>
+    // Add custom dependencies and business utilities
+    dayjs,
+    money: {
+      dollarsToCents: (value: number) => Math.round(value * 100),
+    },
+    userService: {
+      isReservedUsername: (value: string) =>
+        ['admin', 'root', 'system'].includes(value.toLowerCase()),
+    },
+  }), [token]);
+
+  return (
+    <DynamicForm
+      schema={schema}
+      helpers={helpers}
+      onSubmit={handleSubmit}
+    />
+  );
+}
+```
+
+Custom helpers are available in every helper-aware function:
+
+```typescript
+const callbacks = {
+  validateUsername: ({ value, helpers }) => {
+    if (helpers.userService.isReservedUsername(value)) {
+      return 'This username is reserved';
+    }
+    return null;
+  },
+};
+```
+
+Inline scripts can use the same custom helpers:
+
+```typescript
+{
+  type: 'number',
+  title: 'Price',
+  ui: {
+    transform: {
+      callback: {
+        type: 'script',
+        code: `function({ value, helpers }) {
+          return helpers.money.dollarsToCents(value);
+        }`,
+      },
+    },
+  },
+}
 ```
 
 ### Function Signatures
