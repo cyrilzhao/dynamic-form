@@ -64,6 +64,9 @@ export interface CodeMirrorViewProps {
   /** 最大高度（px） */
   maxHeight?: number;
 
+  /** 是否自动换行 */
+  lineWrapping?: boolean;
+
   /** 值变化回调 */
   onChange?: (value: string) => void;
 

@@ -1,26 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'
 import {
   Switch,
   Card,
   Elevation,
   Button,
+  FormGroup,
   Tag,
-} from '@blueprintjs/core';
-import { Select } from '../../../../Select';
-import type { LinkageEffect, LinkageType } from '../../../../DynamicForm/types/linkage';
-import { ObjectEditor } from '../../../../ObjectEditor';
-import { FunctionRefEditor } from './FunctionRefEditor';
+} from '@blueprintjs/core'
+import { Select } from '../../../../Select'
+import type {
+  LinkageEffect,
+  LinkageType,
+} from '../../../../DynamicForm/types/linkage'
+import { ObjectEditor } from '../../../../ObjectEditor'
+import { FunctionRefEditor } from './FunctionRefEditor'
 
 interface EffectEditorProps {
-  value?: LinkageEffect;
-  onChange: (value: LinkageEffect | undefined) => void;
-  linkageType: LinkageType;
-  disabled?: boolean;
-  label: string;
-  isFulfill?: boolean;
+  value?: LinkageEffect
+  onChange: (value: LinkageEffect | undefined) => void
+  linkageType: LinkageType
+  disabled?: boolean
+  label: string
+  isFulfill?: boolean
 }
 
-type ConfigMode = 'dynamic' | 'static';
+type ConfigMode = 'dynamic' | 'static'
 
 // 默认的内联脚本模板
 const getDefaultScriptTemplate = (linkageType: LinkageType): string => {
@@ -100,9 +104,9 @@ async function({ formData, context, helpers }) {
     title: 'Dynamic Field',
   };
 }`,
-  };
-  return examples[linkageType];
-};
+  }
+  return examples[linkageType]
+}
 
 /**
  * 联动效果编辑器（重构版）
@@ -118,68 +122,68 @@ export const EffectEditor: React.FC<EffectEditorProps> = ({
 }) => {
   // 确定当前的配置模式
   const getCurrentMode = (): ConfigMode => {
-    if (!value) return 'static';
+    if (!value) return 'static'
     // 如果有 function 字段（即使是空字符串），则为 dynamic 模式
-    if ('function' in value) return 'dynamic';
+    if ('function' in value) return 'dynamic'
     // 否则为 static 模式
-    return 'static';
-  };
+    return 'static'
+  }
 
-  const [configMode, setConfigMode] = useState<ConfigMode>(getCurrentMode);
+  const [configMode, setConfigMode] = useState<ConfigMode>(getCurrentMode)
 
   // 当 value 变化时同步状态
   useEffect(() => {
-    setConfigMode(getCurrentMode());
-  }, [value]);
+    setConfigMode(getCurrentMode())
+  }, [value])
 
   const handleClear = () => {
-    onChange(undefined);
-  };
+    onChange(undefined)
+  }
 
   const handleAdd = () => {
     // 默认添加为 static 模式
     if (['visibility', 'disabled', 'readonly'].includes(linkageType)) {
-      const stateKey = linkageType === 'visibility' ? 'visible' : linkageType;
+      const stateKey = linkageType === 'visibility' ? 'visible' : linkageType
       onChange({
         state: {
           [stateKey]: isFulfill,
         },
-      });
+      })
     } else if (linkageType === 'value') {
-      onChange({ value: '' });
+      onChange({ value: '' })
     } else if (linkageType === 'options') {
-      onChange({ options: [] });
+      onChange({ options: [] })
     } else if (linkageType === 'schema') {
-      onChange({ schema: {} });
+      onChange({ schema: {} })
     }
-  };
+  }
 
   const handleModeChange = (newMode: ConfigMode) => {
-    setConfigMode(newMode);
+    setConfigMode(newMode)
 
     if (newMode === 'dynamic') {
       // 切换到 dynamic 模式：移除静态字段，添加空的 function
-      const newValue: LinkageEffect = { function: '' };
-      onChange(newValue);
+      const newValue: LinkageEffect = { function: '' }
+      onChange(newValue)
     } else {
       // 切换到 static 模式：移除 function，设置默认静态值
-      const newValue: LinkageEffect = {};
+      const newValue: LinkageEffect = {}
 
       if (['visibility', 'disabled', 'readonly'].includes(linkageType)) {
-        const stateKey = linkageType === 'visibility' ? 'visible' : linkageType;
+        const stateKey = linkageType === 'visibility' ? 'visible' : linkageType
         newValue.state = {
           [stateKey]: isFulfill,
-        };
+        }
       } else if (linkageType === 'value') {
-        newValue.value = '';
+        newValue.value = ''
       } else if (linkageType === 'options') {
-        newValue.options = [];
+        newValue.options = []
       } else if (linkageType === 'schema') {
-        newValue.schema = {};
+        newValue.schema = {}
       }
-      onChange(newValue);
+      onChange(newValue)
     }
-  };
+  }
 
   if (!value) {
     return (
@@ -193,12 +197,22 @@ export const EffectEditor: React.FC<EffectEditorProps> = ({
           small
         />
       </div>
-    );
+    )
   }
 
   return (
-    <Card elevation={Elevation.ONE} className="effect-editor" style={{ padding: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+    <Card
+      elevation={Elevation.ONE}
+      className="effect-editor"
+      style={{ padding: 12 }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          marginBottom: 8,
+        }}
+      >
         <Tag intent="success" minimal>
           {label}
         </Tag>
@@ -246,15 +260,15 @@ export const EffectEditor: React.FC<EffectEditorProps> = ({
         />
       )}
     </Card>
-  );
-};
+  )
+}
 
 // Dynamic 模式配置组件
 interface DynamicModeConfigProps {
-  linkageType: LinkageType;
-  value: LinkageEffect;
-  onChange: (value: LinkageEffect) => void;
-  disabled?: boolean;
+  linkageType: LinkageType
+  value: LinkageEffect
+  onChange: (value: LinkageEffect) => void
+  disabled?: boolean
 }
 
 const DynamicModeConfig: React.FC<DynamicModeConfigProps> = ({
@@ -263,13 +277,15 @@ const DynamicModeConfig: React.FC<DynamicModeConfigProps> = ({
   onChange,
   disabled,
 }) => {
-  const handleFunctionRefChange = (functionRef: string | { type: 'script'; code: string } | undefined) => {
+  const handleFunctionRefChange = (
+    functionRef: string | { type: 'script'; code: string } | undefined
+  ) => {
     if (!functionRef) {
-      onChange({ ...value, function: '' });
-      return;
+      onChange({ ...value, function: '' })
+      return
     }
-    onChange({ ...value, function: functionRef });
-  };
+    onChange({ ...value, function: functionRef })
+  }
 
   return (
     <FunctionRefEditor
@@ -285,16 +301,16 @@ const DynamicModeConfig: React.FC<DynamicModeConfigProps> = ({
       scriptTemplate={getDefaultScriptTemplate(linkageType)}
       previewLines={6}
     />
-  );
-};
+  )
+}
 
 // Static 模式配置组件
 interface StaticModeConfigProps {
-  linkageType: LinkageType;
-  value: LinkageEffect;
-  onChange: (value: LinkageEffect) => void;
-  disabled?: boolean;
-  isFulfill: boolean;
+  linkageType: LinkageType
+  value: LinkageEffect
+  onChange: (value: LinkageEffect) => void
+  disabled?: boolean
+  isFulfill: boolean
 }
 
 const StaticModeConfig: React.FC<StaticModeConfigProps> = ({
@@ -311,33 +327,33 @@ const StaticModeConfig: React.FC<StaticModeConfigProps> = ({
         ...value?.state,
         [key]: val,
       },
-    });
-  };
+    })
+  }
 
   const handleValueChange = (val: string) => {
     onChange({
       ...value,
       value: val,
-    });
-  };
+    })
+  }
 
   const handleOptionsChange = (options: unknown) => {
     onChange({
       ...value,
       options: options as Array<{ label: string; value: any }>,
-    });
-  };
+    })
+  }
 
   const handleSchemaChange = (schema: unknown) => {
     onChange({
       ...value,
       schema,
-    });
-  };
+    })
+  }
 
   // visibility/disabled/readonly 类型
   if (['visibility', 'disabled', 'readonly'].includes(linkageType)) {
-    const stateKey = linkageType === 'visibility' ? 'visible' : linkageType;
+    const stateKey = linkageType === 'visibility' ? 'visible' : linkageType
     return (
       <FormGroup label="Static State">
         <Switch
@@ -358,7 +374,7 @@ const StaticModeConfig: React.FC<StaticModeConfigProps> = ({
           disabled={disabled}
         />
       </FormGroup>
-    );
+    )
   }
 
   // value 类型
@@ -372,7 +388,7 @@ const StaticModeConfig: React.FC<StaticModeConfigProps> = ({
           disabled={disabled}
         />
       </FormGroup>
-    );
+    )
   }
 
   // options 类型
@@ -389,7 +405,7 @@ const StaticModeConfig: React.FC<StaticModeConfigProps> = ({
           config={{ previewMaxHeight: 120 }}
         />
       </FormGroup>
-    );
+    )
   }
 
   // schema 类型
@@ -406,8 +422,8 @@ const StaticModeConfig: React.FC<StaticModeConfigProps> = ({
           config={{ previewMaxHeight: 150 }}
         />
       </FormGroup>
-    );
+    )
   }
 
-  return null;
-};
+  return null
+}

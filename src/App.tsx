@@ -93,6 +93,13 @@ const groups = [
     ],
   },
   {
+    label: 'Widget 管理',
+    items: [
+      { id: 'widget-manager', label: 'Widget 列表', component: namedLazy(() => import('./features/widget-manager/pages/WidgetListPage'), 'WidgetListPage') },
+      { id: 'custom-widget-example', label: '使用示例', component: namedLazy(() => import('./examples/CustomWidgetExample'), 'CustomWidgetExample') },
+    ],
+  },
+  {
     label: '性能测试',
     items: [
       { id: 'memo-performance', label: 'Memo 性能', component: namedLazy(() => import('./examples/PerformanceTest/MemoPerformanceTest'), 'MemoPerformanceTest') },
@@ -102,6 +109,12 @@ const groups = [
 ]
 
 const allItems = groups.flatMap((g) => g.items)
+
+// 定义需要参数的路由组件
+const WidgetEditorPageLazy = namedLazy(
+  () => import('./features/widget-manager/pages/WidgetEditorPage'),
+  'WidgetEditorPage'
+)
 
 const Sidebar: React.FC = () => {
   const { pathname } = useLocation()
@@ -148,6 +161,10 @@ export const App: React.FC = () => (
             {allItems.map(({ id, component: Comp }) => (
               <Route key={id} path={`/${id}`} element={<Comp />} />
             ))}
+            <Route
+              path="/widget-manager/editor/:id"
+              element={<WidgetEditorPageLazy />}
+            />
           </Routes>
         </Suspense>
       </div>

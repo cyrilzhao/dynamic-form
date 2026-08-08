@@ -17,6 +17,7 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
+    "@babel/standalone": "^7.29.8",
     "@blueprintjs/core": "^6.4.1",
     "@blueprintjs/datetime": "^6.0.10",
     "@blueprintjs/icons": "^6.3.2",

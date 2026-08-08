@@ -44,6 +44,7 @@ export const CodeMirrorView: React.FC<CodeMirrorViewProps> = ({
   language,
   readonly = false,
   maxHeight,
+  lineWrapping = false,
   onChange,
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -74,6 +75,11 @@ export const CodeMirrorView: React.FC<CodeMirrorViewProps> = ({
     // 添加自动补全（仅在非只读模式下）
     if (!readonly) {
       extensions.push(autocompletion());
+    }
+
+    // 添加自动换行
+    if (lineWrapping) {
+      extensions.push(EditorView.lineWrapping);
     }
 
     // 添加最大高度限制
@@ -110,7 +116,7 @@ export const CodeMirrorView: React.FC<CodeMirrorViewProps> = ({
       view.destroy();
       viewRef.current = null;
     };
-  }, [language, readonly, maxHeight]);
+  }, [language, readonly, maxHeight, lineWrapping]);
 
   // 同步外部值变化到编辑器
   useEffect(() => {
