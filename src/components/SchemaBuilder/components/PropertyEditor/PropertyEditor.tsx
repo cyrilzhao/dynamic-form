@@ -25,6 +25,7 @@ import { LinkagesEditor } from './components/LinkagesEditor'
 import { TransformEditor } from './components/TransformEditor'
 import { CallbackPropsEditor } from './components/CallbackPropsEditor'
 import { ObjectEditor } from '../../../ObjectEditor'
+import type { ExtendedJSONSchema } from '@/components/DynamicForm'
 
 // Helper to get node from path
 const getNode = (schema: any, path: string[]) => {
@@ -650,15 +651,16 @@ export const PropertyEditor: React.FC = () => {
                     onChange={(e) => {
                       const isRequired = e.currentTarget.checked
                       const parentPath = selectedPath.slice(0, -2)
-                      const parentNode =
+                      const parentNode: ExtendedJSONSchema =
                         parentPath.length === 0
                           ? schema
                           : get(schema, parentPath)
 
                       if (parentNode) {
-                        const currentRequired = parentNode.required || []
+                        const currentRequired: string[] =
+                          parentNode.required || []
                         const newRequired = isRequired
-                          ? [...currentRequired, currentKey]
+                          ? [...currentRequired, currentKey!]
                           : currentRequired.filter((k) => k !== currentKey)
 
                         onUpdate(parentPath, {
@@ -1969,8 +1971,8 @@ export const PropertyEditor: React.FC = () => {
                         icon="info-sign"
                         style={{ marginBottom: 12 }}
                       >
-                        Transform functions convert between the value users
-                        type and the value stored in form data.
+                        Transform functions convert between the value users type
+                        and the value stored in form data.
                       </Callout>
                       <TransformEditor
                         value={currentNode.ui?.transform}

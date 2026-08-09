@@ -5,6 +5,7 @@ import {
   Elevation,
   Button,
   FormGroup,
+  InputGroup,
   Tag,
 } from '@blueprintjs/core'
 import { Select } from '../../../../Select'
