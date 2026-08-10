@@ -1,5 +1,7 @@
 # Schema Builder 组件设计文档
 
+> **状态：部分实现。** 本文保留完整的目标设计和实现细节。当前 SchemaBuilder 已支持树编辑、预览、`initialSelectedPath`、`hideTree`、`previewMode` 和 Ref API；未实现或不完整的 JSON Schema 关键字编辑能力应按提案阅读。
+
 ## 1. 概述
 
 `SchemaBuilder` 是一个可视化编辑器组件，旨在创建和修改 `ExtendedJSONSchema` 对象。它允许用户直观地构建复杂的表单 Schema，无需编写原始 JSON，涵盖了标准 JSON Schema 验证规则以及项目特有的 UI 扩展（Widget、布局、路径扁平化等）。

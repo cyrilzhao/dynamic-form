@@ -1,5 +1,7 @@
 # 动态表单性能优化方案设计文档
 
+> **状态：部分实现。** 本文完整保留性能问题分析、已实施优化、待实施方案、实施计划和测试方法。章节中的“已实施”以当前代码为准；无仓库基准报告支撑的性能数字仅作为历史测量或目标，不应视为当前保证。文中的 `performanceConfig`/`debug` 示例属于历史方案，当前公开 Props 使用 `enableVirtualScroll` 和 `virtualScrollHeight`。
+
 ## 文档信息
 
 **版本**: 1.0
@@ -2115,30 +2117,20 @@ fieldA: {
 <DynamicForm
   schema={schema}
   onSubmit={handleSubmit}
-  performanceConfig={{
-    enableVirtualScroll: true,
-    virtualScrollItemHeight: 200,
-  }}
+  enableVirtualScroll
+  virtualScrollHeight={600}
 />
 ```
 
 #### 7.5.2 配置性能选项
 
 ```typescript
-// 根据场景配置性能选项
+// 当前公开性能配置仅包含数组虚拟滚动开关和容器高度
 <DynamicForm
   schema={schema}
   onSubmit={handleSubmit}
-  performanceConfig={{
-    // 启用虚拟滚动
-    enableVirtualScroll: true,
-    // 卸载隐藏字段
-    unmountHiddenFields: true,
-    // 联动计算防抖延迟（ms）
-    linkageDebounceDelay: 100,
-    // 启用 React.memo 优化
-    enableMemoization: true,
-  }}
+  enableVirtualScroll
+  virtualScrollHeight={600}
 />
 ```
 

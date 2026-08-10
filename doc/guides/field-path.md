@@ -27,12 +27,13 @@
 
 ### 1.2 路径的两个维度
 
-| 维度             | 说明                                      | 示例                                     |
-| ---------------- | ----------------------------------------- | ---------------------------------------- |
-| **表单数据路径** | 用于 react-hook-form 的字段注册和数据访问 | `contacts.0.name`                        |
-| **联动依赖路径** | 用于 Schema 中配置字段间的依赖关系        | `./type` 或 `#/properties/enableVip`     |
+| 维度             | 说明                                      | 示例                                 |
+| ---------------- | ----------------------------------------- | ------------------------------------ |
+| **表单数据路径** | 用于 react-hook-form 的字段注册和数据访问 | `contacts.0.name`                    |
+| **联动依赖路径** | 用于 Schema 中配置字段间的依赖关系        | `./type` 或 `#/properties/enableVip` |
 
 **v3.0 重要变更**：
+
 - 统一使用标准 `.` 分隔符
 - 移除了"逻辑路径"和"物理路径"的区分
 - flattenPath 字段通过透明容器实现视觉扁平化，数据结构保持标准嵌套格式
@@ -51,23 +52,24 @@
 | **JSON Pointer** | `#/properties/...` | 跨层级联动依赖         | `#/properties/enableVip` |
 
 **v3.0 变更说明**：
+
 - 移除了"逻辑路径"和"物理路径"的概念
 - 所有路径统一使用标准 `.` 分隔符
 - flattenPath 字段的路径与普通嵌套字段完全相同
 
 ### 2.2 路径格式对比
 
-```
-Schema 定义                    表单数据                      联动配置
-─────────────────────────────────────────────────────────────────────────
-properties:                    {                             dependencies:
-  user:                          user: {                       - './age'        (相对路径)
-    properties:                    name: 'John',               - '#/properties/user/age' (JSON Pointer)
-      name: { type: 'string' }     age: 25
-      age: { type: 'number' }    }
-                               }
+```text
+Schema 定义                               表单数据                      联动配置
+─────────────────────────────────────────────────────────────────────────────────────────────
+properties:                             {                             dependencies:
+  user:                                    user: {                       - './age'        (相对路径)
+    properties:                              name: 'John',               - '#/properties/user/age' (JSON Pointer)
+      name: { type: 'string' }               age: 25
+      age: { type: 'number' }              }
+                                        }
 
-字段路径: user.name            数据路径: user.name           依赖路径: ./age 或 #/properties/user/age
+字段路径: user.name                       数据路径: user.name           依赖路径: ./age 或 #/properties/user/age
 ```
 
 ---
@@ -82,19 +84,19 @@ properties:                    {                             dependencies:
 
 ```typescript
 // 简单字段
-'name'; // → formData.name
+'name' // → formData.name
 
 // 嵌套对象
-'user.name'; // → formData.user.name
-'user.address.city'; // → formData.user.address.city
+'user.name' // → formData.user.name
+'user.address.city' // → formData.user.address.city
 
 // 数组元素
-'contacts.0'; // → formData.contacts[0]
-'contacts.0.name'; // → formData.contacts[0].name
-'contacts.1.phone'; // → formData.contacts[1].phone
+'contacts.0' // → formData.contacts[0]
+'contacts.0.name' // → formData.contacts[0].name
+'contacts.1.phone' // → formData.contacts[1].phone
 
 // 嵌套数组
-'departments.0.employees.1.name'; // → formData.departments[0].employees[1].name
+'departments.0.employees.1.name' // → formData.departments[0].employees[1].name
 ```
 
 ### 3.2 数组索引路径
@@ -104,14 +106,14 @@ properties:                    {                             dependencies:
 ```typescript
 // 判断是否是数组元素路径
 function isArrayElementPath(path: string): boolean {
-  const parts = path.split('.');
-  return parts.some(part => /^\d+$/.test(part));
+  const parts = path.split('.')
+  return parts.some((part) => /^\d+$/.test(part))
 }
 
 // 示例
-isArrayElementPath('contacts.0.name'); // true
-isArrayElementPath('contacts.name'); // false
-isArrayElementPath('items.2.details.0.value'); // true
+isArrayElementPath('contacts.0.name') // true
+isArrayElementPath('contacts.name') // false
+isArrayElementPath('items.2.details.0.value') // true
 ```
 
 ### 3.3 提取数组信息
@@ -196,9 +198,9 @@ function extractArrayInfo(path: string) {
 
 ```typescript
 // 基本格式
-'#/properties/fieldName'; // 顶层字段
-'#/properties/parent/properties/child'; // 嵌套字段
-'#/properties/array/items/properties/field'; // 数组元素字段
+'#/properties/fieldName' // 顶层字段
+'#/properties/parent/properties/child' // 嵌套字段
+'#/properties/array/items/properties/field' // 数组元素字段
 ```
 
 **示例**：
@@ -275,6 +277,8 @@ function extractArrayInfo(path: string) {
 | `#/properties/user/properties/age`            | `user.age`                                             | 嵌套字段     |
 | `#/properties/contacts/items/properties/name` | `contacts.name`（模板）<br>`contacts.0.name`（运行时） | 数组元素字段 |
 
+数组字段为什么同时存在模板路径和运行时路径，以及系统如何补充数组下标，参见 [6.1 模板路径 vs 运行时路径](#61-模板路径-vs-运行时路径)。
+
 **转换函数**：
 
 ```typescript
@@ -283,9 +287,11 @@ function parseJsonPointer(pointer: string): string {
   // '#/properties/contacts/items/properties/type'
   // → 'contacts.type'
 
-  const segments = pointer.slice(2).split('/');
-  const logicalSegments = segments.filter(s => s !== 'properties' && s !== 'items');
-  return logicalSegments.join('.');
+  const segments = pointer.slice(2).split('/')
+  const logicalSegments = segments.filter(
+    (s) => s !== 'properties' && s !== 'items'
+  )
+  return logicalSegments.join('.')
 }
 ```
 
@@ -310,6 +316,7 @@ function parseJsonPointer(pointer: string): string {
 当 Schema 中某个对象字段设置了 `flattenPath: true`，该层级在 UI 上会被"跳过"（不显示 Card 容器和标题），但数据结构保持标准的嵌套格式。
 
 **v3.0 重要变更**：
+
 - flattenPath 字段会渲染 NestedFormWidget，但使用透明容器（无 Card、无标题）
 - 字段路径使用标准 `.` 分隔符，与普通嵌套字段完全相同
 - 数据结构保持标准嵌套格式，无需路径转换
@@ -433,6 +440,11 @@ region (flattenPath: true)
 | **模板路径**   | Schema 解析时的路径（不含索引） | `contacts.name`                      |
 | **运行时路径** | 实际数组元素的路径（含索引）    | `contacts.0.name`, `contacts.1.name` |
 
+- **模板路径**不包含数组下标，表示“数组任意元素中的某个字段”。它用于描述 Schema 字段位置、匹配数组元素和生成缓存键，不能直接用于读取表单值。
+- **运行时路径**包含实际数组下标，指向某一个具体数组元素。React Hook Form 使用这种路径注册和访问字段。
+
+因此，`contacts.name` 不表示数据结构是 `formData.contacts.name`。实际数据仍然通过 `formData.contacts[0].name`、`formData.contacts[1].name` 等路径访问。
+
 ```typescript
 // Schema 定义（模板）
 {
@@ -454,6 +466,8 @@ region (flattenPath: true)
 // contacts.1.name, contacts.1.type
 // contacts.2.name, contacts.2.type
 ```
+
+JSON Pointer 也遵循这一过程。系统先将 `#/properties/contacts/items/properties/name` 转换为模板路径 `contacts.name`；联动执行时，再根据当前字段所在的数组元素补充实际下标。例如，当前字段是 `contacts.2.companyName`，最终依赖路径会解析为 `contacts.2.name`。
 
 ### 6.2 数组联动的路径解析
 
@@ -490,6 +504,51 @@ region (flattenPath: true)
 //   dependencies: ['contacts.1.type']
 //   when.field: 'contacts.1.type'
 ```
+
+除同级相对路径外，也可以使用从根 Schema 开始的 JSON Pointer 表示数组元素字段：
+
+```typescript
+// Schema 中使用非相对路径配置依赖
+{
+  contacts: {
+    type: 'array',
+    items: {
+      properties: {
+        type: { type: 'string' },
+        companyName: {
+          ui: {
+            linkages: [
+              {
+                dependencies: [
+                  '#/properties/contacts/items/properties/type',
+                ],
+                when: {
+                  field: '#/properties/contacts/items/properties/type',
+                  operator: '==',
+                  value: 'work',
+                },
+              },
+            ],
+          },
+        },
+      },
+    },
+  },
+}
+
+// JSON Pointer 对应的模板路径：contacts.type
+
+// 运行时解析
+// 对于 contacts.0.companyName：
+//   dependencies: ['contacts.0.type']
+//   when.field: 'contacts.0.type'
+
+// 对于 contacts.1.companyName：
+//   dependencies: ['contacts.1.type']
+//   when.field: 'contacts.1.type'
+```
+
+JSON Pointer 本身不包含具体数组下标。系统根据当前联动字段的运行时路径选择同一个数组元素，并将模板路径 `contacts.type` 实例化为 `contacts.0.type`、`contacts.1.type` 等实际路径。
 
 ### 6.3 嵌套数组的路径
 
@@ -532,7 +591,7 @@ region (flattenPath: true)
 
 ```typescript
 // 依赖配置
-dependencies: ['#/properties/departments/items/properties/type'];
+dependencies: ['#/properties/departments/items/properties/type']
 
 // 当前路径: departments.0.employees.1.techStack
 // 解析结果: departments.0.type  // 自动匹配父数组索引 0
@@ -552,22 +611,22 @@ dependencies: ['#/properties/departments/items/properties/type'];
 用于 JSON Pointer 路径的解析和转换：
 
 ```typescript
-import { PathResolver } from '@/utils/pathResolver';
+import { PathResolver } from '@/utils/pathResolver'
 
 // 解析 JSON Pointer 获取值
-PathResolver.resolve('#/properties/user/age', { user: { age: 25 } });
+PathResolver.resolve('#/properties/user/age', { user: { age: 25 } })
 // → 25
 
 // 标准化路径
-PathResolver.normalize('user.age');
+PathResolver.normalize('user.age')
 // → '#/properties/user/age'
 
 // JSON Pointer → 表单数据路径
-PathResolver.toFieldPath('#/properties/user/age');
+PathResolver.toFieldPath('#/properties/user/age')
 // → 'user.age'
 
 // 获取嵌套值
-PathResolver.getNestedValue({ user: { age: 25 } }, 'user.age');
+PathResolver.getNestedValue({ user: { age: 25 } }, 'user.age')
 // → 25
 ```
 
@@ -576,14 +635,15 @@ PathResolver.getNestedValue({ user: { age: 25 } }, 'user.age');
 在 v3.0 方案中，pathTransformer 已大幅简化，仅保留相对路径解析功能：
 
 ```typescript
-import { resolveRelativePath } from '@/utils/pathTransformer';
+import { resolveRelativePath } from '@/utils/pathTransformer'
 
 // 解析相对路径
-resolveRelativePath('./type', 'contacts.0.companyName');
+resolveRelativePath('./type', 'contacts.0.companyName')
 // → 'contacts.0.type'
 ```
 
 **v3.0 变更说明**：
+
 - 移除了 PathTransformer 类和路径映射相关功能
 - 移除了 `~~` 分隔符相关的工具函数
 - 数据无需转换，保持标准嵌套格式
@@ -596,16 +656,17 @@ resolveRelativePath('./type', 'contacts.0.companyName');
 import {
   parseSchemaLinkages,
   transformToAbsolutePaths,
-} from '@/utils/schemaLinkageParser';
+} from '@/utils/schemaLinkageParser'
 
 // 解析 Schema
-const { linkages } = parseSchemaLinkages(schema);
+const { linkages } = parseSchemaLinkages(schema)
 
 // 转换为绝对路径（用于嵌套表单）
-transformToAbsolutePaths(linkages, 'contacts.0');
+transformToAbsolutePaths(linkages, 'contacts.0')
 ```
 
 **v3.0 变更说明**：
+
 - 移除了 pathMappings 返回值
 - 移除了 physicalToLogicalPath 和 logicalToPhysicalPath 函数
 - 所有路径统一使用标准 `.` 分隔符
@@ -622,32 +683,36 @@ import {
   resolveRelativePath,
   resolveDependencyPath,
   resolveArrayElementLinkage,
-} from '@/utils/arrayLinkageHelper';
+} from '@/utils/arrayLinkageHelper'
 
 // 判断是否是数组元素路径
-isArrayElementPath('contacts.0.name'); // true
+isArrayElementPath('contacts.0.name') // true
 
 // 提取数组信息
-extractArrayInfo('contacts.0.name');
+extractArrayInfo('contacts.0.name')
 // → { arrayPath: 'contacts', index: 0, fieldPath: 'name' }
 
 // 解析 JSON Pointer
-parseJsonPointer('#/properties/contacts/items/properties/type');
+parseJsonPointer('#/properties/contacts/items/properties/type')
 // → 'contacts.type'
 
 // 解析相对路径
-resolveRelativePath('./type', 'contacts.0.companyName');
+resolveRelativePath('./type', 'contacts.0.companyName')
 // → 'contacts.0.type'
 
 // 解析依赖路径（核心函数）
-resolveDependencyPath({ depPath: './type', currentPath: 'contacts.0.companyName', schema });
+resolveDependencyPath({
+  depPath: './type',
+  currentPath: 'contacts.0.companyName',
+  schema,
+})
 // → 'contacts.0.type'
 
 resolveDependencyPath({
   depPath: '#/properties/enableVip',
   currentPath: 'contacts.0.vipLevel',
   schema,
-});
+})
 // → 'enableVip'
 ```
 
@@ -676,14 +741,14 @@ const schema = {
                 type: 'value',
                 dependencies: ['./age'], // 相对路径
                 fulfill: { function: 'checkAdult' },
-              }
+              },
             ],
           },
         },
       },
     },
   },
-};
+}
 
 // 表单数据路径
 // user.name → formData.user.name
@@ -723,7 +788,7 @@ const schema = {
                   type: 'visibility',
                   dependencies: ['./type'], // 相对路径：同级字段
                   when: { field: './type', operator: '==', value: 'work' },
-                }
+                },
               ],
             },
           },
@@ -735,8 +800,12 @@ const schema = {
                 {
                   type: 'visibility',
                   dependencies: ['#/properties/enableVip'], // JSON Pointer：顶层字段
-                  when: { field: '#/properties/enableVip', operator: '==', value: true },
-                }
+                  when: {
+                    field: '#/properties/enableVip',
+                    operator: '==',
+                    value: true,
+                  },
+                },
               ],
             },
           },
@@ -744,7 +813,7 @@ const schema = {
       },
     },
   },
-};
+}
 
 // 运行时路径解析（假设有 2 个联系人）
 
@@ -833,8 +902,12 @@ const schema = {
                                 {
                                   type: 'visibility',
                                   dependencies: ['./type'],
-                                  when: { field: './type', operator: '==', value: 'vip' },
-                                }
+                                  when: {
+                                    field: './type',
+                                    operator: '==',
+                                    value: 'vip',
+                                  },
+                                },
                               ],
                             },
                           },
@@ -850,7 +923,7 @@ const schema = {
       },
     },
   },
-};
+}
 ```
 
 **生成的字段路径（v3.0 - 统一使用 . 分隔符）**：
@@ -915,20 +988,20 @@ const schema = {
   properties: {
     config: {
       type: 'object',
-      ui: { flattenPath: true },  // 跳过此层级
+      ui: { flattenPath: true }, // 跳过此层级
       properties: {
         auth: {
           type: 'object',
-          ui: { flattenPath: true },  // 跳过此层级
+          ui: { flattenPath: true }, // 跳过此层级
           properties: {
             apiKey: { type: 'string', title: 'API Key' },
-            apiSecret: { type: 'string', title: 'API Secret' }
-          }
-        }
-      }
-    }
-  }
-};
+            apiSecret: { type: 'string', title: 'API Secret' },
+          },
+        },
+      },
+    },
+  },
+}
 
 // 字段路径（v3.0）: config.auth.apiKey, config.auth.apiSecret
 // 数据结构: { config: { auth: { apiKey: 'xxx', apiSecret: 'yyy' } } }
@@ -951,10 +1024,10 @@ const schema = {
 
 ```typescript
 // ❌ 不支持
-dependencies: ['../type'];
+dependencies: ['../type']
 
 // ✅ 使用 JSON Pointer
-dependencies: ['#/properties/departments/items/properties/type'];
+dependencies: ['#/properties/departments/items/properties/type']
 ```
 
 ### 9.2 路径透明化时联动不生效？（v3.0 已解决）
@@ -966,10 +1039,12 @@ dependencies: ['#/properties/departments/items/properties/type'];
 // Schema 中 group.category 设置了 flattenPath: true
 
 // ✅ 正确：使用标准路径
-dependencies: ['group.category.enableFeature'];
+dependencies: ['group.category.enableFeature']
 
 // ✅ 或使用 JSON Pointer
-dependencies: ['#/properties/group/properties/category/properties/enableFeature'];
+dependencies: [
+  '#/properties/group/properties/category/properties/enableFeature',
+]
 ```
 
 ### 9.3 数组元素联动只对第一个元素生效？
@@ -980,10 +1055,10 @@ dependencies: ['#/properties/group/properties/category/properties/enableFeature'
 
 ```typescript
 // ❌ 错误：固定索引
-dependencies: ['contacts.0.type'];
+dependencies: ['contacts.0.type']
 
 // ✅ 正确：相对路径
-dependencies: ['./type'];
+dependencies: ['./type']
 ```
 
 ### 9.4 如何调试路径问题？
@@ -991,18 +1066,19 @@ dependencies: ['./type'];
 **方法 1**：打印联动配置（v3.0）
 
 ```typescript
-const { linkages } = parseSchemaLinkages(schema);
-console.log('联动配置:', linkages);
+const { linkages } = parseSchemaLinkages(schema)
+console.log('联动配置:', linkages)
 ```
 
 **方法 2**：检查运行时解析结果
 
 ```typescript
-const resolved = resolveDependencyPath({ depPath, currentPath, schema });
-console.log(`${depPath} → ${resolved}`);
+const resolved = resolveDependencyPath({ depPath, currentPath, schema })
+console.log(`${depPath} → ${resolved}`)
 ```
 
 **v3.0 变更说明**：
+
 - 移除了 pathMappings 相关的调试方法
 - 所有路径统一使用标准 `.` 分隔符，调试更简单
 

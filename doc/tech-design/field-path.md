@@ -1,5 +1,9 @@
 # 字段路径透明化设计方案
 
+> **状态：v3 现行设计与旧路径转换方案混合。** 当前实现使用标准点号路径和标准嵌套数据；`flattenPath` 只改变 NestedFormWidget 的展示容器，不执行全表单扁平化/反扁平化。
+>
+> 本文中 `PathTransformer.nestedToFlat/flatToNested`、`currentSchema`、单个 `linkage` 字段和相关性能开销描述属于 v2 历史方案。现行实现以 `SchemaParser.ts`、`PathPrefixContext.tsx`、`NestedFormWidget.tsx` 和 `filterValueWithNestedSchemas.ts` 为准。
+
 ## 1. 概述
 
 字段路径透明化（Field Path Flattening）是一个用于解决深层嵌套参数显示冗余问题的特性。当后端接口参数嵌套较深时（如 `{auth: {content: {key: ''}}}`），用户可能只需要填写最内层的 `key` 字段，但如果按照标准的嵌套表单方式展示所有层级会显得过于冗余，并且会产生多余的 Card 边框和 padding。
@@ -101,7 +105,8 @@ export interface UIConfig {
   style?: React.CSSProperties;
   order?: string[];
   errorMessages?: ErrorMessages;
-  linkage?: LinkageConfig;
+  /** 当前联动配置，必须使用数组格式 */
+  linkages?: LinkageConfig[];
 
   // 路径透明化配置
   flattenPath?: boolean;        // 是否对该对象字段进行路径扁平化
@@ -418,7 +423,7 @@ export const NestedFormWidget = forwardRef<HTMLDivElement, NestedFormWidgetProps
 
     const formContent = (
       <DynamicForm
-        schema={currentSchema}
+        schema={schema} // 历史示例中的 currentSchema 已统一为当前有效 schema
         disabled={disabled}
         readonly={readonly}
         layout={layout}

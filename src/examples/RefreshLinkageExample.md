@@ -164,6 +164,6 @@ await formRef.current?.refreshLinkage();
 
 ## 相关文档
 
-- [refreshLinkage 使用指南](../../REFRESH_LINKAGE_USAGE.md)
-- [联动机制设计文档](../../docs/UI_LINKAGE_DESIGN.md)
-- [DynamicForm API 文档](../../src/components/DynamicForm/README.md)
+- [refreshLinkage 使用指南](../../README.md#api-reference)
+- [联动机制设计文档](../../doc/tech-design/linkage.md)
+- [DynamicForm API 文档](../../README.md#api-reference)

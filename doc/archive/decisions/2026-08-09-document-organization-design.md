@@ -80,7 +80,7 @@ doc/
 - 原 `DYNAMIC_FORM_PART6.md` 的 FAQ 已由根目录 `README.md` 的 Troubleshooting 覆盖，因此不再保留独立文档；其中仍有效且未重复的测试、部署和维护约束只合入总体技术设计一次。
 - `FIELD_PATH_GUIDE.md` 包含根目录 `README.md` 未覆盖的路径格式、转换工具、数组路径和排障细节，迁移为 `guides/field-path.md`。
 - `WIDGET_PRESET_GUIDE.md` 包含根目录 `README.md` 未覆盖的预设适配与渐进迁移内容，迁入 `guides/widgets/`。
-- `KEY_VALUE_ARRAY_WIDGET.md` 和 `TABLE_ARRAY_WIDGET.md` 与根目录 `README.md` 的 Widget 概览存在部分重叠，但还包含完整配置、数据格式和使用场景。根目录 `README.md` 只保留概览并链接到专题指南，重复正文从专题指南中删除。
+- `KEY_VALUE_ARRAY_WIDGET.md` 和 `TABLE_ARRAY_WIDGET.md` 的组件说明、配置项、数据格式和选型结论均已由根目录 `README.md` 的 Array Fields 章节覆盖，因此不再保留独立指南。
 - 指南面向使用者，保留可直接运行的示例和排障内容，不重复实现类与内部算法。
 
 ### 4.5 归档

@@ -1,5 +1,9 @@
 # 嵌套动态表单技术方案
 
+> **状态：现行实现与历史示例混合。** 本文原有场景、过滤设计和演进记录完整保留。当前 `NestedFormWidget` 通过 `asNestedForm` 复用父级 React Hook Form Context，接收上层已经合并的 `schema`，不会自行读取 `LinkageStateContext` 或维护 `currentSchema`。
+>
+> 当前联动配置只支持 `ui.linkages[]`，函数使用对象参数。文中的 `linkage?: LinkageConfig`、`ui.linkage`、位置参数函数、`currentSchema` 示例和“内层验证独立”属于旧设计。组件当前使用 `forwardRef`，没有额外使用 `React.memo` 包装。
+
 ## 目录
 
 1. [概述](#1-概述)
@@ -113,7 +117,7 @@ const linkageFunctions = {
 
 > **📖 相关文档**
 >
-> 嵌套表单中的联动配置遵循标准的 UI 联动规范。详细的联动配置说明请参考：[UI 联动设计方案](./UI_LINKAGE_DESIGN.md)
+> 嵌套表单中的联动配置遵循标准的 UI 联动规范。详细的联动配置说明请参考：[UI 联动设计方案](./linkage.md)
 
 ### 2.3 场景 3: 跨层级字段依赖（JSON Pointer）
 
@@ -209,7 +213,7 @@ const linkageFunctions = {
 
 > **📖 相关文档**
 >
-> 数组元素内部的嵌套表单联动涉及复杂的路径解析。详细说明请参考：[数组字段联动设计方案](./ARRAY_FIELD_LINKAGE.md)
+> 数组元素内部的嵌套表单联动涉及复杂的路径解析。详细说明请参考：[数组字段联动设计方案](./linkage.md#14-数组联动详细设计)
 
 ---
 
@@ -217,7 +221,7 @@ const linkageFunctions = {
 
 1. **值传递**: 外层表单将对象值传递给内层表单
 2. **值回传**: 内层表单变化时，将新对象值回传给外层表单
-3. **验证独立**: 内层表单有自己的验证规则
+3. **共享父级验证**: 内层字段注册到父表单，并由父级 resolver 统一验证
 4. **样式隔离**: 内层表单可以有独立的样式配置
 5. **跨层级依赖**: 支持 JSON Pointer 格式依赖任意层级的字段
 6. **智能数据过滤**: 类型切换时保留所有数据，提交时根据当前 schema 自动过滤
@@ -242,15 +246,15 @@ export interface UIConfig {
   style?: React.CSSProperties;
   order?: string[];
   errorMessages?: ErrorMessages;
-  linkage?: LinkageConfig; // UI 联动配置（包括动态 schema 加载）
+  linkages?: LinkageConfig[]; // UI 联动配置（包括动态 schema 加载）
 
   [key: string]: any;
 }
 ```
 
-> **💡 动态嵌套表单**
+> **💡 动态嵌套表单（历史字段名勘误）**
 >
-> 动态 schema 加载现在通过 `linkage` 配置实现，详见 [UI 联动设计方案](./UI_LINKAGE_DESIGN.md)。
+> 动态 schema 加载现在通过 `linkages[]` 配置实现，详见 [UI 联动设计方案](./linkage.md)。
 
 ### 4.2 NestedFormWidget 组件属性
 
@@ -301,7 +305,7 @@ NestedFormWidget 组件的完整实现请参考源代码：`src/components/Dynam
 **动态 Schema 加载**：
 
 动态 schema 加载通过 UI 联动系统实现，配置方式请参考：
-- [UI 联动设计方案](./UI_LINKAGE_DESIGN.md)
+- [UI 联动设计方案](./linkage.md)
 - 本文档第 2.2 和 2.3 节的示例代码
 
 ---
@@ -395,7 +399,7 @@ const schema = {
 }
 ```
 
-详细的路径格式说明、使用规范和转换规则，请参考：[字段路径完全指南](./FIELD_PATH_GUIDE.md#4-联动依赖路径)
+详细的路径格式说明、使用规范和转换规则，请参考：[字段路径完全指南](../guides/field-path.md#4-联动依赖路径)
 
 ### 7.2 智能数据过滤机制
 
@@ -640,7 +644,7 @@ const cleanData = filterValueWithNestedSchemas(dirtyData, schema, nestedSchemas)
 3. 当依赖字段变化触发 schema 联动时，NestedFormWidget 更新并重新注册 schema
 4. 表单提交时，使用注册表过滤数据，只保留当前 schema 定义的字段
 
-详细的实现机制和分层计算策略，请参考：[UI 联动设计方案 - 分层计算策略](./UI_LINKAGE_DESIGN.md#65-分层计算策略)
+详细的实现机制和分层计算策略，请参考：[UI 联动设计方案 - 分层计算策略](./linkage.md)
 
 ---
 
@@ -756,7 +760,7 @@ NestedFormWidget 使用 `asNestedForm={true}` 模式，数据通过父表单的 
 ```typescript
 // NestedFormWidget 内部实现
 <DynamicForm
-  schema={currentSchema}
+  schema={schema}
   pathPrefix={fullPath}
   asNestedForm={true}
   // 不需要 defaultValues 和 onChange
@@ -780,7 +784,7 @@ NestedFormWidget 使用 `asNestedForm={true}` 模式，数据通过父表单的 
 ### 9.2 验证处理
 
 ```typescript
-// 嵌套表单的验证应该独立处理
+// 嵌套表单的验证由父级 createSchemaResolver 统一处理
 const schema = {
   type: 'object',
   properties: {
@@ -836,7 +840,7 @@ export const NestedFormWidget = memo(
       return (
         <Card ref={ref} className="nested-form-widget">
           <DynamicForm
-            schema={currentSchema}
+            schema={schema}
             pathPrefix={fullPath}
             asNestedForm={true}
             disabled={disabled}
@@ -942,14 +946,14 @@ formRef.current?.reset({});
 **主要变更**：
 
 - 废弃了 `ui.schemaKey`、`ui.schemas`、`ui.schemaLoader` 字段
-- 动态 schema 加载现在通过 `ui.linkage` 配置实现（type: 'schema'）
+- 动态 schema 加载现在通过 `ui.linkages[]` 配置实现（type: 'schema'）
 - 更新了所有示例代码，使用 linkage 配置替代旧的 schemaKey/schemas 方式
 - 简化了第 5 节（组件实现），改为核心机制说明并指向源代码
 - 更新了第 7 节（数据过滤机制），删除了过时的 schemaKey 路径格式说明
 - 更新了类型定义，移除了废弃字段
 - 文档更加简洁，重点突出 linkage 系统的使用
 
-**迁移指南**：详见 [UI 联动设计方案](./UI_LINKAGE_DESIGN.md) 和本文档第 2.2、2.3 节的示例
+**迁移指南**：详见 [UI 联动设计方案](./linkage.md) 和本文档第 2.2、2.3 节的示例
 
 ### v2.1 (2025-12-31)
 
@@ -957,10 +961,10 @@ formRef.current?.reset({});
 
 **主要变更**：
 
-- ✅ 精简第 7.1 节：删除与 FIELD_PATH_GUIDE.md 重复的路径格式详细说明，改为引用链接
-- ✅ 精简第 7.3 节：删除与 UI_LINKAGE_DESIGN.md 重复的 Context 实现细节，保留核心概念
+- ✅ 精简第 7.1 节：删除与字段路径指南重复的路径格式详细说明，改为引用链接
+- ✅ 精简第 7.3 节：删除与联动系统设计重复的 Context 实现细节，保留核心概念
 - ✅ 优化概述部分：使用醒目的提示框突出默认 widget 说明
-- ✅ 添加交叉引用：在关键位置添加到 UI_LINKAGE_DESIGN.md 和 ARRAY_FIELD_LINKAGE.md 的链接
+- ✅ 添加交叉引用：在关键位置添加到联动系统设计和数组联动章节的链接
 - ✅ 文档篇幅减少约 20%，内容更加聚焦和易读
 
 ### v2.0 (2025-12-27)

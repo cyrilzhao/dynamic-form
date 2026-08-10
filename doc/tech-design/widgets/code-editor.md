@@ -1,5 +1,7 @@
 # CodeMirror Widget 设计方案
 
+> **状态：部分实现。** 本文完整保留预览/编辑架构、CodeMirror 设计和扩展路线。当前 Schema 中的编辑器专用配置应放在 `ui.widgetProps`；支持的语言是完整名称，主题在 `CodeMirrorView` 中尚未实际应用，语言扩展当前静态导入而非按需加载。
+
 ## 1. 概述
 
 ### 1.1 背景
@@ -576,12 +578,12 @@ const schema: ExtendedJSONSchema = {
       description: 'Enter your code here',
       ui: {
         widget: 'code-editor',
-        language: 'javascript',
-        config: {
-          initialMode: 'preview',
-          previewLines: 5,
-          editorHeight: 400,
-          resizable: true,
+        widgetProps: {
+          language: 'javascript',
+          config: {
+            initialMode: 'preview',
+            previewLines: 5,
+          },
         },
       },
     },
@@ -871,10 +873,11 @@ const schema = {
       title: 'Configuration',
       ui: {
         widget: 'code-editor',
-        language: 'json',
-        config: {
-          previewLines: 5,
-          editorHeight: 400,
+        widgetProps: {
+          language: 'json',
+          config: {
+            previewLines: 5,
+          },
         },
       },
     },
@@ -923,10 +926,11 @@ const schema = {
       title: 'SQL Query',
       ui: {
         widget: 'code-editor',
-        language: 'sql',
-        config: {
-          initialMode: 'edit',
-          editorHeight: 300,
+        widgetProps: {
+          language: 'sql',
+          config: {
+            initialMode: 'edit',
+          },
         },
       },
     },

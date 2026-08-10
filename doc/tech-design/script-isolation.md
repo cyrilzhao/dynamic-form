@@ -1,5 +1,7 @@
 # Inline Script 安全隔离方案设计
 
+> **状态：提案/未实现。** 本文完整保留 Worker、iframe、QuickJS、ShadowRealm 和白名单方案，供后续设计使用。当前实现仍在主线程通过动态 `Function` 执行，没有 `safeExecution`、Worker 或安全沙箱；文中的配置示例不可直接用于当前 `DynamicFormProps`。
+
 ## 1. 背景
 
 ### 1.1 当前实现

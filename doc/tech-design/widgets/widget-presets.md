@@ -1,5 +1,7 @@
 # Widget 预设系统设计优势
 
+> **状态：现行实现。** 本文描述 `FieldRegistry`、Blueprint 默认预设和表单级 `widgets` 覆盖机制。
+
 ## 1. 简单易用
 
 ### 全局替换（一行代码）
@@ -73,14 +75,16 @@ TypeScript 会在编译时检查类型兼容性。
 ## 5. 向后兼容
 
 - 默认自动初始化 Blueprint 预设
-- 现有代码无需修改
-- 测试全部通过
+- 未传入自定义 `widgets` 时继续使用全局注册表
+- 表单级 `widgets` 优先于 `FieldRegistry` 中的同名 Widget
 
 ## 6. 解耦设计
 
 - FieldRegistry 不再依赖具体的 widget 实现
 - Blueprint widgets 作为可选预设，而非硬编码
 - 支持任意组件库（Antd、Material-UI、Chakra UI 等）
+
+自定义预设需要自行适配 `FieldWidgetProps`，项目当前只提供 Blueprint 预设，不内置 Antd、Material UI 或 Chakra UI 预设。
 
 ## 7. 易于测试
 

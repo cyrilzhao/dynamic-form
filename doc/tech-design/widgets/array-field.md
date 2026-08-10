@@ -1,5 +1,7 @@
 # ArrayFieldWidget 通用数组组件设计方案
 
+> **状态：部分实现。** 本文完整保留数组包装、组件设计、示例、性能方案和实施路线图。当前 DynamicForm 会自动解包基础类型数组；拖拽排序、批量操作以及未被 `ArrayFieldWidget` 消费的 UIConfig 仍属于提案/未实现，不能按正文中的旧示例直接使用。
+
 ## ⚠️ 重要提示
 
 ### 基本类型数组的数据格式
@@ -75,7 +77,7 @@ const handleSubmit = (data: any) => {
 
 1. **统一数组处理**：所有 `type: 'array'` 字段都由 `ArrayFieldWidget` 处理
 2. **智能 Widget 选择**：根据 `items` 的配置自动选择合适的子 Widget
-3. **完整的数组操作**：支持增删改查、排序、拖拽等操作
+3. **完整的数组操作（部分实现）**：当前支持增删改查和移动；拖拽排序、批量操作属于提案/未实现
 4. **类型安全**：完整的 TypeScript 类型支持
 5. **易于扩展**：可以轻松支持新的数组元素类型
 
@@ -202,8 +204,8 @@ const handleSubmit = (data: any) => {
 - ✅ 添加元素
 - ✅ 删除元素
 - ✅ 移动元素（上移/下移）
-- ✅ 拖拽排序（可选）
-- ✅ 批量操作（可选）
+- ⚠️ 拖拽排序（提案/未实现）
+- ⚠️ 批量操作（提案/未实现）
 - ✅ 最小/最大数量限制
 
 #### 按钮禁用状态和用户提示
@@ -402,7 +404,7 @@ const { fields, append, remove, move } = useFieldArray({
     widget: 'array',
     widgetProps: {
       enableVirtualScroll: true,      // 启用虚拟滚动
-      virtualScrollHeight: 400,       // 滚动容器高度（像素）
+      virtualScrollHeight: 600,       // 滚动容器高度（像素）
       addButtonText: 'Add Item'       // 可选：自定义添加按钮文本
     }
   }
@@ -414,7 +416,7 @@ const { fields, append, remove, move } = useFieldArray({
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `enableVirtualScroll` | boolean | false | 是否启用虚拟滚动 |
-| `virtualScrollHeight` | number | 400 | 滚动容器高度（像素） |
+| `virtualScrollHeight` | number | 600 | 滚动容器高度（像素） |
 | `addButtonText` | string | 'Add' | 添加按钮文本 |
 
 #### 性能对比
@@ -2044,7 +2046,7 @@ const handleSubmit = (data: any) => {
 
 数组元素内部的联动需要特殊处理，因为涉及到相对路径和动态索引。
 
-**详细设计请参考**：[数组字段联动设计方案](./ARRAY_FIELD_LINKAGE.md)
+**详细设计请参考**：[数组字段联动设计方案](../linkage.md#14-数组联动详细设计)
 
 该文档详细描述了：
 - 核心挑战（相对路径、动态索引、菱形依赖）
@@ -2286,11 +2288,11 @@ remove(index);
 
 ### 🔗 相关文档
 
-- [数组字段联动设计方案](./ARRAY_FIELD_LINKAGE.md) - 数组字段联动的详细设计
-- [嵌套表单设计](./NESTED_FORM.md)
-- [字段路径透明化](./FIELD_PATH_FLATTENING.md)
-- [UI 联动设计](./UI_LINKAGE_DESIGN.md)
-- [动态表单技术方案](./DYNAMIC_FORM_INDEX.md)
+- [数组字段联动设计方案](../linkage.md#14-数组联动详细设计) - 数组字段联动的详细设计
+- [嵌套表单设计](../nested-form.md)
+- [字段路径透明化](../field-path.md)
+- [UI 联动设计](../linkage.md)
+- [动态表单技术方案](../overview.md)
 
 ---
 
@@ -2298,4 +2300,3 @@ remove(index);
 **创建日期**: 2025-12-27  
 **文档状态**: 已完成  
 **作者**: Claude Code
-

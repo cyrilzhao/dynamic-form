@@ -1,5 +1,9 @@
 # Helpers 系统设计文档
 
+> **状态：现行实现与历史设计混合。** 原有背景、方案比较和实施计划完整保留。当前内置 Helpers 为 `ofetch`、`_`、`z`；Context 路径是 `src/components/DynamicForm/context/HelpersContext.tsx`。联动由 `useLinkageManager` Hook 执行，自定义字段验证由 `runFieldValidators.ts` 执行，不存在本文旧示例中的 `LinkageManager` class，也不是由 `SchemaValidator` 构造函数注入 callbacks/helpers。
+>
+> 本文中使用 `v`、`contexts/HelpersContext.tsx`、位置参数脚本签名，或直接修改 `LinkageManager`/`SchemaValidator` 的章节属于历史方案。现行 Callback 和 Inline Script 应使用对象参数，实施计划中的完成标记不等同于当前性能审计或安全审计结论。
+
 ## 1. 背景和动机
 
 ### 1.1 当前问题
@@ -163,7 +167,7 @@ interface DynamicFormProps {
    * 内置 helpers:
    * - ofetch: 跨浏览器和 Node.js 环境的请求能力
    * - _: lodash 完整功能
-   * - v: Zod 校验工具
+   * - z: Zod 校验工具
    *
    * 用户可以注入自定义 helpers，会与内置 helpers 合并
    *
@@ -191,7 +195,7 @@ DynamicForm 内部默认提供以下 helpers：
 ```typescript
 import { ofetch } from 'ofetch';
 import _ from 'lodash';
-import * as v from 'zod';
+import * as z from 'zod';
 
 // 内置 helpers
 const builtInHelpers = {
@@ -239,7 +243,7 @@ const builtInHelpers = {
    * helpers.z.safeParse(emailSchema, 'test@example.com')
    * ```
    */
-  v,
+  z,
 };
 ```
 
@@ -514,7 +518,7 @@ const callbacks = {
 创建一个 React Context 用于传递 helpers：
 
 ```typescript
-// contexts/HelpersContext.tsx
+// src/components/DynamicForm/context/HelpersContext.tsx（历史路径示例）
 import { createContext, useContext } from 'react';
 
 export interface HelpersContextValue {
@@ -948,7 +952,7 @@ function App() {
 
 **任务**：
 1. ✅ **创建 HelpersContext**
-   - 实现 `contexts/HelpersContext.tsx`
+   - ~~实现 `contexts/HelpersContext.tsx`~~（历史计划；当前文件已位于 `src/components/DynamicForm/context/HelpersContext.tsx`）
    - 提供 `useHelpers` hook
    - 添加类型定义
 

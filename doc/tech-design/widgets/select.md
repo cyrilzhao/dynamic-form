@@ -1,5 +1,7 @@
 # Select 组件技术设计文档
 
+> **状态：部分实现。** 本文完整保留 Select 的组件设计和扩展方案。当前已实现单选、多选、本地/异步搜索、分组、清除和基础键盘导航；`renderTrigger`/`renderOption`/`renderValue`、`noOptionsMessage`、Backspace 删除和文档列出的部分子组件仍是类型预留或提案。
+
 ## 1. 概述
 
 本文档描述了一个功能完整的自定义 Select 组件的设计与实现方案。该组件参考 react-select 的设计理念，提供单一组件入口，支持单选、多选、搜索、分组等功能，同时提供灵活的定制能力。
@@ -112,13 +114,13 @@ export interface SelectProps {
   loading?: boolean;
 
   // ========== 自定义渲染 ==========
-  /** 自定义 Trigger 渲染函数 */
+  /** 自定义 Trigger 渲染函数（提案/类型预留） */
   renderTrigger?: (props: TriggerRenderProps) => React.ReactNode;
 
-  /** 自定义 Option 渲染函数 */
+  /** 自定义 Option 渲染函数（提案/类型预留） */
   renderOption?: (option: SelectOption, props: OptionRenderProps) => React.ReactNode;
 
-  /** 自定义已选中值的显示 */
+  /** 自定义已选中值的显示（提案/类型预留） */
   renderValue?: (value: SelectOption | SelectOption[]) => React.ReactNode;
 
   // ========== 样式相关 ==========
@@ -135,7 +137,7 @@ export interface SelectProps {
   /** 搜索框占位符 */
   searchPlaceholder?: string;
 
-  /** 无数据时的提示文本 */
+  /** 无数据时的提示文本（当前类型预留，未接入空状态渲染） */
   noOptionsMessage?: string;
 }
 ```
@@ -182,7 +184,7 @@ export interface OptionRenderProps {
 
 ## 4. 核心组件设计
 
-### 4.1 Select 主组件
+### 4.1 Select 主组件（现行核心；自定义 render props 为提案）
 
 **职责**：
 - 管理组件的整体状态
@@ -301,7 +303,7 @@ function useClickOutside({
 - `ArrowUp` - 向上移动焦点
 - `Enter` - 选择当前焦点项
 - `Escape` - 关闭下拉菜单
-- `Backspace` - 删除最后一个选中项（多选模式）
+- `Backspace` - 删除最后一个选中项（提案/未实现）
 
 ```typescript
 function useKeyboardNav({
@@ -486,6 +488,7 @@ function CustomTriggerExample() {
       options={options}
       value={value}
       onChange={setValue}
+      // renderTrigger 当前只有类型预留，以下为目标 API 示例
       renderTrigger={({ isOpen, selectedOptions, onClick, ref }) => (
         <button
           ref={ref}
@@ -678,4 +681,3 @@ src/components/Select/
 **文档版本**：v1.0
 **创建日期**：2026-06-04
 **维护者**：项目团队
-
