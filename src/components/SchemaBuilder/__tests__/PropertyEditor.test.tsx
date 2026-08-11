@@ -215,6 +215,92 @@ describe("PropertyEditor", () => {
 
       expect(screen.getByText("Basic")).toBeInTheDocument();
     });
+
+    it("数组 items 类型应该可以切换为基本类型", () => {
+      const onUpdate = jest.fn();
+      const itemsPath = ["properties", "contacts", "items"];
+      const arraySchema = {
+        type: "object",
+        title: "Test",
+        properties: {
+          contacts: {
+            type: "array",
+            title: "Contacts",
+            items: {
+              type: "object",
+              title: "Contact",
+              properties: {},
+            },
+          },
+        },
+      };
+
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema: arraySchema,
+          selectedPath: itemsPath,
+          onUpdate,
+        }),
+      });
+
+      const typeSelect = getFormGroupSelect("Type");
+      expect(typeSelect).not.toBeDisabled();
+
+      ["string", "number", "integer", "boolean"].forEach((type) => {
+        fireEvent.change(typeSelect, { target: { value: type } });
+        expect(onUpdate).toHaveBeenCalledWith(itemsPath, { type });
+      });
+    });
+
+    it("string 类型的数组 items 应该禁用 Options 编辑控件", () => {
+      const arraySchema = {
+        type: "object",
+        title: "Test",
+        properties: {
+          tags: {
+            type: "array",
+            title: "Tags",
+            items: {
+              type: "string",
+              title: "Tag",
+              enum: ["react"],
+              enumNames: ["React"],
+            },
+          },
+        },
+      };
+
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema: arraySchema,
+          selectedPath: ["properties", "tags", "items"],
+        }),
+      });
+
+      const optionsGroup = screen
+        .getByText("Options (enum)")
+        .closest(".bp6-form-group, .bp5-form-group");
+      const inputs = optionsGroup?.querySelectorAll("input") ?? [];
+      const buttons = optionsGroup?.querySelectorAll("button") ?? [];
+
+      expect(inputs).toHaveLength(2);
+      expect(buttons).toHaveLength(2);
+      Array.from(inputs).forEach((input) => expect(input).toBeDisabled());
+      Array.from(buttons).forEach((button) => expect(button).toBeDisabled());
+    });
+
+    it("普通 string 字段应该保持 Options 编辑控件可用", () => {
+      render(<PropertyEditor />, {
+        wrapper: createWrapper(defaultContextValue),
+      });
+
+      const addOptionButton = screen.getByRole("button", {
+        name: "Add Option",
+      });
+      expect(addOptionButton).not.toBeDisabled();
+    });
   });
 
   describe("标签页切换", () => {

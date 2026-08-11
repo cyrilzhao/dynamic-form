@@ -17,6 +17,19 @@ const createWrapper = (contextValue: any) => {
   )
 }
 
+const getTreeNodeContent = (label: RegExp): HTMLElement => {
+  const labelNode = screen
+    .getAllByText(label)
+    .find(node => node.closest('.schema-tree-node-label'))
+  const content = labelNode?.closest('.tree-node-content')
+
+  if (!(content instanceof HTMLElement)) {
+    throw new Error(`Tree node ${label.toString()} was not found`)
+  }
+
+  return content
+}
+
 describe('SchemaTree', () => {
   const defaultContextValue = {
     schema: basicSchema,
@@ -172,6 +185,51 @@ describe('SchemaTree', () => {
       })
 
       expect(screen.getByText(/Contacts/i)).toBeInTheDocument()
+    })
+
+    it('基本类型 items 没有可执行操作时不应该渲染 node-actions', () => {
+      const primitiveArraySchema = {
+        type: 'object' as const,
+        title: 'Primitive Array Form',
+        properties: {
+          tags: {
+            type: 'array' as const,
+            title: 'Tags',
+            items: {
+              type: 'string' as const,
+              title: 'Tag',
+            },
+          },
+        },
+      }
+
+      render(<SchemaTree />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema: primitiveArraySchema,
+          expandedPaths: { '': true, 'properties.tags': true },
+        }),
+      })
+
+      expect(
+        getTreeNodeContent(/Tag \(items\)/i).querySelector('.node-actions')
+      ).not.toBeInTheDocument()
+    })
+
+    it('object 类型 items 可以添加子节点时应该保留 node-actions', () => {
+      render(<SchemaTree />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema: arraySchema,
+          expandedPaths: { '': true, 'properties.contacts': true },
+        }),
+      })
+
+      const actions = getTreeNodeContent(/Contact \(items\)/i).querySelector(
+        '.node-actions'
+      )
+      expect(actions).toBeInTheDocument()
+      expect(actions?.querySelector('button')).toBeInTheDocument()
     })
   })
 

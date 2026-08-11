@@ -298,34 +298,42 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(({
           }
         });
 
-        // Auto-create items for array type
-        if (updates.type === 'array' && !currentNode.items) {
-          const newSubFieldKey = generateRandomKeyStatic({});
+        // 根据节点类型维护互斥的子结构，避免类型切换后残留无效子节点。
+        if (updates.type === 'array') {
+          delete currentNode.properties;
+          delete currentNode.required;
 
-          currentNode.items = {
-            type: 'object',
-            title: 'Items',
-            properties: {
+          if (!currentNode.items) {
+            const newSubFieldKey = generateRandomKeyStatic({});
+
+            currentNode.items = {
+              type: 'object',
+              title: 'Items',
+              properties: {
+                [newSubFieldKey]: {
+                  type: 'string',
+                  title: 'New Field',
+                },
+              },
+            };
+          }
+        } else if (updates.type === 'object') {
+          delete currentNode.items;
+
+          if (!currentNode.properties) {
+            const newSubFieldKey = generateRandomKeyStatic({});
+
+            currentNode.properties = {
               [newSubFieldKey]: {
                 type: 'string',
                 title: 'New Field',
               },
-            },
-          };
-        } else if (updates.type === 'object') {
-          const newSubFieldKey = generateRandomKeyStatic({});
-
-          currentNode.properties = {
-            [newSubFieldKey]: {
-              type: 'string',
-              title: 'New Field',
-            },
-          };
-        }
-
-        // Remove items if switching away from array
-        if (updates.type && updates.type !== 'array' && currentNode.items) {
+            };
+          }
+        } else if (updates.type) {
           delete currentNode.items;
+          delete currentNode.properties;
+          delete currentNode.required;
         }
 
         // Auto-expand logic

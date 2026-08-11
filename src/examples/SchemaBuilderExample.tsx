@@ -3,59 +3,126 @@ import { SchemaBuilder } from '@/components/SchemaBuilder/SchemaBuilder'
 import type { ExtendedJSONSchema } from '@/components/DynamicForm'
 import { H3 } from '@blueprintjs/core'
 
+// const initialSchema: ExtendedJSONSchema = {
+//   type: 'object',
+//   title: 'Root',
+//   properties: {
+//     username: {
+//       type: 'string',
+//       title: 'Name',
+//       minLength: 3,
+//     },
+//     age: {
+//       type: 'integer',
+//       title: 'Age',
+//       minimum: 0,
+//     },
+//     weight: {
+//       type: 'number',
+//       title: 'Weight',
+//       minimum: 0,
+//     },
+//     address: {
+//       type: 'object',
+//       title: 'Address',
+//       properties: {
+//         province: {
+//           type: 'string',
+//           title: 'Province',
+//         },
+//         city: {
+//           type: 'string',
+//           title: 'City',
+//         },
+//       },
+//     },
+//     contacts: {
+//       type: 'array',
+//       title: 'Contacts',
+//       items: {
+//         type: 'object',
+//         title: 'Contact',
+//         properties: {
+//           email: {
+//             type: 'string',
+//             title: 'Email',
+//           },
+//           phone: {
+//             type: 'string',
+//             title: 'Phone',
+//           },
+//         },
+//       },
+//     },
+//   },
+//   required: ['username'],
+// }
+
 const initialSchema: ExtendedJSONSchema = {
   type: 'object',
-  title: 'Root',
   properties: {
-    username: {
-      type: 'string',
-      title: 'Name',
-      minLength: 3,
+    users: {
+      type: 'array',
+      title: 'Users',
+      items: {
+        type: 'string',
+      },
     },
-    age: {
-      type: 'integer',
-      title: 'Age',
-      minimum: 0,
-    },
-    weight: {
-      type: 'number',
-      title: 'Weight',
-      minimum: 0,
-    },
-    address: {
-      type: 'object',
-      title: 'Address',
-      properties: {
-        province: {
-          type: 'string',
-          title: 'Province',
-        },
-        city: {
-          type: 'string',
-          title: 'City',
+    actions: {
+      type: 'array',
+      title: 'Actions',
+      items: {
+        type: 'object',
+        properties: {
+          code: {
+            type: 'string',
+            title: 'Code',
+          },
+          label: {
+            type: 'string',
+            title: 'Label',
+          },
         },
       },
     },
-    contacts: {
+    permissions: {
       type: 'array',
-      title: 'Contacts',
+      title: 'Permissions',
       items: {
         type: 'object',
-        title: 'Contact',
         properties: {
-          email: {
-            type: 'string',
-            title: 'Email',
+          users: {
+            type: 'array',
+            title: 'Users',
+            items: {
+              title: 'User',
+              type: 'string',
+            },
+            ui: {
+              widget: 'select',
+              widgetProps: {
+                multiple: true,
+              },
+            },
           },
-          phone: {
-            type: 'string',
-            title: 'Phone',
+          actions: {
+            type: 'array',
+            title: 'Actions',
+            items: {
+              title: 'Action',
+              type: 'string',
+            },
+            ui: {
+              widget: 'select',
+              widgetProps: {
+                multiple: true,
+              },
+            },
           },
         },
       },
     },
   },
-  required: ['username'],
 }
 
 export const SchemaBuilderExample: React.FC = () => {

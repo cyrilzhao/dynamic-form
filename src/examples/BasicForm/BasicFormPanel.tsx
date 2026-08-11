@@ -9,326 +9,421 @@ import { SchemaBuilderWidget } from '@/components/DynamicForm/widgets/SchemaBuil
 export const BasicFormPanel: React.FC = () => {
   const formRef = useRef<DynamicFormRef>(null)
 
+  // const schema: ExtendedJSONSchema = {
+  //   type: 'object',
+  //   title: '用户注册表单',
+  //   properties: {
+  //     username: {
+  //       type: 'string',
+  //       title: '用户名',
+  //       minLength: 3,
+  //       maxLength: 20,
+  //       default: 'aaa',
+  //       ui: {
+  //         placeholder: '请输入用户名',
+  //         errorMessages: {
+  //           required: '用户名不能为空',
+  //           minLength: '用户名至少3个字符',
+  //           maxLength: '用户名最多20个字符',
+  //         },
+  //       },
+  //     },
+  //     hiddenUsername: {
+  //       type: 'string',
+  //       title: '用户名',
+  //       minLength: 3,
+  //       maxLength: 20,
+  //       default: 'bbb',
+  //       ui: {
+  //         hidden: true,
+  //         placeholder: '请输入用户名',
+  //         errorMessages: {
+  //           required: '用户名不能为空',
+  //           minLength: '用户名至少3个字符',
+  //           maxLength: '用户名最多20个字符',
+  //         },
+  //       },
+  //     },
+  //     email: {
+  //       type: 'string',
+  //       title: '邮箱',
+  //       format: 'email',
+  //       ui: {
+  //         placeholder: 'example@email.com',
+  //       },
+  //     },
+  //     website: {
+  //       type: 'string',
+  //       title: '个人网站',
+  //       format: 'uri',
+  //       ui: {
+  //         widget: 'url',
+  //         placeholder: 'https://example.com',
+  //         errorMessages: {
+  //           format: '请输入有效的 URL 地址',
+  //         },
+  //       },
+  //     },
+  //     phone: {
+  //       type: 'string',
+  //       title: '手机号',
+  //       format: 'phone',
+  //       ui: {
+  //         placeholder: '请输入手机号',
+  //         errorMessages: {
+  //           format: '请输入有效的手机号码',
+  //         },
+  //       },
+  //     },
+  //     password: {
+  //       type: 'string',
+  //       title: '密码',
+  //       minLength: 6,
+  //       ui: {
+  //         widget: 'password',
+  //         placeholder: '至少6位字符',
+  //       },
+  //     },
+  //     age: {
+  //       type: 'integer',
+  //       title: '年龄',
+  //       minimum: 18,
+  //       maximum: 100,
+  //     },
+  //     country: {
+  //       type: 'string',
+  //       title: '国家',
+  //       enum: ['china', 'usa', 'japan', 'uk', 'other'],
+  //       enumNames: ['中国', '美国', '日本', '英国', '其他'],
+  //       ui: {
+  //         widget: 'select',
+  //         placeholder: '请选择国家',
+  //       },
+  //     },
+  //     countrySearchable: {
+  //       type: 'string',
+  //       title: '国家（本地搜索）',
+  //       enum: ['china', 'usa', 'japan', 'uk', 'other'],
+  //       enumNames: ['中国', '美国', '日本', '英国', '其他'],
+  //       ui: {
+  //         widget: 'select',
+  //         placeholder: '输入关键词搜索国家',
+  //         widgetProps: {
+  //           searchable: true,
+  //           clearable: true,
+  //         },
+  //       },
+  //     },
+  //     asyncLanguage: {
+  //       type: 'string',
+  //       title: '编程语言（异步搜索）',
+  //       ui: {
+  //         widget: 'select',
+  //         placeholder: '输入关键词异步搜索',
+  //         widgetProps: {
+  //           searchable: true,
+  //           clearable: true,
+  //           onSearch: async (term: string) => {
+  //             const all = [
+  //               { label: 'TypeScript', value: 'ts' },
+  //               { label: 'JavaScript', value: 'js' },
+  //               { label: 'Python', value: 'py' },
+  //               { label: 'Rust', value: 'rs' },
+  //               { label: 'Go', value: 'go' },
+  //               { label: 'Java', value: 'java' },
+  //               { label: 'C++', value: 'cpp' },
+  //               { label: 'Swift', value: 'swift' },
+  //             ]
+  //             await new Promise((r) => setTimeout(r, 400))
+  //             if (!term) return all
+  //             return all.filter((o) =>
+  //               o.label.toLowerCase().includes(term.toLowerCase())
+  //             )
+  //           },
+  //         },
+  //       },
+  //     },
+  //     techStack: {
+  //       type: 'array',
+  //       title: '技术栈（多选 + 搜索）',
+  //       items: { type: 'string' },
+  //       ui: {
+  //         widget: 'select',
+  //         placeholder: '选择或搜索技术栈',
+  //         widgetProps: {
+  //           multiple: true,
+  //           searchable: true,
+  //           clearable: true,
+  //           onSearch: async (term: string) => {
+  //             const all = [
+  //               { label: 'TypeScript', value: 'ts' },
+  //               { label: 'JavaScript', value: 'js' },
+  //               { label: 'React', value: 'react' },
+  //               { label: 'Vue', value: 'vue' },
+  //               { label: 'Node.js', value: 'node' },
+  //               { label: 'Python', value: 'py' },
+  //               { label: 'Go', value: 'go' },
+  //               { label: 'Rust', value: 'rs' },
+  //               { label: 'Docker', value: 'docker' },
+  //               { label: 'Kubernetes', value: 'k8s' },
+  //             ]
+  //             await new Promise((r) => setTimeout(r, 300))
+  //             if (!term) return all
+  //             return all.filter((o) =>
+  //               o.label.toLowerCase().includes(term.toLowerCase())
+  //             )
+  //           },
+  //         },
+  //       },
+  //     },
+  //     gender: {
+  //       type: 'string',
+  //       title: '性别',
+  //       enum: ['male', 'female', 'other'],
+  //       enumNames: ['男', '女', '其他'],
+  //       ui: {
+  //         widget: 'radio',
+  //       },
+  //     },
+  //     introduction: {
+  //       type: 'string',
+  //       title: '个人简介',
+  //       maxLength: 500,
+  //       ui: {
+  //         widget: 'textarea',
+  //         placeholder: '介绍一下自己...',
+  //       },
+  //     },
+  //     config: {
+  //       type: 'string',
+  //       title: '配置信息 (JSON)',
+  //       ui: {
+  //         widget: 'code-editor',
+  //         widgetProps: {
+  //           language: 'json',
+  //           config: {
+  //             previewLines: 5,
+  //             previewMaxHeight: 150,
+  //           },
+  //         },
+  //       },
+  //     },
+  //     authScript: {
+  //       type: 'string',
+  //       title: '鉴权脚本',
+  //       ui: {
+  //         widget: 'code-editor',
+  //         widgetProps: {
+  //           language: 'javascript',
+  //           config: {
+  //             previewLines: 5,
+  //             previewMaxHeight: 150,
+  //           },
+  //         },
+  //       },
+  //     },
+  //     metadata: {
+  //       type: 'object',
+  //       title: '元数据 (Object)',
+  //       ui: {
+  //         widget: 'object-editor',
+  //         widgetProps: {
+  //           config: {
+  //             previewLines: 5,
+  //             previewMaxHeight: 150,
+  //           },
+  //         },
+  //       },
+  //     },
+  //     receiveNewsletter: {
+  //       type: 'boolean',
+  //       title: '订阅新闻邮件',
+  //       ui: {
+  //         widget: 'switch',
+  //       },
+  //     },
+  //     agreeTerms: {
+  //       type: 'boolean',
+  //       title: '同意用户协议',
+  //     },
+  //     dynamicFormSchema: {
+  //       type: 'object',
+  //       title: '动态表单 Schema',
+  //       ui: {
+  //         widget: 'schema-builder',
+  //       },
+  //     },
+  //     rate: {
+  //       type: 'number',
+  //       title: '利率（百分比输入，小数存储）',
+  //       default: 50,
+  //       maximum: 100,
+  //       ui: {
+  //         widget: 'number',
+  //         placeholder: '请输入百分比，如 96',
+  //         transform: {
+  //           callback: 'percentToDecimal',
+  //           reverseCallback: 'decimalToPercent',
+  //         },
+  //       },
+  //     },
+  //     ocr: {
+  //       type: 'object',
+  //       title: 'OCR',
+  //       properties: {
+  //         model: {
+  //           title: 'Model',
+  //           type: 'string',
+  //           enum: ['azure-layout', 'azure-read', 'mistral'],
+  //           enumNames: ['Azure-Layout', 'Azure-Read', 'Mistral'],
+  //           ui: {
+  //             widget: 'select',
+  //           },
+  //         },
+  //         format: {
+  //           title: 'Format',
+  //           type: 'string',
+  //           ui: {
+  //             widget: 'select',
+  //             linkages: [
+  //               {
+  //                 type: 'options',
+  //                 dependencies: ['#/properties/ocr/properties/model'],
+  //                 when: {
+  //                   field: '#/properties/ocr/properties/model',
+  //                   operator: '==',
+  //                   value: 'azure-layout',
+  //                 },
+  //                 fulfill: {
+  //                   options: [
+  //                     { label: 'Markdown', value: 'markdown' },
+  //                     { label: 'Text', value: 'text' },
+  //                   ],
+  //                 },
+  //               },
+  //               {
+  //                 type: 'options',
+  //                 dependencies: ['#/properties/ocr/properties/model'],
+  //                 when: {
+  //                   field: '#/properties/ocr/properties/model',
+  //                   operator: '==',
+  //                   value: 'azure-read',
+  //                 },
+  //                 fulfill: {
+  //                   options: [{ label: 'Text', value: 'text' }],
+  //                 },
+  //               },
+  //               {
+  //                 type: 'options',
+  //                 dependencies: ['#/properties/ocr/properties/model'],
+  //                 when: {
+  //                   field: '#/properties/ocr/properties/model',
+  //                   operator: '==',
+  //                   value: 'mistral',
+  //                 },
+  //                 fulfill: {
+  //                   options: [{ label: 'Markdown', value: 'markdown' }],
+  //                 },
+  //               },
+  //             ],
+  //           },
+  //         },
+  //       },
+  //       required: ['format'],
+  //     },
+  //   },
+  //   required: ['username', 'email', 'password', 'agreeTerms', 'rate'],
+  // }
+
   const schema: ExtendedJSONSchema = {
     type: 'object',
-    title: '用户注册表单',
     properties: {
-      username: {
-        type: 'string',
-        title: '用户名',
-        minLength: 3,
-        maxLength: 20,
-        default: 'aaa',
-        ui: {
-          placeholder: '请输入用户名',
-          errorMessages: {
-            required: '用户名不能为空',
-            minLength: '用户名至少3个字符',
-            maxLength: '用户名最多20个字符',
-          },
-        },
-      },
-      hiddenUsername: {
-        type: 'string',
-        title: '用户名',
-        minLength: 3,
-        maxLength: 20,
-        default: 'bbb',
-        ui: {
-          hidden: true,
-          placeholder: '请输入用户名',
-          errorMessages: {
-            required: '用户名不能为空',
-            minLength: '用户名至少3个字符',
-            maxLength: '用户名最多20个字符',
-          },
-        },
-      },
-      email: {
-        type: 'string',
-        title: '邮箱',
-        format: 'email',
-        ui: {
-          placeholder: 'example@email.com',
-        },
-      },
-      website: {
-        type: 'string',
-        title: '个人网站',
-        format: 'uri',
-        ui: {
-          widget: 'url',
-          placeholder: 'https://example.com',
-          errorMessages: {
-            format: '请输入有效的 URL 地址',
-          },
-        },
-      },
-      phone: {
-        type: 'string',
-        title: '手机号',
-        format: 'phone',
-        ui: {
-          placeholder: '请输入手机号',
-          errorMessages: {
-            format: '请输入有效的手机号码',
-          },
-        },
-      },
-      password: {
-        type: 'string',
-        title: '密码',
-        minLength: 6,
-        ui: {
-          widget: 'password',
-          placeholder: '至少6位字符',
-        },
-      },
-      age: {
-        type: 'integer',
-        title: '年龄',
-        minimum: 18,
-        maximum: 100,
-      },
-      country: {
-        type: 'string',
-        title: '国家',
-        enum: ['china', 'usa', 'japan', 'uk', 'other'],
-        enumNames: ['中国', '美国', '日本', '英国', '其他'],
-        ui: {
-          widget: 'select',
-          placeholder: '请选择国家',
-        },
-      },
-      countrySearchable: {
-        type: 'string',
-        title: '国家（本地搜索）',
-        enum: ['china', 'usa', 'japan', 'uk', 'other'],
-        enumNames: ['中国', '美国', '日本', '英国', '其他'],
-        ui: {
-          widget: 'select',
-          placeholder: '输入关键词搜索国家',
-          widgetProps: {
-            searchable: true,
-            clearable: true,
-          },
-        },
-      },
-      asyncLanguage: {
-        type: 'string',
-        title: '编程语言（异步搜索）',
-        ui: {
-          widget: 'select',
-          placeholder: '输入关键词异步搜索',
-          widgetProps: {
-            searchable: true,
-            clearable: true,
-            onSearch: async (term: string) => {
-              const all = [
-                { label: 'TypeScript', value: 'ts' },
-                { label: 'JavaScript', value: 'js' },
-                { label: 'Python', value: 'py' },
-                { label: 'Rust', value: 'rs' },
-                { label: 'Go', value: 'go' },
-                { label: 'Java', value: 'java' },
-                { label: 'C++', value: 'cpp' },
-                { label: 'Swift', value: 'swift' },
-              ]
-              await new Promise(r => setTimeout(r, 400))
-              if (!term) return all
-              return all.filter(o => o.label.toLowerCase().includes(term.toLowerCase()))
-            },
-          },
-        },
-      },
-      techStack: {
+      users: {
         type: 'array',
-        title: '技术栈（多选 + 搜索）',
-        items: { type: 'string' },
-        ui: {
-          widget: 'select',
-          placeholder: '选择或搜索技术栈',
-          widgetProps: {
-            multiple: true,
-            searchable: true,
-            clearable: true,
-            onSearch: async (term: string) => {
-              const all = [
-                { label: 'TypeScript', value: 'ts' },
-                { label: 'JavaScript', value: 'js' },
-                { label: 'React', value: 'react' },
-                { label: 'Vue', value: 'vue' },
-                { label: 'Node.js', value: 'node' },
-                { label: 'Python', value: 'py' },
-                { label: 'Go', value: 'go' },
-                { label: 'Rust', value: 'rs' },
-                { label: 'Docker', value: 'docker' },
-                { label: 'Kubernetes', value: 'k8s' },
-              ]
-              await new Promise(r => setTimeout(r, 300))
-              if (!term) return all
-              return all.filter(o => o.label.toLowerCase().includes(term.toLowerCase()))
+        title: 'Users',
+        items: {
+          type: 'string',
+        },
+      },
+      actions: {
+        type: 'array',
+        title: 'Actions',
+        items: {
+          type: 'object',
+          properties: {
+            code: {
+              type: 'string',
+              title: 'Code',
+            },
+            label: {
+              type: 'string',
+              title: 'Label',
             },
           },
         },
       },
-      gender: {
-        type: 'string',
-        title: '性别',
-        enum: ['male', 'female', 'other'],
-        enumNames: ['男', '女', '其他'],
-        ui: {
-          widget: 'radio',
-        },
-      },
-      introduction: {
-        type: 'string',
-        title: '个人简介',
-        maxLength: 500,
-        ui: {
-          widget: 'textarea',
-          placeholder: '介绍一下自己...',
-        },
-      },
-      config: {
-        type: 'string',
-        title: '配置信息 (JSON)',
-        ui: {
-          widget: 'code-editor',
-          widgetProps: {
-            language: 'json',
-            config: {
-              previewLines: 5,
-              previewMaxHeight: 150,
-            },
-          },
-        },
-      },
-      authScript: {
-        type: 'string',
-        title: '鉴权脚本',
-        ui: {
-          widget: 'code-editor',
-          widgetProps: {
-            language: 'javascript',
-            config: {
-              previewLines: 5,
-              previewMaxHeight: 150,
-            },
-          },
-        },
-      },
-      metadata: {
-        type: 'object',
-        title: '元数据 (Object)',
-        ui: {
-          widget: 'object-editor',
-          widgetProps: {
-            config: {
-              previewLines: 5,
-              previewMaxHeight: 150,
-            },
-          },
-        },
-      },
-      receiveNewsletter: {
-        type: 'boolean',
-        title: '订阅新闻邮件',
-        ui: {
-          widget: 'switch',
-        },
-      },
-      agreeTerms: {
-        type: 'boolean',
-        title: '同意用户协议',
-      },
-      dynamicFormSchema: {
-        type: 'object',
-        title: '动态表单 Schema',
-        ui: {
-          widget: 'schema-builder',
-        },
-      },
-      rate: {
-        type: 'number',
-        title: '利率（百分比输入，小数存储）',
-        default: 50,
-        maximum: 100,
-        ui: {
-          widget: 'number',
-          placeholder: '请输入百分比，如 96',
-          transform: {
-            callback: 'percentToDecimal',
-            reverseCallback: 'decimalToPercent',
-          },
-        },
-      },
-      ocr: {
-        type: 'object',
-        title: 'OCR',
-        properties: {
-          model: {
-            title: 'Model',
-            type: 'string',
-            enum: ['azure-layout', 'azure-read', 'mistral'],
-            enumNames: ['Azure-Layout', 'Azure-Read', 'Mistral'],
-            ui: {
-              widget: 'select',
-            },
-          },
-          format: {
-            title: 'Format',
-            type: 'string',
-            ui: {
-              widget: 'select',
-              linkages: [
-                {
-                  type: 'options',
-                  dependencies: ['#/properties/ocr/properties/model'],
-                  when: {
-                    field: '#/properties/ocr/properties/model',
-                    operator: '==',
-                    value: 'azure-layout',
-                  },
-                  fulfill: {
-                    options: [
-                      { label: 'Markdown', value: 'markdown' },
-                      { label: 'Text', value: 'text' },
-                    ],
-                  },
+      permissions: {
+        type: 'array',
+        title: 'Permissions',
+        items: {
+          type: 'object',
+          properties: {
+            users: {
+              type: 'array',
+              title: 'Users',
+              items: {
+                title: 'User',
+                type: 'string',
+              },
+              ui: {
+                widget: 'select',
+                widgetProps: {
+                  multiple: true,
                 },
-                {
-                  type: 'options',
-                  dependencies: ['#/properties/ocr/properties/model'],
-                  when: {
-                    field: '#/properties/ocr/properties/model',
-                    operator: '==',
-                    value: 'azure-read',
+                linkages: [
+                  {
+                    type: 'options',
+                    dependencies: [],
+                    fulfill: {
+                      function: {
+                        type: 'script',
+                        code: '/**\n * Generate dynamic options\n * @param {object} params - Parameters object\n * @param {object} params.formData - Current form values\n * @param {object} params.context - Linkage context\n * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)\n * @returns {Array<{label: string, value: any}>} - Options array\n */\nasync function({ formData, context, helpers }) {\n  // Example: fetch from API or calculate based on other fields\n  return formData.users.map((user) => {\n    return {\n      label: user.value,\n      value: user.value,\n    }\n  })\n}',
+                      },
+                    },
                   },
-                  fulfill: {
-                    options: [{ label: 'Text', value: 'text' }],
-                  },
+                ],
+              },
+            },
+            actions: {
+              type: 'array',
+              title: 'Actions',
+              items: {
+                title: 'Action',
+                type: 'string',
+              },
+              ui: {
+                widget: 'select',
+                widgetProps: {
+                  multiple: true,
                 },
-                {
-                  type: 'options',
-                  dependencies: ['#/properties/ocr/properties/model'],
-                  when: {
-                    field: '#/properties/ocr/properties/model',
-                    operator: '==',
-                    value: 'mistral',
+                linkages: [
+                  {
+                    type: 'options',
+                    dependencies: [],
+                    fulfill: {
+                      function: {
+                        type: 'script',
+                        code: '/**\n * Generate dynamic options\n * @param {object} params - Parameters object\n * @param {object} params.formData - Current form values\n * @param {object} params.context - Linkage context\n * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)\n * @returns {Array<{label: string, value: any}>} - Options array\n */\nasync function({ formData, context, helpers }) {\n  // Example: fetch from API or calculate based on other fields\n  return formData.actions.map((action) => {\n    return {\n      label: action.label,\n      value: action.code\n    }\n  })\n}',
+                      },
+                    },
                   },
-                  fulfill: {
-                    options: [{ label: 'Markdown', value: 'markdown' }],
-                  },
-                },
-              ],
+                ],
+              },
             },
           },
         },
-        required: ['format'],
       },
     },
-    required: ['username', 'email', 'password', 'agreeTerms', 'rate'],
   }
 
   const handleSubmit = (data: any) => {

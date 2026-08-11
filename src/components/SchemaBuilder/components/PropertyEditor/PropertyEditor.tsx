@@ -619,7 +619,7 @@ export const PropertyEditor: React.FC = () => {
                           handleFieldChange('default', undefined)
                         }}
                         options={typeOptions}
-                        disabled={isRoot || isArrayItems}
+                        disabled={isRoot}
                       />
                     )}
                   />
@@ -774,6 +774,7 @@ export const PropertyEditor: React.FC = () => {
                                 <div style={{ flex: 1 }}>
                                   <InputGroup
                                     value={String(value)}
+                                    disabled={isArrayItems}
                                     onChange={(e) =>
                                       handleUpdateValue(index, e.target.value)
                                     }
@@ -784,6 +785,7 @@ export const PropertyEditor: React.FC = () => {
                                   <InputGroup
                                     placeholder="Display text"
                                     value={enumNames[index] || ''}
+                                    disabled={isArrayItems}
                                     onChange={(e) =>
                                       handleUpdateLabel(index, e.target.value)
                                     }
@@ -794,6 +796,7 @@ export const PropertyEditor: React.FC = () => {
                                   icon="cross"
                                   minimal
                                   small
+                                  disabled={isArrayItems}
                                   onClick={() => handleRemoveOption(index)}
                                 />
                               </div>
@@ -802,6 +805,7 @@ export const PropertyEditor: React.FC = () => {
                               icon="add"
                               text="Add Option"
                               minimal
+                              disabled={isArrayItems}
                               onClick={handleAddOption}
                             />
                           </div>

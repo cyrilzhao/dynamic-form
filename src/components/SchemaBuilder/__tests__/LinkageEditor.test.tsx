@@ -133,6 +133,25 @@ describe('LinkageEditor', () => {
   })
 
   describe('依赖字段管理', () => {
+    it('Dependencies 为空时应该允许保存联动配置', () => {
+      const onSave = jest.fn()
+      const linkageValue = {
+        type: 'visibility' as const,
+        dependencies: [],
+        fulfill: {
+          state: { visible: true },
+        },
+      }
+
+      render(
+        <LinkageEditor {...defaultProps} onSave={onSave} value={linkageValue} />
+      )
+
+      fireEvent.click(screen.getByText('Save'))
+
+      expect(onSave).toHaveBeenCalledWith(linkageValue)
+    })
+
     it('点击添加依赖按钮应该添加空依赖', () => {
       const onChange = jest.fn()
       const linkageValue = {

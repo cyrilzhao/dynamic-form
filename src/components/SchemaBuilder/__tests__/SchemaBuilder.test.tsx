@@ -33,6 +33,30 @@ jest.mock('../../Select', () => ({
   ),
 }));
 
+const getTreeNodeContent = (label: RegExp): HTMLElement => {
+  const labelNode = screen
+    .getAllByText(label)
+    .find(node => node.closest('.schema-tree-node-label'));
+  const content = labelNode?.closest('.tree-node-content');
+
+  if (!(content instanceof HTMLElement)) {
+    throw new Error(`Tree node ${label.toString()} was not found`);
+  }
+
+  return content;
+};
+
+const expandTreeNode = (label: RegExp): void => {
+  const content = getTreeNodeContent(label);
+  const caret = content.querySelector('.tree-node-caret');
+
+  if (!(caret instanceof HTMLElement)) {
+    throw new Error(`Tree node caret ${label.toString()} was not found`);
+  }
+
+  fireEvent.click(caret);
+};
+
 describe('SchemaBuilder', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -547,6 +571,119 @@ describe('SchemaBuilder', () => {
         node.closest('.tree-node-label')
       );
       expect(treeUserNode).toBeInTheDocument();
+    });
+  });
+
+  describe('数组 items 类型切换', () => {
+    it('从 object 切换为 string 时应该移除 properties 和子节点', async () => {
+      const onChange = jest.fn();
+      const schema = {
+        type: 'object' as const,
+        title: 'Array Form',
+        properties: {
+          contacts: {
+            type: 'array' as const,
+            title: 'Contacts',
+            items: {
+              type: 'object' as const,
+              title: 'Contact',
+              required: ['name'],
+              properties: {
+                name: { type: 'string' as const, title: 'Contact Name' },
+              },
+            },
+          },
+        },
+      };
+
+      render(<SchemaBuilder defaultValue={schema} onChange={onChange} />);
+
+      expandTreeNode(/Contacts \(contacts\)/i);
+      fireEvent.click(getTreeNodeContent(/Contact \(items\)/i));
+      fireEvent.change(screen.getByDisplayValue('Object'), {
+        target: { value: 'string' },
+      });
+
+      await waitFor(() => {
+        const lastSchema =
+          onChange.mock.calls[onChange.mock.calls.length - 1][0];
+        expect(lastSchema.properties.contacts.items.type).toBe('string');
+        expect(lastSchema.properties.contacts.items.properties).toBeUndefined();
+        expect(lastSchema.properties.contacts.items.required).toBeUndefined();
+        expect(
+          screen.queryByText(/Contact Name \(name\)/i)
+        ).not.toBeInTheDocument();
+      });
+    });
+
+    it('从基本类型切换为 object 时应该创建 properties 和默认子节点', async () => {
+      const onChange = jest.fn();
+      const schema = {
+        type: 'object' as const,
+        title: 'Array Form',
+        properties: {
+          tags: {
+            type: 'array' as const,
+            title: 'Tags',
+            items: { type: 'string' as const, title: 'Item' },
+          },
+        },
+      };
+
+      render(<SchemaBuilder defaultValue={schema} onChange={onChange} />);
+
+      expandTreeNode(/Tags \(tags\)/i);
+      fireEvent.click(getTreeNodeContent(/Item \(items\)/i));
+      fireEvent.change(screen.getByDisplayValue('String'), {
+        target: { value: 'object' },
+      });
+
+      await waitFor(() => {
+        const lastSchema =
+          onChange.mock.calls[onChange.mock.calls.length - 1][0];
+        const itemProperties = lastSchema.properties.tags.items.properties;
+        expect(lastSchema.properties.tags.items.type).toBe('object');
+        expect(Object.keys(itemProperties)).toHaveLength(1);
+        expect(Object.values(itemProperties)[0]).toEqual({
+          type: 'string',
+          title: 'New Field',
+        });
+        expect(screen.getByText(/New Field/i)).toBeInTheDocument();
+      });
+    });
+
+    it('从基本类型切换为 array 时应该创建嵌套 items 和默认子节点', async () => {
+      const onChange = jest.fn();
+      const schema = {
+        type: 'object' as const,
+        title: 'Array Form',
+        properties: {
+          matrix: {
+            type: 'array' as const,
+            title: 'Matrix',
+            items: { type: 'number' as const, title: 'Row' },
+          },
+        },
+      };
+
+      render(<SchemaBuilder defaultValue={schema} onChange={onChange} />);
+
+      expandTreeNode(/Matrix \(matrix\)/i);
+      fireEvent.click(getTreeNodeContent(/Row \(items\)/i));
+      fireEvent.change(screen.getByDisplayValue('Number'), {
+        target: { value: 'array' },
+      });
+
+      await waitFor(() => {
+        const lastSchema =
+          onChange.mock.calls[onChange.mock.calls.length - 1][0];
+        const nestedItems = lastSchema.properties.matrix.items.items;
+        expect(lastSchema.properties.matrix.items.type).toBe('array');
+        expect(nestedItems.type).toBe('object');
+        expect(Object.keys(nestedItems.properties)).toHaveLength(1);
+        expect(screen.getByText(/Items \(items\)/i)).toBeInTheDocument();
+        expect(screen.getByText(/New Field/i)).toBeInTheDocument();
+      });
     });
   });
 

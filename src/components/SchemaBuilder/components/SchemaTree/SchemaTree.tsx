@@ -13,6 +13,9 @@ import type { TreeNodeInfo } from '../../../Tree'
 import { useSchemaBuilder } from '../../SchemaBuilder'
 import type { ExtendedJSONSchema } from '../../../DynamicForm/types/schema'
 
+const canAddChildToNode = (schema: ExtendedJSONSchema): boolean =>
+  schema.type === 'object'
+
 export const SchemaTree: React.FC = () => {
   const {
     schema,
@@ -49,8 +52,7 @@ export const SchemaTree: React.FC = () => {
       const key = path.length > 0 ? path[path.length - 1] : ''
       const parentKey = path.length > 1 ? path[path.length - 2] : ''
 
-      const canAddChild =
-        currentSchema.type === 'object' || currentSchema.type === 'array'
+      const canAddChild = canAddChildToNode(currentSchema)
 
       // Can add sibling if parent is 'properties' (standard object field)
       const canAddSibling = !isRoot && parentKey === 'properties'
@@ -148,10 +150,13 @@ export const SchemaTree: React.FC = () => {
         }
       }
 
-      const canAddChild = currentSchema.type === 'object'
+      const canAddChild = canAddChildToNode(currentSchema)
       const canAddSibling =
         path.length > 0 && path[path.length - 2] === 'properties'
-      const showActions = canAddChild || canAddSibling || path.length > 0
+      const isItemsNode = path[path.length - 1] === 'items'
+      const hasNodeManagementActions = path.length > 0 && !isItemsNode
+      const showActions =
+        canAddChild || canAddSibling || hasNodeManagementActions
 
       const node: TreeNodeInfo<string[]> = {
         id: pathStr || 'root',
@@ -164,8 +169,8 @@ export const SchemaTree: React.FC = () => {
             >
               <span className="node-text">{label}</span>
             </Tooltip>
-            <div className="node-actions">
-              {showActions && (
+            {showActions && (
+              <div className="node-actions">
                 <Popover
                   content={renderNodeMenu(path, currentSchema)}
                   position={Position.BOTTOM_LEFT}
@@ -173,8 +178,8 @@ export const SchemaTree: React.FC = () => {
                 >
                   <Button icon="more" minimal small />
                 </Popover>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         ),
         isSelected: isSelected,

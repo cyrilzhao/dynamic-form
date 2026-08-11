@@ -46,7 +46,6 @@ export const LinkageEditor: React.FC<LinkageEditorProps> = ({
   onCancel,
 }) => {
   const [errors, setErrors] = useState<{
-    dependencies?: string
     fulfill?: string
   }>({})
 
@@ -61,13 +60,7 @@ export const LinkageEditor: React.FC<LinkageEditorProps> = ({
   ]
 
   const validateLinkage = (): boolean => {
-    const newErrors: { dependencies?: string; fulfill?: string } = {}
-
-    // 校验 dependencies
-    const validDeps = value.dependencies.filter((d) => d.trim())
-    if (validDeps.length === 0) {
-      newErrors.dependencies = 'At least one dependency is required'
-    }
+    const newErrors: { fulfill?: string } = {}
 
     // 校验 fulfill
     if (!value.fulfill) {
@@ -112,10 +105,6 @@ export const LinkageEditor: React.FC<LinkageEditorProps> = ({
       ...value,
       dependencies: newDeps,
     })
-    // 清除 dependencies 错误
-    if (errors.dependencies && newValue.trim()) {
-      setErrors({ ...errors, dependencies: undefined })
-    }
   }
 
   const handleRemoveDependency = (index: number) => {
@@ -230,7 +219,7 @@ export const LinkageEditor: React.FC<LinkageEditorProps> = ({
       <FormGroup
         label={
           <span style={{ display: 'flex', gap: '4px' }}>
-            Dependencies <span style={{ color: '#c23030' }}>*</span>{' '}
+            Dependencies{' '}
             <Tooltip
               content={
                 <div style={{ maxWidth: 300 }}>
@@ -239,8 +228,10 @@ export const LinkageEditor: React.FC<LinkageEditorProps> = ({
                   </p>
                   <p style={{ margin: 0 }}>
                     When any of these dependency fields change, the linkage will
-                    re-evaluate conditions and apply effects. Select at least
-                    one field that this linkage should watch for changes.
+                    re-evaluate conditions and apply effects. If no dependencies
+                    are selected, it will only be evaluated during
+                    initialization, explicit refreshes, or linkage context
+                    updates; ordinary form field changes will not trigger it.
                   </p>
                 </div>
               }
@@ -257,7 +248,6 @@ export const LinkageEditor: React.FC<LinkageEditorProps> = ({
             </Tooltip>
           </span>
         }
-        intent={errors.dependencies ? 'danger' : 'none'}
       >
         {value.dependencies.map((dep, index) => (
           <div key={index} className="dependency-item">
@@ -277,11 +267,6 @@ export const LinkageEditor: React.FC<LinkageEditorProps> = ({
             />
           </div>
         ))}
-        {errors.dependencies && (
-          <div style={{ color: '#c23030', fontSize: 12, marginTop: 4 }}>
-            {errors.dependencies}
-          </div>
-        )}
         <Button
           text="Add Dependency"
           icon="add"
