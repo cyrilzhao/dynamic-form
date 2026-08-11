@@ -946,6 +946,77 @@ describe("useLinkageManager", () => {
       });
     });
 
+    it("多选 options 变化后应该移除无效值并保留有效值", async () => {
+      const linkages: Record<string, LinkageConfig[]> = {
+        tags: [
+          {
+            type: "options",
+            dependencies: ["category"],
+            fulfill: {
+              options: [
+                { label: "React", value: "react" },
+                { label: "TypeScript", value: "typescript" },
+              ],
+            },
+          },
+        ],
+      };
+
+      const { result } = renderHook(() => {
+        const form = useForm({
+          defaultValues: {
+            category: "frontend",
+            tags: ["react", "invalid", "typescript"],
+          },
+        });
+        const linkageManager = useLinkageManager({ form, linkages });
+        return { form, ...linkageManager };
+      });
+
+      await act(async () => {
+        await result.current.refreshLinkage();
+      });
+
+      expect(result.current.form.getValues("tags")).toEqual([
+        "react",
+        "typescript",
+      ]);
+    });
+
+    it("多选 options 变化后所有值都无效时应该清空数组", async () => {
+      const linkages: Record<string, LinkageConfig[]> = {
+        tags: [
+          {
+            type: "options",
+            dependencies: ["category"],
+            fulfill: {
+              options: [
+                { label: "React", value: "react" },
+                { label: "TypeScript", value: "typescript" },
+              ],
+            },
+          },
+        ],
+      };
+
+      const { result } = renderHook(() => {
+        const form = useForm({
+          defaultValues: {
+            category: "frontend",
+            tags: ["invalid", "obsolete"],
+          },
+        });
+        const linkageManager = useLinkageManager({ form, linkages });
+        return { form, ...linkageManager };
+      });
+
+      await act(async () => {
+        await result.current.refreshLinkage();
+      });
+
+      expect(result.current.form.getValues("tags")).toEqual([]);
+    });
+
     it("应该支持 disabled 类型的函数联动", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         submitBtn: [

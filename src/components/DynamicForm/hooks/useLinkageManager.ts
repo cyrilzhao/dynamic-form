@@ -324,8 +324,8 @@ export function useLinkageManager({
           }
 
           // 处理 options 联动：当 options 更新后，原有值可能已不在新选项列表中。
-          // 若不清空，表单会包含非法值（UI 显示为空但 getValues() 返回旧值），导致提交数据错误。
-          // 对多选（数组）要求每个元素都合法；对单选直接检查。
+          // 若不清理，表单会包含非法值（UI 显示为空但 getValues() 返回旧值），导致提交数据错误。
+          // 多选（数组）只移除非法元素并保留合法元素；单选值非法时清空。
           const hasOptionsLinkage = linkageArray?.some(
             (linkage) => linkage.type === "options",
           );
@@ -340,23 +340,22 @@ export function useLinkageManager({
               currentValue !== ""
             ) {
               const optionValues = newOptions.map((opt: any) => opt.value);
-              const isValidValue = Array.isArray(currentValue)
-                ? currentValue.every((v) => optionValues.includes(v))
-                : optionValues.includes(currentValue);
+              const nextValue = Array.isArray(currentValue)
+                ? currentValue.filter((value) => optionValues.includes(value))
+                : undefined;
+              const shouldUpdateValue = Array.isArray(currentValue)
+                ? nextValue.length !== currentValue.length
+                : !optionValues.includes(currentValue);
 
-              // 如果当前值不在新 options 中，清空该值
-              if (!isValidValue) {
+              // 多选过滤非法元素；单选值非法时清空
+              if (shouldUpdateValue) {
                 if (!preMarkFields) {
                   taskQueue.markFieldUpdating(fieldName);
                 }
-                setValue(
-                  fieldName,
-                  Array.isArray(currentValue) ? [] : undefined,
-                  {
-                    shouldValidate: false,
-                    shouldDirty: false,
-                  },
-                );
+                setValue(fieldName, nextValue, {
+                  shouldValidate: false,
+                  shouldDirty: false,
+                });
               }
             }
           }
