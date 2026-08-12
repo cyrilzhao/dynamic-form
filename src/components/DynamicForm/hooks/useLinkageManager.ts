@@ -340,19 +340,27 @@ export function useLinkageManager({
               currentValue !== ""
             ) {
               const optionValues = newOptions.map((opt: any) => opt.value);
-              const nextValue = Array.isArray(currentValue)
-                ? currentValue.filter((value) => optionValues.includes(value))
-                : undefined;
-              const shouldUpdateValue = Array.isArray(currentValue)
-                ? nextValue.length !== currentValue.length
-                : !optionValues.includes(currentValue);
 
-              // 多选过滤非法元素；单选值非法时清空
-              if (shouldUpdateValue) {
+              if (Array.isArray(currentValue)) {
+                // 多选只移除非法元素，保留仍然有效的已选值
+                const nextValue = currentValue.filter((value) =>
+                  optionValues.includes(value),
+                );
+                if (nextValue.length !== currentValue.length) {
+                  if (!preMarkFields) {
+                    taskQueue.markFieldUpdating(fieldName);
+                  }
+                  setValue(fieldName, nextValue, {
+                    shouldValidate: false,
+                    shouldDirty: false,
+                  });
+                }
+              } else if (!optionValues.includes(currentValue)) {
+                // 单选值不再合法时清空
                 if (!preMarkFields) {
                   taskQueue.markFieldUpdating(fieldName);
                 }
-                setValue(fieldName, nextValue, {
+                setValue(fieldName, undefined, {
                   shouldValidate: false,
                   shouldDirty: false,
                 });
