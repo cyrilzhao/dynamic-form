@@ -1,40 +1,34 @@
-import React, {
-  useMemo,
-  useState,
-  useCallback,
-  useRef,
-  useEffect,
-} from "react";
-import { useFormContext, Controller } from "react-hook-form";
-import { FormGroup } from "@blueprintjs/core";
-import { FieldLabel } from "../components/FieldLabel";
-import { FieldError } from "../components/FieldError";
-import { FieldHelp } from "../components/FieldHelp";
-import { FieldRegistry } from "../core/FieldRegistry";
-import { useWidgets } from "../context/WidgetsContext";
-import { useCallbacks } from "../context/CallbacksContext";
-import { useHelpers } from "../context/HelpersContext";
-import { resolveTransformFn } from "../utils/resolveTransformFn";
-import { executeInlineScript } from "../utils/executeInlineScript";
-import type { CallbackPropRef, FieldConfig } from "../types/schema";
-import type { LinkageResult } from "../types/linkage";
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react'
+import { useFormContext, Controller } from 'react-hook-form'
+import { FormGroup } from '@blueprintjs/core'
+import { FieldLabel } from '../components/FieldLabel'
+import { FieldError } from '../components/FieldError'
+import { FieldHelp } from '../components/FieldHelp'
+import { FieldRegistry } from '../core/FieldRegistry'
+import { useWidgets } from '../context/WidgetsContext'
+import { useCallbacks } from '../context/CallbacksContext'
+import { useHelpers } from '../context/HelpersContext'
+import { resolveTransformFn } from '../utils/resolveTransformFn'
+import { executeInlineScript } from '../utils/executeInlineScript'
+import type { CallbackPropRef, FieldConfig } from '../types/schema'
+import type { LinkageResult } from '../types/linkage'
 
 // 通过 globalThis 访问 Function 构造器，避免静态分析误报
-const DynamicFn = globalThis["Function"] as FunctionConstructor; // trusted-dynamic-code
+const DynamicFn = globalThis['Function'] as FunctionConstructor // trusted-dynamic-code
 
 export interface FormFieldProps {
-  field: FieldConfig;
-  disabled?: boolean;
-  readonly?: boolean;
-  linkageState?: LinkageResult;
-  layout?: "vertical" | "horizontal" | "inline";
-  labelWidth?: number | string;
-  fieldRowStyle?: React.CSSProperties;
-  fieldLabelStyle?: React.CSSProperties;
-  fieldControlStyle?: React.CSSProperties;
-  enableVirtualScroll?: boolean;
-  virtualScrollHeight?: number;
-  columnsCount?: number;
+  field: FieldConfig
+  disabled?: boolean
+  readonly?: boolean
+  linkageState?: LinkageResult
+  layout?: 'vertical' | 'horizontal' | 'inline'
+  labelWidth?: number | string
+  fieldRowStyle?: React.CSSProperties
+  fieldLabelStyle?: React.CSSProperties
+  fieldControlStyle?: React.CSSProperties
+  enableVirtualScroll?: boolean
+  virtualScrollHeight?: number
+  columnsCount?: number
 }
 
 /**
@@ -47,25 +41,25 @@ function resolveCallbackProps(
   callbackProps: Record<string, CallbackPropRef> | undefined,
   callbacks: Record<string, (...args: any[]) => any>,
   helpers: Record<string, any>,
-  widgetProps?: Record<string, any>,
+  widgetProps?: Record<string, any>
 ): Record<string, (...args: any[]) => any> {
   if (!callbackProps) {
-    return {};
+    return {}
   }
-  const result: Record<string, (...args: any[]) => any> = {};
+  const result: Record<string, (...args: any[]) => any> = {}
   for (const [propName, callbackRef] of Object.entries(callbackProps)) {
-    let fn: ((...args: any[]) => any) | undefined;
-    let hasWarned = false;
+    let fn: ((...args: any[]) => any) | undefined
+    let hasWarned = false
 
-    if (typeof callbackRef === "string") {
-      fn = callbacks[callbackRef];
-      if (!fn && process.env.NODE_ENV !== "production") {
+    if (typeof callbackRef === 'string') {
+      fn = callbacks[callbackRef]
+      if (!fn && process.env.NODE_ENV !== 'production') {
         console.warn(
-          `[DynamicForm] callbacks missing: "${callbackRef}" (used by callbackProps.${propName})`,
-        );
-        hasWarned = true;
+          `[DynamicForm] callbacks missing: "${callbackRef}" (used by callbackProps.${propName})`
+        )
+        hasWarned = true
       }
-    } else if (callbackRef.type === "script" && callbackRef.code.trim()) {
+    } else if (callbackRef.type === 'script' && callbackRef.code.trim()) {
       // 使用 executeInlineScript 执行内联脚本，支持 helpers
       try {
         fn = (...args: any[]) =>
@@ -73,51 +67,51 @@ function resolveCallbackProps(
             code: callbackRef.code,
             params: { args },
             helpers,
-          });
+          })
       } catch (e) {
-        if (process.env.NODE_ENV !== "production") {
+        if (process.env.NODE_ENV !== 'production') {
           console.warn(
-            `[DynamicForm] callbackProps.${propName} script error: ${(e as Error).message}`,
-          );
-          hasWarned = true;
+            `[DynamicForm] callbackProps.${propName} script error: ${(e as Error).message}`
+          )
+          hasWarned = true
         }
       }
     }
 
     if (!fn) {
-      if (process.env.NODE_ENV !== "production") {
+      if (process.env.NODE_ENV !== 'production') {
         if (!hasWarned) {
           console.warn(
-            `[DynamicForm] callbackProps.${propName} function not configured`,
-          );
+            `[DynamicForm] callbackProps.${propName} function not configured`
+          )
         }
       }
-      continue;
+      continue
     }
 
     // 包装函数以支持对象参数形式
     const wrappedFn = (...args: any[]) => {
-      if (typeof callbackRef === "string") {
+      if (typeof callbackRef === 'string') {
         // 从 callbacks 获取的函数，使用对象参数调用
-        return fn!({ args, helpers });
+        return fn!({ args, helpers })
       } else {
         // 内联脚本已经在上面处理了 helpers，直接调用
-        return fn!(...args);
+        return fn!(...args)
       }
-    };
+    }
 
     if (
-      process.env.NODE_ENV !== "production" &&
+      process.env.NODE_ENV !== 'production' &&
       widgetProps &&
       propName in widgetProps
     ) {
       console.warn(
-        `[DynamicForm] callbackProps key "${propName}" overrides widgetProps`,
-      );
+        `[DynamicForm] callbackProps key "${propName}" overrides widgetProps`
+      )
     }
-    result[propName] = wrappedFn;
+    result[propName] = wrappedFn
   }
-  return result;
+  return result
 }
 
 /**
@@ -134,12 +128,12 @@ function resolveCallbackProps(
  * - displayValueRef 供 useEffect 内读取最新值，避免 useEffect deps 中加入 displayValue 导致不必要重跑
  */
 interface WidgetWithTransformProps {
-  controllerField: any;
-  WidgetComponent: React.ComponentType<any>;
-  transformFn: (params: { value: any; helpers: Record<string, any> }) => any;
-  helpers: Record<string, any>;
-  hideConvertedValue?: boolean;
-  widgetProps: Record<string, any>;
+  controllerField: any
+  WidgetComponent: React.ComponentType<any>
+  transformFn: (params: { value: any; helpers: Record<string, any> }) => any
+  helpers: Record<string, any>
+  hideConvertedValue?: boolean
+  widgetProps: Record<string, any>
 }
 
 const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
@@ -151,69 +145,72 @@ const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
   widgetProps,
 }) => {
   const [displayValue, setDisplayValue] = useState(
-    () => controllerField.value ?? "",
-  );
+    () => controllerField.value ?? ''
+  )
   const [transformedPreview, setTransformedPreview] = useState<string | null>(
     () => {
-      const initial = controllerField.value;
-      if (initial != null && initial !== "") {
+      const initial = controllerField.value
+      if (initial != null && initial !== '') {
         try {
-          return String(transformFn({ value: initial, helpers }));
+          return String(transformFn({ value: initial, helpers }))
         } catch {
-          return null;
+          return null
         }
       }
-      return null;
-    },
-  );
+      return null
+    }
+  )
 
   // 每次渲染更新 ref，确保 handleChange/handleBlur 的闭包始终访问最新引用
-  const controllerFieldRef = useRef(controllerField);
-  controllerFieldRef.current = controllerField;
-  const transformRef = useRef(transformFn);
-  transformRef.current = transformFn;
-  const displayValueRef = useRef(displayValue);
-  displayValueRef.current = displayValue;
+  const controllerFieldRef = useRef(controllerField)
+  controllerFieldRef.current = controllerField
+  const transformRef = useRef(transformFn)
+  transformRef.current = transformFn
+  const displayValueRef = useRef(displayValue)
+  displayValueRef.current = displayValue
 
   // 当外部通过 setValue/setValues 更新表单值时，同步更新本地展示值
   // 仅在值真正变化时执行，避免用户正在输入时被外部赋值打断
   useEffect(() => {
-    const val = controllerField.value ?? "";
+    const val = controllerField.value ?? ''
     if (val === displayValueRef.current) {
-      return;
+      return
     }
-    setDisplayValue(val);
+    setDisplayValue(val)
     setTransformedPreview(
-      val !== "" && val != null
+      val !== '' && val != null
         ? (() => {
             try {
-              return String(transformRef.current({ value: val, helpers }));
+              return String(transformRef.current({ value: val, helpers }))
             } catch {
-              return null;
+              return null
             }
           })()
-        : null,
-    );
-  }, [controllerField.value, helpers]);
+        : null
+    )
+  }, [controllerField.value, helpers])
 
   // 用户输入时：存储展示域值（不做转换），同时实时计算并展示转换后的预览
   // 存储展示域而非存储域的原因：使所有校验规则（min/max/pattern/custom validate）
   // 都在展示域下工作，错误提示天然符合用户输入的单位语义
-  const handleChange = useCallback((val: any) => {
-    setDisplayValue(val);
-    let preview: any;
-    try {
-      preview = transformRef.current({ value: val, helpers });
-    } catch {
-      preview = undefined;
-    }
-    controllerFieldRef.current.onChange(val);
-    setTransformedPreview(preview != null ? String(preview) : null);
-  }, [helpers]);
+  const handleChange = useCallback(
+    (val: any) => {
+      setDisplayValue(val)
+      let preview: any
+      try {
+        preview = transformRef.current({ value: val, helpers })
+      } catch {
+        preview = undefined
+      }
+      controllerFieldRef.current.onChange(val)
+      setTransformedPreview(preview != null ? String(preview) : null)
+    },
+    [helpers]
+  )
 
   const handleBlur = useCallback((e: any) => {
-    controllerFieldRef.current.onBlur(e);
-  }, []);
+    controllerFieldRef.current.onBlur(e)
+  }, [])
 
   return (
     <>
@@ -229,8 +226,8 @@ const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
         <span
           style={{
             fontSize: 12,
-            color: "#888",
-            display: "block",
+            color: '#888',
+            display: 'block',
             marginTop: 2,
           }}
         >
@@ -238,14 +235,14 @@ const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
         </span>
       )}
     </>
-  );
-};
+  )
+}
 
 const FormFieldComponent: React.FC<FormFieldProps> = ({
   field,
   disabled,
   readonly,
-  layout = "vertical",
+  layout = 'vertical',
   labelWidth,
   fieldRowStyle,
   fieldLabelStyle,
@@ -253,82 +250,82 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
   virtualScrollHeight,
   columnsCount = 1,
 }) => {
-  const { control } = useFormContext();
+  const { control } = useFormContext()
 
   // 从 Context 获取 widgets、callbacks 和 helpers
-  const widgets = useWidgets();
-  const callbacks = useCallbacks();
-  const helpers = useHelpers();
+  const widgets = useWidgets()
+  const callbacks = useCallbacks()
+  const helpers = useHelpers()
 
   const resolvedWidget =
-    field.widget === "checkbox" && field.type !== "boolean"
-      ? "checkbox-group"
-      : field.widget;
+    field.widget === 'checkbox' && field.type !== 'boolean'
+      ? 'checkbox-group'
+      : field.widget
   const WidgetComponent =
-    widgets[resolvedWidget] || FieldRegistry.getWidget(resolvedWidget);
+    widgets[resolvedWidget] || FieldRegistry.getWidget(resolvedWidget)
 
   if (!WidgetComponent) {
-    console.warn(`Widget "${field.widget}" not found`);
-    return null;
+    console.warn(`Widget "${field.widget}" not found`)
+    return null
   }
 
   // 检查是否是 flattenPath 字段（路径透明化）
   // flattenPath 字段不应该显示 label，因为它是视觉透明的
-  const isFlattenPath = field.schema?.ui?.flattenPath === true;
+  const isFlattenPath = field.schema?.ui?.flattenPath === true
 
   // 计算 layout 的优先级：字段级 > 父级 > 全局级
-  const effectiveLayout = field.schema?.ui?.layout ?? layout;
+  const effectiveLayout = field.schema?.ui?.layout ?? layout
 
   // 计算 labelWidth 的优先级：字段级 > 全局级
-  const effectiveLabelWidth = field.schema?.ui?.labelWidth ?? labelWidth;
+  const effectiveLabelWidth = field.schema?.ui?.labelWidth ?? labelWidth
 
-  const colSpan = field.schema?.ui?.colSpan ?? 1;
+  const colSpan = field.schema?.ui?.colSpan ?? 1
 
   // 使用 useMemo 缓存 formGroupStyle，避免每次渲染都创建新对象
   const formGroupStyle = useMemo(() => {
-    const style: React.CSSProperties = {};
-    if (effectiveLayout === "horizontal") {
-      style.flexDirection = "row"; // 覆盖 Blueprint 的 column
-      style.alignItems = "flex-start";
-    } else if (effectiveLayout === "inline") {
-      style.display = "inline-flex";
-      style.marginRight = "15px";
+    const style: React.CSSProperties = {}
+    if (effectiveLayout === 'horizontal') {
+      style.flexDirection = 'row' // 覆盖 Blueprint 的 column
+      style.alignItems = 'flex-start'
+    } else if (effectiveLayout === 'inline') {
+      style.display = 'inline-flex'
+      style.marginRight = '15px'
     }
     if (columnsCount > 1 && colSpan > 1) {
-      style.gridColumn = `span ${Math.min(colSpan, columnsCount)}`;
+      style.gridColumn = `span ${Math.min(colSpan, columnsCount)}`
     }
-    return style;
-  }, [effectiveLayout, columnsCount, colSpan]);
+    return style
+  }, [effectiveLayout, columnsCount, colSpan])
 
   // 使用 useMemo 缓存 labelStyle，避免每次渲染都创建新对象
   const labelStyle = useMemo(() => {
-    const style: React.CSSProperties = {};
-    if (effectiveLayout === "horizontal" && effectiveLabelWidth) {
+    const style: React.CSSProperties = {}
+    if (effectiveLayout === 'horizontal' && effectiveLabelWidth) {
       style.width =
-        typeof effectiveLabelWidth === "number"
+        typeof effectiveLabelWidth === 'number'
           ? `${effectiveLabelWidth}px`
-          : effectiveLabelWidth;
-      style.flexShrink = 0;
-      style.marginRight = "12px";
+          : effectiveLabelWidth
+      style.flexShrink = 0
+      style.marginRight = '12px'
     }
     return {
       ...style,
       ...fieldLabelStyle,
-    };
-  }, [effectiveLayout, effectiveLabelWidth, fieldLabelStyle]);
+    }
+  }, [effectiveLayout, effectiveLabelWidth, fieldLabelStyle])
 
-  const widgetProps = field.schema?.ui?.widgetProps;
+  const widgetProps = field.schema?.ui?.widgetProps
   const resolvedCallbacks = resolveCallbackProps(
     field.schema?.ui?.callbackProps,
     callbacks,
     helpers,
-    widgetProps,
-  );
+    widgetProps
+  )
 
-  const transformConfig = field.schema?.ui?.transform;
+  const transformConfig = field.schema?.ui?.transform
   const transformFn = transformConfig
     ? resolveTransformFn(transformConfig.callback, callbacks)
-    : undefined;
+    : undefined
 
   return (
     <FormGroup
@@ -358,7 +355,7 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
         control={control}
         rules={field.validation}
         render={({ field: controllerField, fieldState }) => {
-          const error = fieldState.error?.message;
+          const error = fieldState.error?.message
           const commonWidgetProps = {
             placeholder: field.placeholder,
             disabled: disabled || field.disabled,
@@ -372,11 +369,11 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
             virtualScrollHeight,
             ...(widgetProps || {}),
             ...resolvedCallbacks,
-          };
+          }
 
           return (
             <>
-              <FormGroup intent={error ? "danger" : "none"}>
+              <FormGroup intent={error ? 'danger' : 'none'}>
                 {transformFn && transformConfig ? (
                   <WidgetWithTransform
                     controllerField={controllerField}
@@ -395,12 +392,12 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
               </FormGroup>
               {error && <FieldError message={error} />}
             </>
-          );
+          )
         }}
       />
     </FormGroup>
-  );
-};
+  )
+}
 
 /**
  * 自定义比较函数：只在关键 props 变化时重渲染
@@ -412,7 +409,7 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
  */
 export function arePropsEqual(
   prevProps: FormFieldProps,
-  nextProps: FormFieldProps,
+  nextProps: FormFieldProps
 ): boolean {
   // 比较 field 的关键属性
   if (
@@ -423,7 +420,7 @@ export function arePropsEqual(
     prevProps.field.label !== nextProps.field.label ||
     prevProps.field.placeholder !== nextProps.field.placeholder
   ) {
-    return false;
+    return false
   }
 
   // 比较其他基本 props
@@ -438,22 +435,22 @@ export function arePropsEqual(
     prevProps.enableVirtualScroll !== nextProps.enableVirtualScroll ||
     prevProps.virtualScrollHeight !== nextProps.virtualScrollHeight
   ) {
-    return false;
+    return false
   }
 
   // 比较 field.schema（用于 schema 联动）
   if (prevProps.field.schema !== nextProps.field.schema) {
-    return false;
+    return false
   }
 
   // 比较 linkageState（浅比较）
   if (prevProps.linkageState !== nextProps.linkageState) {
     // 如果引用不同，检查内容是否相同
     if (!prevProps.linkageState && !nextProps.linkageState) {
-      return true;
+      return true
     }
     if (!prevProps.linkageState || !nextProps.linkageState) {
-      return false;
+      return false
     }
     // 比较 linkageState 的关键属性
     if (
@@ -464,13 +461,13 @@ export function arePropsEqual(
       prevProps.linkageState.schema !== nextProps.linkageState.schema ||
       prevProps.linkageState.options !== nextProps.linkageState.options
     ) {
-      return false;
+      return false
     }
   }
 
   // 所有关键 props 都相同，不需要重渲染
-  return true;
+  return true
 }
 
 // 使用 React.memo 包装组件，传入自定义比较函数
-export const FormField = React.memo(FormFieldComponent, arePropsEqual);
+export const FormField = React.memo(FormFieldComponent, arePropsEqual)

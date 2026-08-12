@@ -5,9 +5,13 @@ import { Card } from '@blueprintjs/core'
 import { CodeEditorWidget } from '@/components/DynamicForm'
 import { ObjectEditorWidget } from '@/components/DynamicForm'
 import { SchemaBuilderWidget } from '@/components/DynamicForm/widgets/SchemaBuilderWidget'
+import type { CallbackFunction } from '@/components/DynamicForm/types'
 
 export const BasicFormPanel: React.FC = () => {
   const formRef = useRef<DynamicFormRef>(null)
+
+  // @ts-ignore
+  window.__formRef = formRef
 
   // const schema: ExtendedJSONSchema = {
   //   type: 'object',
@@ -348,16 +352,19 @@ export const BasicFormPanel: React.FC = () => {
       actions: {
         type: 'array',
         title: 'Actions',
+        description: 'actions',
         items: {
           type: 'object',
           properties: {
             code: {
               type: 'string',
               title: 'Code',
+              description: 'action code',
             },
             label: {
               type: 'string',
               title: 'Label',
+              description: 'action label',
             },
           },
         },
@@ -387,7 +394,7 @@ export const BasicFormPanel: React.FC = () => {
                     fulfill: {
                       function: {
                         type: 'script',
-                        code: '/**\n * Generate dynamic options\n * @param {object} params - Parameters object\n * @param {object} params.formData - Current form values\n * @param {object} params.context - Linkage context\n * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)\n * @returns {Array<{label: string, value: any}>} - Options array\n */\nasync function({ formData, context, helpers }) {\n  // Example: fetch from API or calculate based on other fields\n  return formData.users.map((user) => {\n    return {\n      label: user.value,\n      value: user.value,\n    }\n  })\n}',
+                        code: "/**\n * Generate dynamic options\n * @param {object} params - Parameters object\n * @param {object} params.formData - Current form values\n * @param {object} params.context - Linkage context\n * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)\n * @returns {Array<{label: string, value: any}>} - Options array\n */\nasync function({ formData, context, helpers }) {\n  // Example: fetch from API or calculate based on other fields\n  console.info('cyril formData.users: ', formData.users)\n  return formData.users.map((user) => {\n    return {\n      label: user.value,\n      value: user.value,\n    }\n  })\n}",
                       },
                     },
                   },
@@ -443,8 +450,32 @@ export const BasicFormPanel: React.FC = () => {
   useEffect(() => {
     setTimeout(() => {
       // formRef.current?.setValue('rate', 0.6)
+      // formRef.current?.setValues({
+      //   rate: 0.7,
+      // })
+
       formRef.current?.setValues({
-        rate: 0.7,
+        users: ['Alan Zhao', 'Leo Huang', 'Carmen Zhu'],
+        actions: [
+          {
+            code: 'approve',
+            label: 'Approve',
+          },
+          {
+            code: 'reject',
+            label: 'Reject',
+          },
+        ],
+        permissions: [
+          {
+            users: ['Alan Zhao', 'Leo Huang'],
+            actions: ['approve', 'reject'],
+          },
+          {
+            users: ['Carmen Zhu'],
+            actions: ['approve'],
+          },
+        ],
       })
     }, 3000)
   }, [])
@@ -462,8 +493,10 @@ export const BasicFormPanel: React.FC = () => {
         onChange={handleChange}
         customFormats={customFormats}
         callbacks={{
-          percentToDecimal: (val: number) => (val != null ? val / 100 : val),
-          decimalToPercent: (val: number) => (val != null ? val * 100 : val),
+          percentToDecimal: (({ value }: { value: number }) =>
+            value != null ? value / 100 : value) as CallbackFunction,
+          decimalToPercent: (({ value }: { value: number }) =>
+            value != null ? value * 100 : value) as CallbackFunction,
         }}
         widgets={{
           'code-editor': CodeEditorWidget,

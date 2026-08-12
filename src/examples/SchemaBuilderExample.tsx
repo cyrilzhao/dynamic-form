@@ -103,6 +103,18 @@ const initialSchema: ExtendedJSONSchema = {
               widgetProps: {
                 multiple: true,
               },
+              linkages: [
+                {
+                  type: 'options',
+                  dependencies: [],
+                  fulfill: {
+                    function: {
+                      type: 'script',
+                      code: '/**\n * Generate dynamic options\n * @param {object} params - Parameters object\n * @param {object} params.formData - Current form values\n * @param {object} params.context - Linkage context\n * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)\n * @returns {Array<{label: string, value: any}>} - Options array\n */\nasync function({ formData, context, helpers }) {\n  // Example: fetch from API or calculate based on other fields\n  return formData.users.map((user) => {\n    return {\n      label: user.value,\n      value: user.value,\n    }\n  })\n}',
+                    },
+                  },
+                },
+              ],
             },
           },
           actions: {
@@ -117,6 +129,18 @@ const initialSchema: ExtendedJSONSchema = {
               widgetProps: {
                 multiple: true,
               },
+              linkages: [
+                {
+                  type: 'options',
+                  dependencies: [],
+                  fulfill: {
+                    function: {
+                      type: 'script',
+                      code: '/**\n * Generate dynamic options\n * @param {object} params - Parameters object\n * @param {object} params.formData - Current form values\n * @param {object} params.context - Linkage context\n * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)\n * @returns {Array<{label: string, value: any}>} - Options array\n */\nasync function({ formData, context, helpers }) {\n  // Example: fetch from API or calculate based on other fields\n  return formData.actions.map((action) => {\n    return {\n      label: action.label,\n      value: action.code\n    }\n  })\n}',
+                    },
+                  },
+                },
+              ],
             },
           },
         },
