@@ -14,9 +14,17 @@ function isPrimitiveType(schema: ExtendedJSONSchema): boolean {
 }
 
 /**
- * 判断数组是否为 static 模式（枚举数组）
+ * 判断数组值是否应保持基本类型数组格式
  */
-function isStaticArray(schema: ExtendedJSONSchema): boolean {
+function shouldPreserveArrayValues(schema: ExtendedJSONSchema): boolean {
+  // 多选 Select 直接使用基本类型数组，不经过 useFieldArray 的对象包装
+  if (
+    schema.ui?.widget === "select" &&
+    schema.ui.widgetProps?.multiple === true
+  ) {
+    return true;
+  }
+
   // 显式指定了 static 模式
   if (schema.ui?.arrayMode === "static") {
     return true;
@@ -104,8 +112,8 @@ export function wrapPrimitiveArrays(
 
     const arrayData = data as any[];
 
-    // 如果是 static 模式（枚举数组），不进行包装，直接返回原数组
-    if (isStaticArray(schema)) {
+    // static 数组和多选 Select 不进行包装，直接返回原数组
+    if (shouldPreserveArrayValues(schema)) {
       return arrayData;
     }
 
@@ -166,8 +174,8 @@ export function unwrapPrimitiveArrays(
 
     const arrayData = data as any[];
 
-    // 如果是 static 模式（枚举数组），不进行解包，直接返回原数组
-    if (isStaticArray(schema)) {
+    // static 数组和多选 Select 不进行解包，直接返回原数组
+    if (shouldPreserveArrayValues(schema)) {
       return arrayData;
     }
 

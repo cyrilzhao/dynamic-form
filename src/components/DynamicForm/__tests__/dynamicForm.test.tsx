@@ -1,9 +1,11 @@
 import "@testing-library/jest-dom";
 import React from "react";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import type { LinkageFunction } from "../types/linkage";
 import type { ExtendedJSONSchema } from "../types/schema";
 import {
   getInputByName,
+  refreshLinkage,
   renderDynamicForm,
   setFieldValue,
   setupDynamicFormTest,
@@ -163,6 +165,128 @@ describe("DynamicForm", () => {
     expect(getInputByName({ container, name: "address.city" })).toHaveValue(
       "Paris",
     );
+  });
+
+  it("setValues 应该保留对象数组内多选 Select 的基本类型数组值", async () => {
+    interface PermissionOptionsFormData {
+      users: Array<{ value: string }>;
+      actions: Array<{ code: string; label: string }>;
+    }
+
+    const schema: ExtendedJSONSchema = {
+      type: "object",
+      properties: {
+        users: {
+          type: "array",
+          title: "Users",
+          items: { type: "string" },
+        },
+        actions: {
+          type: "array",
+          title: "Actions",
+          items: {
+            type: "object",
+            properties: {
+              code: { type: "string", title: "Code" },
+              label: { type: "string", title: "Label" },
+            },
+          },
+        },
+        permissions: {
+          type: "array",
+          title: "Permissions",
+          items: {
+            type: "object",
+            properties: {
+              users: {
+                type: "array",
+                title: "Users",
+                items: { type: "string" },
+                ui: {
+                  widget: "select",
+                  widgetProps: { multiple: true },
+                  linkages: [
+                    {
+                      type: "options",
+                      dependencies: [],
+                      fulfill: { function: "getUserOptions" },
+                    },
+                  ],
+                },
+              },
+              actions: {
+                type: "array",
+                title: "Actions",
+                items: { type: "string" },
+                ui: {
+                  widget: "select",
+                  widgetProps: { multiple: true },
+                  linkages: [
+                    {
+                      type: "options",
+                      dependencies: [],
+                      fulfill: { function: "getActionOptions" },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    const getUserOptions: LinkageFunction = ({ formData }) =>
+      (formData as PermissionOptionsFormData).users.map((user) => ({
+        label: user.value,
+        value: user.value,
+      }));
+    const getActionOptions: LinkageFunction = ({ formData }) =>
+      (formData as PermissionOptionsFormData).actions.map((action) => ({
+        label: action.label,
+        value: action.code,
+      }));
+    const linkageFunctions = {
+      getUserOptions,
+      getActionOptions,
+    };
+    const { formRef } = renderDynamicForm({
+      props: { schema, linkageFunctions },
+    });
+    await waitForFormReady({ formRef });
+
+    await act(async () => {
+      formRef.current!.setValues({
+        users: ["Alan Zhao", "Leo Huang", "Carmen Zhu"],
+        actions: [
+          { code: "approve", label: "Approve" },
+          { code: "reject", label: "Reject" },
+        ],
+        permissions: [
+          {
+            users: ["Alan Zhao", "Leo Huang"],
+            actions: ["approve", "reject"],
+          },
+          {
+            users: ["Carmen Zhu"],
+            actions: ["approve"],
+          },
+        ],
+      });
+    });
+    await refreshLinkage({ formRef });
+
+    await waitFor(() => {
+      expect(formRef.current!.getValues().permissions).toEqual([
+        {
+          users: ["Alan Zhao", "Leo Huang"],
+          actions: ["approve", "reject"],
+        },
+        {
+          users: ["Carmen Zhu"],
+          actions: ["approve"],
+        },
+      ]);
+    });
   });
 
   it("reset 空值时应该按 schema 类型清空字段", async () => {

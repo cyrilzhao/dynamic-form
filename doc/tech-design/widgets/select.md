@@ -455,6 +455,42 @@ function MultiSelectExample() {
 }
 ```
 
+#### 6.2.1 DynamicForm 多选值契约
+
+在 DynamicForm 中，多选 Select 使用基本类型数组作为受控值：
+
+```typescript
+const schema: ExtendedJSONSchema = {
+  type: 'object',
+  properties: {
+    permissions: {
+      type: 'array',
+      title: 'Permissions',
+      items: { type: 'string' },
+      ui: {
+        widget: 'select',
+        widgetProps: {
+          multiple: true,
+        },
+      },
+    },
+  },
+};
+
+formRef.current?.setValues({
+  permissions: ['approve', 'reject'],
+});
+```
+
+`SelectWidget` 会把 `Controller` 提供的 `value` 原样传给 `Select`。因此，多选字段在表单内部也必须保持 `Array<string | number>`，不能使用动态基本类型数组的 `{ value }[]` 包装格式。
+
+数组转换边界会根据 `ui.widget === 'select'` 且 `ui.widgetProps.multiple === true` 跳过包装。这样可以保证：
+
+- `setValues`、`reset(values)` 接受基本类型数组；
+- `getValue`、`getValues`、`onChange` 和 `onSubmit` 返回基本类型数组；
+- option value 校验直接比较字符串或数字，不会因为对象包装误清空已选值；
+- 普通 `ArrayFieldWidget` 动态数组仍可继续使用 `{ value }[]` 作为内部实现。
+
 ### 6.3 搜索 + 分组
 
 ```tsx
@@ -552,7 +588,7 @@ export const SelectWidget = forwardRef<HTMLElement, FieldWidgetProps>(
           value: opt.value,
           disabled: opt.disabled,
         }))}
-        value={value ?? ''}
+        value={value}
         onChange={onChange}
         placeholder={placeholder}
         disabled={disabled || readonly}
@@ -678,6 +714,13 @@ src/components/Select/
 
 ---
 
-**文档版本**：v1.0
+**文档版本**：v1.1
 **创建日期**：2026-06-04
+**最后更新**：2026-08-12
 **维护者**：项目团队
+
+### v1.1 (2026-08-12)
+
+- 补充 DynamicForm 多选 Select 的基本类型数组契约
+- 说明数组转换边界必须跳过多选 Select 的 `{ value }[]` 包装
+- 修正 `SelectWidget` 示例，保持 `value` 原样透传

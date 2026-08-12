@@ -194,6 +194,33 @@ describe("arrayTransformer", () => {
           },
         ]);
       });
+
+      it("对象数组中的多选 Select 应该保持基本类型数组", () => {
+        const schema: ExtendedJSONSchema = {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              users: {
+                type: "array",
+                items: { type: "string" },
+                ui: {
+                  widget: "select",
+                  widgetProps: {
+                    multiple: true,
+                  },
+                },
+              },
+            },
+          },
+        };
+        const data = [
+          { users: ["Alan Zhao", "Leo Huang"] },
+          { users: ["Carmen Zhu"] },
+        ];
+
+        expect(wrapPrimitiveArrays(data, schema)).toEqual(data);
+      });
     });
 
     describe("嵌套数组", () => {

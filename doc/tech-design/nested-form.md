@@ -910,7 +910,8 @@ formRef.current?.reset({});
 
 - `setValues` 递归遍历传入的对象，对每一层路径（如 `address`、`address.street`、`company.location.city`）都调用 `setValue`，确保嵌套 `NestedFormWidget` 内部的子 Controller 都能正确更新
 - `reset({})` 根据 schema 结构为每个字段生成类型恰当的空值（`string → ''`、`array → []`、`object → {}`），避免 React 受控组件因收到 `undefined` 而保留旧值
-- 基本类型数组（如 `tags: ['a', 'b']`）会自动包装为 `useFieldArray` 所需的对象数组格式
+- 由 `ArrayFieldWidget/useFieldArray` 管理的动态基本类型数组（如 `tags: ['a', 'b']`）会在内部自动包装为对象数组格式，对外仍保持原始基本类型数组
+- 显式配置为多选 Select（`ui.widget: 'select'` 且 `widgetProps.multiple: true`）的数组不会包装；其内部和外部值都保持基本类型数组，确保 Select 与 options 联动能按 option value 正确匹配
 
 ---
 
@@ -924,11 +925,19 @@ formRef.current?.reset({});
 ---
 
 **创建日期**: 2025-12-24
-**最后更新**: 2026-03-17
-**版本**: 3.1
+**最后更新**: 2026-08-12
+**版本**: 3.2
 **文档状态**: 已更新（废弃 schemaKey/schemas，改用 linkage）
 
 ## 变更历史
+
+### v3.2 (2026-08-12)
+
+**修正**：数组字段外部赋值的数据格式边界
+
+- 明确只有 `ArrayFieldWidget/useFieldArray` 管理的动态基本类型数组会在内部包装
+- 补充多选 Select 数组保持基本类型数组的例外规则
+- 说明包装格式不会暴露给 `setValues/getValues/onChange/onSubmit`
 
 ### v3.1 (2026-03-17)
 
@@ -937,7 +946,7 @@ formRef.current?.reset({});
 **主要变更**：
 
 - 新增第 9.4 节：说明通过 `ref.current.setValues()` 和 `ref.current.reset()` 向嵌套表单设值的用法和内部机制
-- 涵盖嵌套对象递归展开、基本类型数组自动包装、清空表单的类型恰当空值生成等细节
+- 涵盖嵌套对象递归展开、动态基本类型数组内部自动包装、清空表单的类型恰当空值生成等细节
 
 ### v3.0 (2026-01-09)
 

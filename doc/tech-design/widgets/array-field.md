@@ -1,12 +1,14 @@
 # ArrayFieldWidget 通用数组组件设计方案
 
-> **状态：部分实现。** 本文完整保留数组包装、组件设计、示例、性能方案和实施路线图。当前 DynamicForm 会自动解包基础类型数组；拖拽排序、批量操作以及未被 `ArrayFieldWidget` 消费的 UIConfig 仍属于提案/未实现，不能按正文中的旧示例直接使用。
+> **状态：部分实现。** 本文完整保留数组包装、组件设计、示例、性能方案和实施路线图。当前 DynamicForm 会在外部数据边界自动包装/解包基本类型数组；拖拽排序、批量操作以及未被 `ArrayFieldWidget` 消费的 UIConfig 仍属于提案/未实现，不能按正文中的旧示例直接使用。
 
 ## ⚠️ 重要提示
 
 ### 基本类型数组的数据格式
 
-由于 react-hook-form 的 `useFieldArray` 会过滤掉基本类型的空值（空字符串、0、false），ArrayFieldWidget 会将基本类型包装成对象格式：
+由于 react-hook-form 的 `useFieldArray` 会过滤掉基本类型的空值（空字符串、0、false），由 `ArrayFieldWidget` 动态管理的基本类型数组会在表单内部包装成对象格式。
+
+该规则只适用于实际使用 `ArrayFieldWidget/useFieldArray` 的动态数组。显式配置为 `ui.widget: 'select'` 且 `ui.widgetProps.multiple: true` 的数组由多选 Select 直接管理，内部和外部都保持基本类型数组，不得包装成 `{ value }[]`。
 
 **表单内部存储格式**：
 ```typescript
@@ -24,14 +26,16 @@
 'tags.1.value'  // 第二个标签的值
 ```
 
-**提交时需要转换**：
+**外部数据边界会自动转换**：
 ```typescript
-const handleSubmit = (data: any) => {
-  // 方式 1: 转换为纯数组（推荐）
-  const pureTags = data.tags.map((item: any) => item.value);
-  console.log(pureTags); // ['tag1', 'tag2']
+formRef.current?.setValues({ tags: ['tag1', 'tag2'] });
 
-  // 方式 2: 在后端接收时进行解包处理
+const values = formRef.current?.getValues();
+// values.tags === ['tag1', 'tag2']
+
+const handleSubmit = (data: { tags: string[] }) => {
+  // onSubmit 收到的也是基本类型数组
+  console.log(data.tags);
 };
 ```
 
@@ -39,6 +43,7 @@ const handleSubmit = (data: any) => {
 - react-hook-form 的 useFieldArray 在处理基本类型时，会过滤掉"假值"
 - 包装成对象后，即使 value 为空，对象本身也不会被过滤
 - 这确保了数组项的稳定性和可编辑性
+- 包装属于 DynamicForm 内部实现细节，调用方不应传入或依赖 `{ value }[]`
 
 详见第 3.1 节和第 6.1 节。
 
@@ -63,7 +68,7 @@ const handleSubmit = (data: any) => {
 
 ## 1. 概述
 
-`ArrayFieldWidget` 是一个通用的数组字段渲染组件，用于处理 JSON Schema 中所有 `type: 'array'` 类型的字段。它不仅支持对象数组，还支持基本类型数组、枚举数组等各种数组场景。
+`ArrayFieldWidget` 是默认的数组字段渲染组件，用于处理未显式指定其他 widget 的 `type: 'array'` 字段。它支持对象数组、基本类型数组、枚举数组等场景；当 schema 通过 `ui.widget` 指定多选 Select 等自定义 widget 时，由指定 widget 直接接管数组值。
 
 ### 1.1 设计背景
 
@@ -75,7 +80,7 @@ const handleSubmit = (data: any) => {
 
 ### 1.2 设计目标
 
-1. **统一数组处理**：所有 `type: 'array'` 字段都由 `ArrayFieldWidget` 处理
+1. **统一默认处理**：未显式指定 widget 的 `type: 'array'` 字段由 `ArrayFieldWidget` 处理
 2. **智能 Widget 选择**：根据 `items` 的配置自动选择合适的子 Widget
 3. **完整的数组操作（部分实现）**：当前支持增删改查和移动；拖拽排序、批量操作属于提案/未实现
 4. **类型安全**：完整的 TypeScript 类型支持
@@ -128,7 +133,7 @@ TextWidget  NestedForm  Checkbox  CustomWidget
 
 ### 3.1 基本类型数组的数据包装（重要）
 
-**⚠️ 关键特性**：为了避免 react-hook-form 的 `useFieldArray` 过滤掉基本类型的空值（空字符串、0、false），ArrayFieldWidget 会将基本类型包装成对象。
+**⚠️ 关键特性**：为了避免 react-hook-form 的 `useFieldArray` 过滤掉基本类型的空值（空字符串、0、false），由 `ArrayFieldWidget` 动态管理的基本类型数组会包装成对象。
 
 **内部数据结构**：
 
@@ -158,15 +163,14 @@ TextWidget  NestedForm  Checkbox  CustomWidget
 'tags.1.value'  // 第二个标签的值
 ```
 
-**表单提交时的数据转换**：
+**外部 API 的数据格式**：
 
 ```typescript
-const handleSubmit = (data: any) => {
-  // 方式 1: 转换为纯数组（推荐）
-  const pureTags = data.tags.map((item: any) => item.value);
-  console.log(pureTags); // ['tag1', 'tag2']
+formRef.current?.setValues({ tags: ['tag1', 'tag2'] });
+formRef.current?.getValues(); // { tags: ['tag1', 'tag2'] }
 
-  // 方式 2: 在后端接收时进行解包处理
+const handleSubmit = (data: { tags: string[] }) => {
+  console.log(data.tags); // ['tag1', 'tag2']
 };
 ```
 
@@ -174,6 +178,37 @@ const handleSubmit = (data: any) => {
 - react-hook-form 的 useFieldArray 在处理基本类型时，会过滤掉"假值"（空字符串、0、false）
 - 包装成对象后，即使 value 为空，对象本身也不会被过滤
 - 这确保了数组项的稳定性和可编辑性
+
+#### 3.1.1 多选 Select 的例外
+
+当数组字段显式使用多选 Select 时，它不经过 `ArrayFieldWidget/useFieldArray`：
+
+```typescript
+const schema: ExtendedJSONSchema = {
+  type: 'array',
+  title: 'Users',
+  items: { type: 'string' },
+  ui: {
+    widget: 'select',
+    widgetProps: {
+      multiple: true,
+    },
+  },
+};
+```
+
+这类字段的值契约始终是基本类型数组：
+
+```typescript
+formRef.current?.setValues({
+  users: ['Alan Zhao', 'Leo Huang'],
+});
+
+formRef.current?.getValue('users');
+// ['Alan Zhao', 'Leo Huang']
+```
+
+`wrapPrimitiveArrays` 会识别该配置并跳过对象包装。否则 Select 会收到 `{ value }[]`，无法与字符串或数字类型的 option value 匹配；options 联动也会把这些对象判定为非法值并清空。
 
 ---
 
@@ -701,10 +736,9 @@ function determineArrayMode(schema: ExtendedJSONSchema): 'static' | 'dynamic' {
   { value: 'tag2' }
 ]
 
-// 如果需要纯数组格式，需要在提交时转换
-const handleSubmit = (data: any) => {
-  const pureTags = data.tags.map((item: any) => item.value);
-  console.log(pureTags); // ['tag1', 'tag2']
+// 外部 API 自动解包，不需要业务方手动转换
+const handleSubmit = (data: { tags: string[] }) => {
+  console.log(data.tags); // ['tag1', 'tag2']
 };
 ```
 
@@ -721,16 +755,10 @@ const handleSubmit = (data: any) => {
 ]
 ```
 
-**表单提交时的数据转换：**
+**外部 API 自动解包：**
 ```typescript
-const handleSubmit = (data: any) => {
-  // 方式 1: 转换为纯数组（推荐）
-  const pureTags = data.tags.map((item: any) => item.value);
-
-  // 方式 2: 在后端接收时进行解包处理
-  // 后端: tags.map(item => item.value)
-
-  console.log(pureTags); // ['tag1', 'tag2']
+const handleSubmit = (data: { tags: string[] }) => {
+  console.log(data.tags); // ['tag1', 'tag2']
 };
 ```
 
@@ -1875,7 +1903,7 @@ const arrayError = errors[name];
 #### 4. 基本类型数组的数据包装
 
 ```typescript
-// ⚠️ 重要：基本类型数组会被包装成对象
+// ⚠️ 重要：由 ArrayFieldWidget 管理的动态基本类型数组会在内部包装成对象
 const schema = {
   type: 'array',
   items: { type: 'string' }
@@ -1889,19 +1917,19 @@ const schema = {
   ]
 }
 
-// 如果需要纯数组格式，需要转换
-const handleSubmit = (data: any) => {
-  const pureTags = data.tags.map((item: any) => item.value);
-  // 现在 pureTags = ['tag1', 'tag2']
+// DynamicForm 的外部 API 会自动转换回基本类型数组
+const handleSubmit = (data: { tags: string[] }) => {
+  console.log(data.tags); // ['tag1', 'tag2']
 };
 ```
 
 **原因**：react-hook-form 的 useFieldArray 会过滤掉基本类型的空值（空字符串、0、false），为了避免这个问题，ArrayFieldWidget 将基本类型包装成对象。
 
-**解决方案**：
-1. 在表单提交时进行转换（推荐）
-2. 在后端接收时进行解包处理
-3. 使用对象数组代替基本类型数组
+**边界规则**：
+1. `defaultValues`、`setValues` 和 `reset(values)` 传入基本类型数组
+2. `getValues`、`onChange` 和 `onSubmit` 返回基本类型数组
+3. `{ value }[]` 只存在于 `ArrayFieldWidget/useFieldArray` 的内部展示域
+4. 多选 Select 不使用该包装格式
 
 **字段路径**：
 ```typescript
@@ -2265,7 +2293,7 @@ remove(index);
 
 ### ✅ 核心优势
 
-1. **统一的数组处理**：所有 `type: 'array'` 字段都由 `ArrayFieldWidget` 统一处理
+1. **统一的默认数组处理**：未显式指定 widget 的 `type: 'array'` 字段由 `ArrayFieldWidget` 统一处理
 2. **智能 Widget 选择**：根据 `items` 配置自动选择最合适的子 Widget
 3. **完整的数组操作**：支持增删改查、排序、拖拽等操作
 4. **类型安全**：完整的 TypeScript 类型支持
@@ -2296,7 +2324,13 @@ remove(index);
 
 ---
 
-**文档版本**: 1.0  
-**创建日期**: 2025-12-27  
-**文档状态**: 已完成  
+**文档版本**: 1.1
+**创建日期**: 2025-12-27
+**文档状态**: 已完成
 **作者**: Claude Code
+
+### v1.1 (2026-08-12)
+
+- 明确动态基本类型数组的对象包装仅是 `ArrayFieldWidget/useFieldArray` 的内部实现
+- 补充多选 Select 保持基本类型数组的例外规则
+- 修正 `setValues/getValues/onChange/onSubmit` 的外部数组数据契约
