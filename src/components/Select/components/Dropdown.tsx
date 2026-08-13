@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import { Option } from './Option';
-import { OptionGroup } from './OptionGroup';
-import type { SelectOption } from '../types';
+import React, { useLayoutEffect, useState, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
+import { Option } from "./Option";
+import { OptionGroup } from "./OptionGroup";
+import { calculateDropdownPosition } from "../utils/position";
+import type { SelectOption } from "../types";
 
 interface DropdownProps {
   isOpen: boolean;
@@ -23,29 +24,88 @@ export const Dropdown: React.FC<DropdownProps> = ({
   focusedIndex = -1,
   onSelect,
   triggerRef,
-  className = '',
+  className = "",
   maxHeight = 300,
   loading = false,
 }) => {
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (isOpen && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setPosition({
-        top: rect.bottom,
-        left: rect.left,
-        width: rect.width,
-      });
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      return;
     }
-  }, [isOpen, triggerRef]);
+
+    let animationFrameId: number | null = null;
+
+    const updatePosition = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) {
+        return;
+      }
+
+      const triggerRect = trigger.getBoundingClientRect();
+      const dropdownHeight =
+        dropdownRef.current?.getBoundingClientRect().height ?? 0;
+      const nextPosition = calculateDropdownPosition({
+        triggerRect,
+        dropdownHeight,
+        maxHeight,
+      });
+
+      setPosition({
+        top: nextPosition.top + window.scrollY,
+        left: nextPosition.left + window.scrollX,
+        width: nextPosition.width,
+      });
+    };
+
+    const schedulePositionUpdate = () => {
+      if (animationFrameId !== null) {
+        return;
+      }
+
+      animationFrameId = window.requestAnimationFrame(() => {
+        animationFrameId = null;
+        updatePosition();
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("scroll", schedulePositionUpdate, true);
+    window.addEventListener("resize", schedulePositionUpdate);
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(schedulePositionUpdate);
+
+    if (resizeObserver) {
+      if (triggerRef.current) {
+        resizeObserver.observe(triggerRef.current);
+      }
+      if (dropdownRef.current) {
+        resizeObserver.observe(dropdownRef.current);
+      }
+    }
+
+    return () => {
+      window.removeEventListener("scroll", schedulePositionUpdate, true);
+      window.removeEventListener("resize", schedulePositionUpdate);
+      resizeObserver?.disconnect();
+
+      if (animationFrameId !== null) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [isOpen, maxHeight, triggerRef]);
 
   // 分组选项
   const groupedOptions = useMemo(() => {
     const groups: Record<string, SelectOption[]> = {};
     const ungrouped: SelectOption[] = [];
 
-    options.forEach(option => {
+    options.forEach((option) => {
       if (option.group) {
         if (!groups[option.group]) {
           groups[option.group] = [];
@@ -59,13 +119,16 @@ export const Dropdown: React.FC<DropdownProps> = ({
     return { groups, ungrouped };
   }, [options]);
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   return createPortal(
     <div
+      ref={dropdownRef}
       className={`select-dropdown ${className}`}
       style={{
-        position: 'fixed',
+        position: "absolute",
         top: position.top,
         left: position.left,
         width: position.width,
@@ -82,31 +145,33 @@ export const Dropdown: React.FC<DropdownProps> = ({
             <Option
               key={option.value}
               option={option}
-              isSelected={selectedValues.some(v => v == option.value)}
+              isSelected={selectedValues.some((v) => v == option.value)}
               isFocused={index === focusedIndex}
               onClick={() => onSelect(option)}
             />
           ))}
           {/* 渲染分组的选项 */}
-          {Object.entries(groupedOptions.groups).map(([groupName, groupOptions]) => {
-            const groupStartIndex = groupedOptions.ungrouped.length;
-            return (
-              <OptionGroup key={groupName} label={groupName}>
-                {groupOptions.map((option, index) => (
-                  <Option
-                    key={option.value}
-                    option={option}
-                    isSelected={selectedValues.some(v => v == option.value)}
-                    isFocused={groupStartIndex + index === focusedIndex}
-                    onClick={() => onSelect(option)}
-                  />
-                ))}
-              </OptionGroup>
-            );
-          })}
+          {Object.entries(groupedOptions.groups).map(
+            ([groupName, groupOptions]) => {
+              const groupStartIndex = groupedOptions.ungrouped.length;
+              return (
+                <OptionGroup key={groupName} label={groupName}>
+                  {groupOptions.map((option, index) => (
+                    <Option
+                      key={option.value}
+                      option={option}
+                      isSelected={selectedValues.some((v) => v == option.value)}
+                      isFocused={groupStartIndex + index === focusedIndex}
+                      onClick={() => onSelect(option)}
+                    />
+                  ))}
+                </OptionGroup>
+              );
+            },
+          )}
         </>
       )}
     </div>,
-    document.body
+    document.body,
   );
 };
