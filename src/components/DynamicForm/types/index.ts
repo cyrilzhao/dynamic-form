@@ -42,13 +42,55 @@ export type CallbackFunction =
 /**
  * DynamicForm 组件对外暴露的方法
  * 通过 ref 访问这些方法
+ *
+ * @example
+ * ```tsx
+ * const formRef = useRef<DynamicFormRef>(null);
+ *
+ * // 设置单个字段
+ * formRef.current?.setValue('email', 'user@example.com');
+ *
+ * // 设置嵌套字段
+ * formRef.current?.setValue('address.city', 'Beijing');
+ *
+ * // 获取表单值
+ * const values = formRef.current?.getValues();
+ * console.log(values); // { email: '...', address: { city: '...' } }
+ * ```
  */
 export interface DynamicFormRef {
   /**
    * 设置单个字段的值
-   * @param name - 字段路径，如 'email' 或 'address.city'
-   * @param value - 要设置的值
+   *
+   * 注意事项：
+   * - 支持嵌套路径，使用 `.` 分隔符，如 `'address.city'` 或 `'items.0.name'`
+   * - 会自动应用字段的 `reverseCallback` 转换（存储域 → 展示域）
+   * - 会触发表单联动计算（除非使用 `setValues` 的 `silence` 选项）
+   * - 会标记表单为脏状态（dirty），除非设置 `shouldDirty: false`
+   *
+   * @param name - 字段路径，支持嵌套路径（如 'email'、'address.city'、'items.0.name'）
+   * @param value - 要设置的值（存储域值，会自动转换为展示域）
    * @param options - 可选配置
+   * @param options.shouldValidate - 是否立即验证该字段（默认 false）
+   * @param options.shouldDirty - 是否标记为脏状态（默认 true）
+   * @param options.shouldTouch - 是否标记为已触摸（默认 false）
+   *
+   * @example
+   * ```tsx
+   * // 设置顶层字段
+   * formRef.current?.setValue('email', 'user@example.com');
+   *
+   * // 设置嵌套对象字段
+   * formRef.current?.setValue('address.city', 'Beijing');
+   *
+   * // 设置数组元素
+   * formRef.current?.setValue('items.0.name', 'Item 1');
+   *
+   * // 设置并立即验证
+   * formRef.current?.setValue('email', 'invalid-email', {
+   *   shouldValidate: true,
+   * });
+   * ```
    */
   setValue: (
     name: string,
@@ -62,21 +104,105 @@ export interface DynamicFormRef {
 
   /**
    * 获取单个字段的值
-   * @param name - 字段路径
-   * @returns 字段值
+   *
+   * 注意事项：
+   * - 支持嵌套路径，使用 `.` 分隔符
+   * - 会自动应用字段的 `callback` 转换（展示域 → 存储域）
+   * - 返回的是存储域值，适合用于提交到后端
+   *
+   * @param name - 字段路径，支持嵌套路径（如 'email'、'address.city'、'items.0.name'）
+   * @returns 字段值（存储域值）
+   *
+   * @example
+   * ```tsx
+   * // 获取顶层字段
+   * const email = formRef.current?.getValue('email');
+   *
+   * // 获取嵌套字段
+   * const city = formRef.current?.getValue('address.city');
+   *
+   * // 获取数组元素
+   * const itemName = formRef.current?.getValue('items.0.name');
+   * ```
    */
   getValue: (name: string) => any;
 
   /**
    * 获取所有表单值
-   * @returns 完整的表单数据对象
+   *
+   * 注意事项：
+   * - 返回完整的表单数据对象（嵌套结构）
+   * - 会自动应用所有字段的 `callback` 转换（展示域 → 存储域）
+   * - 会解包基本类型数组（内部使用 `{ value }` 包装的数组会被解包）
+   * - 返回的数据适合直接提交到后端 API
+   *
+   * @returns 完整的表单数据对象（存储域值）
+   *
+   * @example
+   * ```tsx
+   * const values = formRef.current?.getValues();
+   * console.log(values);
+   * // {
+   * //   email: 'user@example.com',
+   * //   address: {
+   * //     city: 'Beijing',
+   * //     street: 'Main St'
+   * //   },
+   * //   items: [
+   * //     { name: 'Item 1' },
+   * //     { name: 'Item 2' }
+   * //   ]
+   * // }
+   *
+   * // 提交到后端
+   * await fetch('/api/submit', {
+   *   method: 'POST',
+   *   body: JSON.stringify(values),
+   * });
+   * ```
    */
   getValues: () => Record<string, any>;
 
   /**
    * 批量设置表单值
-   * @param values - 要设置的值对象
+   *
+   * 注意事项：
+   * - 接受完整或部分的表单数据对象
+   * - 会自动应用所有字段的 `reverseCallback` 转换（存储域 → 展示域）
+   * - 会递归设置所有嵌套字段，确保所有 React Hook Form 的 Controller 都能收到新值
+   * - 默认会触发表单联动计算，可使用 `silence: true` 禁用
+   * - 会包装基本类型数组（字符串数组等会被包装为 `{ value }` 结构）
+   *
+   * @param values - 要设置的值对象（存储域值，会自动转换为展示域）
    * @param options - 可选配置
+   * @param options.shouldValidate - 是否立即验证（默认 false）
+   * @param options.shouldDirty - 是否标记为脏状态（默认 true）
+   * @param options.shouldTouch - 是否标记为已触摸（默认 false）
+   * @param options.silence - 是否静默设置（不触发联动计算，默认 false）
+   *
+   * @example
+   * ```tsx
+   * // 批量设置表单值
+   * formRef.current?.setValues({
+   *   email: 'user@example.com',
+   *   address: {
+   *     city: 'Beijing',
+   *     street: 'Main St'
+   *   }
+   * });
+   *
+   * // 静默设置（不触发联动）
+   * formRef.current?.setValues(
+   *   { email: 'new@example.com' },
+   *   { silence: true }
+   * );
+   *
+   * // 设置并立即验证
+   * formRef.current?.setValues(
+   *   { email: 'invalid-email' },
+   *   { shouldValidate: true }
+   * );
+   * ```
    */
   setValues: (
     values: Record<string, any>,
@@ -90,38 +216,182 @@ export interface DynamicFormRef {
 
   /**
    * 重置表单到初始值或指定值
-   * @param values - 可选的重置目标值
+   *
+   * 注意事项：
+   * - 如果提供 `values` 参数，会重置到指定值
+   * - 如果不提供参数或提供空对象，会重置为类型恰当的空值（避免受控组件变为非受控组件）
+   * - 会清除表单的脏状态、错误状态和触摸状态
+   * - 会应用字段的 `reverseCallback` 转换
+   * - 会递归设置所有嵌套字段
+   *
+   * @param values - 可选的重置目标值（存储域值）。不提供则重置为空值
+   *
+   * @example
+   * ```tsx
+   * // 重置为初始值（defaultValues）
+   * formRef.current?.reset();
+   *
+   * // 重置为空值
+   * formRef.current?.reset({});
+   *
+   * // 重置为指定值
+   * formRef.current?.reset({
+   *   email: 'admin@example.com',
+   *   address: {
+   *     city: 'Shanghai'
+   *   }
+   * });
+   * ```
    */
   reset: (values?: Record<string, any>) => void;
 
   /**
    * 触发表单验证
-   * @param name - 可选，指定要验证的字段路径
-   * @returns 验证是否通过
+   *
+   * 注意事项：
+   * - 不提供 `name` 参数时，验证整个表单
+   * - 提供 `name` 参数时，只验证指定的字段或字段数组
+   * - 支持嵌套路径（如 'address.city'）
+   * - 会跳过被联动隐藏的字段（visible: false）
+   * - 异步验证器会等待完成
+   *
+   * @param name - 可选，指定要验证的字段路径或路径数组
+   * @returns Promise，resolve 为 true 表示验证通过，false 表示验证失败
+   *
+   * @example
+   * ```tsx
+   * // 验证整个表单
+   * const isValid = await formRef.current?.validate();
+   * if (isValid) {
+   *   console.log('Form is valid');
+   * }
+   *
+   * // 验证单个字段
+   * const isEmailValid = await formRef.current?.validate('email');
+   *
+   * // 验证多个字段
+   * const areFieldsValid = await formRef.current?.validate([
+   *   'email',
+   *   'address.city'
+   * ]);
+   * ```
    */
   validate: (name?: string | string[]) => Promise<boolean>;
 
   /**
    * 获取表单错误
-   * @returns 错误对象
+   *
+   * 注意事项：
+   * - 返回 React Hook Form 的 `FieldErrors` 对象
+   * - 错误对象的键为字段路径（支持嵌套，如 'address.city'）
+   * - 错误值包含 `type` 和 `message` 属性
+   *
+   * @returns 错误对象，键为字段路径，值为错误信息
+   *
+   * @example
+   * ```tsx
+   * const errors = formRef.current?.getErrors();
+   * console.log(errors);
+   * // {
+   * //   email: { type: 'required', message: 'Email is required' },
+   * //   'address.city': { type: 'minLength', message: 'Too short' }
+   * // }
+   *
+   * // 检查特定字段是否有错误
+   * if (errors?.email) {
+   *   console.log('Email error:', errors.email.message);
+   * }
+   * ```
    */
   getErrors: () => FieldErrors;
 
   /**
    * 清除表单错误
-   * @param name - 可选，指定要清除错误的字段路径
+   *
+   * 注意事项：
+   * - 不提供 `name` 参数时，清除所有错误
+   * - 提供 `name` 参数时，只清除指定字段的错误
+   * - 支持嵌套路径和数组
+   *
+   * @param name - 可选，指定要清除错误的字段路径或路径数组
+   *
+   * @example
+   * ```tsx
+   * // 清除所有错误
+   * formRef.current?.clearErrors();
+   *
+   * // 清除单个字段错误
+   * formRef.current?.clearErrors('email');
+   *
+   * // 清除多个字段错误
+   * formRef.current?.clearErrors(['email', 'address.city']);
+   * ```
    */
   clearErrors: (name?: string | string[]) => void;
 
   /**
    * 设置字段错误
+   *
+   * 注意事项：
+   * - 支持嵌套路径（如 'address.city'）
+   * - 错误会显示在对应的字段下方
+   * - 可用于显示服务端验证错误
+   *
    * @param name - 字段路径
-   * @param error - 错误信息
+   * @param error - 错误信息对象
+   * @param error.type - 错误类型（如 'required'、'pattern'、'custom'）
+   * @param error.message - 错误消息文本
+   *
+   * @example
+   * ```tsx
+   * // 设置单个字段错误
+   * formRef.current?.setError('email', {
+   *   type: 'custom',
+   *   message: 'This email is already taken'
+   * });
+   *
+   * // 处理服务端验证错误
+   * try {
+   *   await submitForm(values);
+   * } catch (error) {
+   *   if (error.field === 'email') {
+   *     formRef.current?.setError('email', {
+   *       type: 'server',
+   *       message: error.message
+   *     });
+   *   }
+   * }
+   * ```
    */
   setError: (name: string, error: { type: string; message: string }) => void;
 
   /**
    * 获取表单状态
+   *
+   * 返回值说明：
+   * - `isDirty`: 表单是否有修改（与初始值不同）
+   * - `isValid`: 表单是否通过验证（所有字段都有效）
+   * - `isSubmitting`: 表单是否正在提交中
+   * - `isSubmitted`: 表单是否已提交过（至少一次）
+   * - `submitCount`: 表单提交次数
+   *
+   * @returns 表单状态对象
+   *
+   * @example
+   * ```tsx
+   * const state = formRef.current?.getFormState();
+   * console.log(state);
+   * // {
+   * //   isDirty: true,
+   * //   isValid: false,
+   * //   isSubmitting: false,
+   * //   isSubmitted: false,
+   * //   submitCount: 0
+   * // }
+   *
+   * // 根据状态禁用提交按钮
+   * const canSubmit = state.isValid && !state.isSubmitting;
+   * ```
    */
   getFormState: () => {
     isDirty: boolean;
@@ -132,16 +402,24 @@ export interface DynamicFormRef {
   };
 
   /**
-   * 重新触发联动初始化
-   * 用于在异步数据加载完成后，手动触发表单的联动计算
+   * 重新触发联动计算
    *
    * 使用场景：
    * - 联动函数依赖异步加载的数据（如员工列表、部门列表等）
    * - 需要在数据加载完成后重新计算联动状态
+   * - 外部上下文数据（linkageContext）发生变化后，需要刷新联动
+   *
+   * 注意事项：
+   * - 会读取当前表单的最新值，重新执行所有联动规则
+   * - 异步操作，返回 Promise
+   * - 通常配合 `linkageContext` 使用
+   *
+   * @returns Promise，联动计算完成时 resolve
    *
    * @example
    * ```tsx
    * const formRef = useRef<DynamicFormRef>(null);
+   * const [employees, setEmployees] = useState([]);
    *
    * useEffect(() => {
    *   // 加载员工列表
@@ -151,6 +429,11 @@ export interface DynamicFormRef {
    *     formRef.current?.refreshLinkage();
    *   });
    * }, []);
+   *
+   * // 或者在 linkageContext 变化时刷新
+   * useEffect(() => {
+   *   formRef.current?.refreshLinkage();
+   * }, [linkageContext]);
    * ```
    */
   refreshLinkage: () => Promise<void>;
