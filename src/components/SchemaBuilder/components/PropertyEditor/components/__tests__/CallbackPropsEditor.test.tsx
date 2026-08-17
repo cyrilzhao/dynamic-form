@@ -111,9 +111,9 @@ describe("CallbackPropsEditor", () => {
 
     const code = screen.getByLabelText("code-editor") as HTMLTextAreaElement;
     expect(code.value).toContain("Widget callback prop");
-    expect(code.value).toContain("@param {...any} args");
-    expect(code.value).toContain("@returns {any}");
+    expect(code.value).toContain("@param {any[]} params.args");
+    expect(code.value).toContain("@returns {any|Promise<any>}");
     expect(code.value).toContain("return the first argument unchanged");
-    expect(code.value).toContain("function(...args)");
+    expect(code.value).toContain("async function({ args, helpers })");
   });
 });

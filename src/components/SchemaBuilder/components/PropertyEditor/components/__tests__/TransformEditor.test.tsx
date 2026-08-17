@@ -68,10 +68,10 @@ describe("TransformEditor", () => {
 
     expect(
       (screen.getAllByLabelText("code-editor")[0] as HTMLTextAreaElement).value,
-    ).toContain("function(value)");
+    ).toContain("function({ value, helpers })");
     expect(
       (screen.getAllByLabelText("code-editor")[0] as HTMLTextAreaElement).value,
-    ).toContain("@param {any} value");
+    ).toContain("@param {any} params.value");
     expect(
       (screen.getAllByLabelText("code-editor")[0] as HTMLTextAreaElement).value,
     ).toContain("@returns {any}");
