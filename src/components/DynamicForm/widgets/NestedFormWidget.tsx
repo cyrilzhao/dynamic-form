@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useRef, useCallback, useMemo } from "react";
 import { useFormContext } from "react-hook-form";
 import { Card } from "@blueprintjs/core";
 import { DynamicForm } from "../DynamicForm";
-import type { FieldWidgetProps } from "../types";
+import type { NestedFormWidgetProps } from "../types";
 import type { ExtendedJSONSchema } from "../types/schema";
 import { useNestedSchemaRegistry } from "../context/NestedSchemaContext";
 import { usePathPrefix, joinPath } from "../context/PathPrefixContext";
@@ -11,25 +11,7 @@ import {
   mergeDefaults,
 } from "../utils/extractSchemaDefaults";
 
-export interface NestedFormWidgetProps extends FieldWidgetProps {
-  // 当前字段的 schema（包含 properties）
-  schema: ExtendedJSONSchema;
-
-  // 当前字段值（对象）
-  value?: Record<string, any>;
-
-  // 值变化回调
-  onChange?: (value: Record<string, any>) => void;
-
-  // 其他配置
-  disabled?: boolean;
-  readonly?: boolean;
-  layout?: "vertical" | "horizontal" | "inline"; // 布局方式
-  labelWidth?: number | string; // 标签宽度
-
-  // 是否不渲染 Card 容器（用于 ArrayFieldWidget 调用时避免双层 Card）
-  noCard?: boolean;
-}
+export type { NestedFormWidgetProps } from "../types";
 
 export const NestedFormWidget = forwardRef<
   HTMLDivElement,

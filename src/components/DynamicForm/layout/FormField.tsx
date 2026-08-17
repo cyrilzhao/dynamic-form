@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react'
-import { useFormContext, Controller } from 'react-hook-form'
+import { useFormContext, Controller, useFormState } from 'react-hook-form'
 import { FormGroup } from '@blueprintjs/core'
 import { FieldLabel } from '../components/FieldLabel'
 import { FieldError } from '../components/FieldError'
@@ -12,6 +12,7 @@ import { resolveTransformFn } from '../utils/resolveTransformFn'
 import { executeInlineScript } from '../utils/executeInlineScript'
 import type { CallbackPropRef, FieldConfig } from '../types/schema'
 import type { LinkageResult } from '../types/linkage'
+import type { NestedFormWidgetProps } from '../types'
 
 // 通过 globalThis 访问 Function 构造器，避免静态分析误报
 const DynamicFn = globalThis['Function'] as FunctionConstructor // trusted-dynamic-code
@@ -238,6 +239,41 @@ const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
   )
 }
 
+interface StructuralFieldControlProps {
+  name: string
+  schema: NestedFormWidgetProps['schema']
+  WidgetComponent: React.ComponentType<NestedFormWidgetProps>
+  widgetProps: Record<string, unknown>
+}
+
+/**
+ * 渲染不拥有表单值的结构字段。
+ *
+ * nested-form 只负责组织子字段，不能为父对象路径注册 Controller。
+ * 父对象自身的验证错误通过只读 formState 订阅获取。
+ */
+const StructuralFieldControl: React.FC<StructuralFieldControlProps> = ({
+  name,
+  schema,
+  WidgetComponent,
+  widgetProps,
+}) => {
+  const { control, getFieldState } = useFormContext()
+  const formState = useFormState({ control, name, exact: true })
+  const fieldError = getFieldState(name, formState).error
+  const error =
+    typeof fieldError?.message === 'string' ? fieldError.message : undefined
+
+  return (
+    <>
+      <FormGroup intent={error ? 'danger' : 'none'}>
+        <WidgetComponent name={name} schema={schema} {...widgetProps} />
+      </FormGroup>
+      {error && <FieldError message={error} />}
+    </>
+  )
+}
+
 const FormFieldComponent: React.FC<FormFieldProps> = ({
   field,
   disabled,
@@ -327,6 +363,20 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
     ? resolveTransformFn(transformConfig.callback, callbacks)
     : undefined
 
+  const commonWidgetProps = {
+    placeholder: field.placeholder,
+    disabled: disabled || field.disabled,
+    readonly: readonly || field.readonly,
+    options: field.options,
+    schema: field.schema,
+    layout: effectiveLayout,
+    labelWidth: effectiveLabelWidth,
+    enableVirtualScroll,
+    virtualScrollHeight,
+    ...(widgetProps || {}),
+    ...resolvedCallbacks,
+  }
+
   return (
     <FormGroup
       label={
@@ -350,51 +400,47 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
         ...fieldRowStyle,
       }}
     >
-      <Controller
-        name={field.name}
-        control={control}
-        rules={field.validation}
-        render={({ field: controllerField, fieldState }) => {
-          const error = fieldState.error?.message
-          const commonWidgetProps = {
-            placeholder: field.placeholder,
-            disabled: disabled || field.disabled,
-            readonly: readonly || field.readonly,
-            options: field.options,
-            error,
-            schema: field.schema,
-            layout: effectiveLayout,
-            labelWidth: effectiveLabelWidth,
-            enableVirtualScroll,
-            virtualScrollHeight,
-            ...(widgetProps || {}),
-            ...resolvedCallbacks,
-          }
+      {resolvedWidget === 'nested-form' ? (
+        <StructuralFieldControl
+          name={field.name}
+          schema={field.schema!}
+          WidgetComponent={WidgetComponent}
+          widgetProps={commonWidgetProps}
+        />
+      ) : (
+        <Controller
+          name={field.name}
+          control={control}
+          rules={field.validation}
+          render={({ field: controllerField, fieldState }) => {
+            const error = fieldState.error?.message
+            const valueWidgetProps = { error, ...commonWidgetProps }
 
-          return (
-            <>
-              <FormGroup intent={error ? 'danger' : 'none'}>
-                {transformFn && transformConfig ? (
-                  <WidgetWithTransform
-                    controllerField={controllerField}
-                    WidgetComponent={WidgetComponent}
-                    transformFn={transformFn}
-                    helpers={helpers}
-                    hideConvertedValue={transformConfig.hideConvertedValue}
-                    widgetProps={commonWidgetProps}
-                  />
-                ) : (
-                  <WidgetComponent
-                    {...controllerField}
-                    {...commonWidgetProps}
-                  />
-                )}
-              </FormGroup>
-              {error && <FieldError message={error} />}
-            </>
-          )
-        }}
-      />
+            return (
+              <>
+                <FormGroup intent={error ? 'danger' : 'none'}>
+                  {transformFn && transformConfig ? (
+                    <WidgetWithTransform
+                      controllerField={controllerField}
+                      WidgetComponent={WidgetComponent}
+                      transformFn={transformFn}
+                      helpers={helpers}
+                      hideConvertedValue={transformConfig.hideConvertedValue}
+                      widgetProps={valueWidgetProps}
+                    />
+                  ) : (
+                    <WidgetComponent
+                      {...controllerField}
+                      {...valueWidgetProps}
+                    />
+                  )}
+                </FormGroup>
+                {error && <FieldError message={error} />}
+              </>
+            )
+          }}
+        />
+      )}
     </FormGroup>
   )
 }

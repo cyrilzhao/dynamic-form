@@ -1,11 +1,10 @@
 import React from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import { FormProvider, useForm } from "react-hook-form";
+import { FormProvider, useForm, useFormContext } from "react-hook-form";
 import { FormField, arePropsEqual, FormFieldProps } from "../FormField";
 import { WidgetsProvider } from "../../context/WidgetsContext";
 import type { FieldConfig } from "../../types/schema";
-import type { LinkageResult } from "../../types/linkage";
 
 /**
  * 测试用的 Mock Widget 组件
@@ -29,6 +28,24 @@ const MockWidget = React.forwardRef<HTMLInputElement, any>((props, ref) => {
 });
 MockWidget.displayName = "MockWidget";
 
+function createRegisterTrackingControl(
+  control: ReturnType<typeof useForm>["control"],
+  onRegister: (name: string) => void,
+) {
+  const trackedRegister: typeof control.register = (name, options) => {
+    onRegister(name);
+    return control.register(name, options);
+  };
+
+  return new Proxy(control, {
+    get(target, property, receiver) {
+      return property === "register"
+        ? trackedRegister
+        : Reflect.get(target, property, receiver);
+    },
+  });
+}
+
 /**
  * 测试包装器
  */
@@ -36,10 +53,15 @@ const TestWrapper: React.FC<{
   children: React.ReactNode;
   defaultValues?: Record<string, any>;
   customWidgets?: Record<string, React.ComponentType<any>>;
-}> = ({ children, defaultValues = {}, customWidgets = {} }) => {
+  onRegister?: (name: string) => void;
+}> = ({ children, defaultValues = {}, customWidgets = {}, onRegister }) => {
   const methods = useForm({ defaultValues });
+  const control = onRegister
+    ? createRegisterTrackingControl(methods.control, onRegister)
+    : methods.control;
+
   return (
-    <FormProvider {...methods}>
+    <FormProvider {...methods} control={control}>
       <WidgetsProvider
         widgets={{ "mock-widget": MockWidget, ...customWidgets }}
       >
@@ -47,6 +69,19 @@ const TestWrapper: React.FC<{
       </WidgetsProvider>
     </FormProvider>
   );
+};
+
+const ParentErrorSetter: React.FC<{
+  name: string;
+  message: string;
+}> = ({ name, message }) => {
+  const { setError } = useFormContext();
+
+  React.useEffect(() => {
+    setError(name, { type: "manual", message });
+  }, [message, name, setError]);
+
+  return null;
 };
 
 /**
@@ -63,6 +98,126 @@ const createFieldConfig = (
 });
 
 describe("FormField", () => {
+  describe("结构 Widget 注册所有权", () => {
+    const StructuralWidget: React.FC<Record<string, any>> = (props) => {
+      const hasControllerProps = ["value", "onChange", "onBlur", "ref"].some(
+        (propName) => Object.prototype.hasOwnProperty.call(props, propName),
+      );
+
+      return (
+        <div
+          data-testid="structural-widget"
+          data-has-controller-props={String(hasControllerProps)}
+        />
+      );
+    };
+
+    it("nested-form 不应该注册父对象路径", () => {
+      const handleRegister = jest.fn();
+      const field = createFieldConfig({
+        name: "ocr",
+        type: "object",
+        widget: "nested-form",
+        schema: { type: "object", properties: {} },
+      });
+
+      render(
+        <TestWrapper
+          customWidgets={{ "nested-form": StructuralWidget }}
+          onRegister={handleRegister}
+        >
+          <FormField field={field} />
+        </TestWrapper>,
+      );
+
+      expect(handleRegister).not.toHaveBeenCalledWith("ocr");
+    });
+
+    it("nested-form 不应该接收 Controller 生成的值控制属性", () => {
+      const field = createFieldConfig({
+        name: "ocr",
+        type: "object",
+        widget: "nested-form",
+        schema: { type: "object", properties: {} },
+      });
+
+      render(
+        <TestWrapper customWidgets={{ "nested-form": StructuralWidget }}>
+          <FormField field={field} />
+        </TestWrapper>,
+      );
+
+      expect(screen.getByTestId("structural-widget")).toHaveAttribute(
+        "data-has-controller-props",
+        "false",
+      );
+    });
+
+    it("显式对象值 Widget 应该继续注册父对象路径", () => {
+      const handleRegister = jest.fn();
+      const field = createFieldConfig({
+        name: "ocr",
+        type: "object",
+        widget: "object-editor",
+        schema: {
+          type: "object",
+          ui: { widget: "object-editor" },
+        },
+      });
+
+      render(
+        <TestWrapper
+          customWidgets={{ "object-editor": MockWidget }}
+          onRegister={handleRegister}
+        >
+          <FormField field={field} />
+        </TestWrapper>,
+      );
+
+      expect(handleRegister).toHaveBeenCalledWith("ocr");
+    });
+
+    it("nested-form 应该显示父对象路径上的直接错误", async () => {
+      const field = createFieldConfig({
+        name: "ocr",
+        type: "object",
+        widget: "nested-form",
+        schema: { type: "object", properties: {} },
+      });
+
+      render(
+        <TestWrapper customWidgets={{ "nested-form": StructuralWidget }}>
+          <ParentErrorSetter name="ocr" message="OCR config is invalid" />
+          <FormField field={field} />
+        </TestWrapper>,
+      );
+
+      expect(
+        await screen.findByText("OCR config is invalid"),
+      ).toBeInTheDocument();
+    });
+
+    it("nested-form 不应该重复显示子字段错误", async () => {
+      const field = createFieldConfig({
+        name: "ocr",
+        type: "object",
+        widget: "nested-form",
+        schema: { type: "object", properties: {} },
+      });
+
+      render(
+        <TestWrapper customWidgets={{ "nested-form": StructuralWidget }}>
+          <ParentErrorSetter name="ocr.model" message="Model is required" />
+          <FormField field={field} />
+        </TestWrapper>,
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByText("Model is required")).not.toBeInTheDocument();
+      });
+    });
+  });
+
   describe("基本渲染", () => {
     it("应该正确渲染字段组件", () => {
       const field = createFieldConfig();

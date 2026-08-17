@@ -417,7 +417,7 @@ interface ValidateFieldsParams {
 - 不会递归数组；
 - 不会显式逐项写入数组元素对象。
 
-如果普通对象层级较深，仍可能产生多次 `setValue`。优化前需要确认哪些父路径和子路径确实必须同时设置，不能破坏 `NestedFormWidget` 已注册 Controller 的同步行为。
+如果普通对象层级较深，仍可能产生多次 `setValue`。`NestedFormWidget` 本身不注册父对象 Controller，但其叶子字段拥有各自的 Controller；优化前仍需确认哪些结构路径和叶子路径必须同时设置，不能破坏已挂载叶子字段的同步行为。
 
 递归 `setValue` 还可能触发多次 `watch` 通知。默认方案必须保持当前可观察的 `onChange` 时序；如果希望把一次 `setValues` 合并成一次通知，需要先定义为新的显式行为并补充兼容性测试。无论是否合并通知，内部增量快照都必须以写入完成后的完整表单为最终基线。
 

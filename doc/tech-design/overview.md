@@ -107,7 +107,7 @@ Schema 扩展集中在 `types/schema.ts`，UI 属性通过 `ui` 字段表达。�
 
 ### 3.4 字段渲染与 Widget
 
-`FormField` 连接 Schema 字段、React Hook Form 控制器和联动状态，并根据字段配置选择 Widget。默认 Widget 通过 Blueprint Preset 注册，调用方可以：
+`FormField` 连接 Schema 字段、React Hook Form 和联动状态，并根据字段配置选择 Widget。值 Widget 通过 Controller 独占字段路径；`nested-form` 是结构 Widget，只组织子字段并通过只读状态订阅展示父对象错误，不注册父对象 Controller。默认 Widget 通过 Blueprint Preset 注册，调用方可以：
 
 - 使用完整 `WidgetPreset` 全局替换组件库。
 - 使用局部 Widget 注册覆盖单个类型。
@@ -140,7 +140,8 @@ Context 用于跨层传递稳定能力，不应成为任意业务状态仓库。
   → 解析字段与静态联动
   → 生成数组运行时联动
   → 计算初始联动状态
-  → FormField 选择 Widget 并注册字段
+  → FormField 选择 Widget
+  → 值 Widget 注册 Controller，结构 Widget 组织叶子字段
 ```
 
 Schema 或联动函数变化时，依赖它们的解析结果必须重新生成。长期运行的回调应读取最新引用，不能通过只初始化一次的闭包永久捕获旧配置。

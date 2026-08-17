@@ -61,10 +61,8 @@ const EMPTY_HELPERS = {}
 /**
  * 递归展开嵌套对象，对每层路径都调用 setValue
  *
- * 问题背景：NestedFormWidget 的子字段（如 address.street）通过独立 Controller 注册，
- * 而 FormField 同时也为 address 注册了一个父 Controller。
- * 当调用 setValue('address', { street: '123' }) 时，RHF 只更新父 Controller，
- * 子 Controller 不会自动收到新值。
+ * NestedFormWidget 的对象路径是结构节点，实际值由 address.street 等叶子 Controller 管理。
+ * 对对象路径整体调用 setValue 时，仍需确保已挂载的叶子 Controller 同步收到新值。
  *
  * 解决方案：递归展开嵌套对象，对每层路径都调用 setValue，确保所有 Controller 都被更新。
  */
@@ -83,9 +81,8 @@ function setValuesRecursive(
     // 设置当前路径的值
     methods.setValue(path, value, options)
     // 普通对象递归展开（数组和 null 除外）：
-    // NestedFormWidget 内部的子字段通过独立的 Controller 注册（如 address.street）。
-    // 仅调用 setValue('address', {...}) 只更新父 Controller，子 Controller 不会收到新值。
-    // 必须对每一层路径都调用 setValue，才能确保所有嵌套表单的子字段同步更新。
+    // NestedFormWidget 内部只有叶子字段注册 Controller（如 address.street）。
+    // 对每一层路径调用 setValue，确保嵌套表单的已挂载叶子字段同步更新。
     // 数组由 useFieldArray 管理，直接设置整体即可，无需递归展开。
     if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
       setValuesRecursive(methods, value, options, path)

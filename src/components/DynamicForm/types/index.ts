@@ -569,3 +569,18 @@ export interface FieldWidgetProps {
   schema?: ExtendedJSONSchema;
   [key: string]: any;
 }
+
+/**
+ * 嵌套表单结构 Widget 属性。
+ *
+ * 结构 Widget 不拥有对象路径的值，因此不接收 value、onChange、onBlur 或字段 ref。
+ */
+export interface NestedFormWidgetProps {
+  name: string;
+  schema: ExtendedJSONSchema;
+  disabled?: boolean;
+  readonly?: boolean;
+  layout?: "vertical" | "horizontal" | "inline";
+  labelWidth?: number | string;
+  noCard?: boolean;
+}

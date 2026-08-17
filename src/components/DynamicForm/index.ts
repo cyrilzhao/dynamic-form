@@ -3,6 +3,7 @@ export type {
   DynamicFormProps,
   DynamicFormRef,
   FieldWidgetProps,
+  NestedFormWidgetProps,
 } from "./types";
 export { FieldRegistry } from "./core/FieldRegistry";
 export { SchemaParser } from "./core/SchemaParser";

@@ -261,28 +261,22 @@ export interface UIConfig {
 ```typescript
 // src/components/DynamicForm/widgets/NestedFormWidget.tsx
 
-export interface NestedFormWidgetProps extends FieldWidgetProps {
-  // 当前字段的 schema（包含 properties）
+export interface NestedFormWidgetProps {
+  name: string;
   schema: ExtendedJSONSchema;
-
-  // 当前字段值（对象）
-  value?: Record<string, any>;
-
-  // 值变化回调
-  onChange?: (value: Record<string, any>) => void;
-
-  // 其他配置
   disabled?: boolean;
   readonly?: boolean;
-  layout?: 'vertical' | 'horizontal' | 'inline'; // 布局方式
-  labelWidth?: number | string; // 标签宽度
-  noCard?: boolean; // 是否不渲染 Card 容器
+  layout?: 'vertical' | 'horizontal' | 'inline';
+  labelWidth?: number | string;
+  noCard?: boolean;
 }
 ```
 
 **重要说明**：
 
-- NestedFormWidget 使用 `asNestedForm` 模式，不需要 `value` 和 `onChange` props
+- NestedFormWidget 是结构 Widget，父对象路径不注册 Controller
+- 只有内部叶子字段注册 Controller，结构组件不接收 `value`、`onChange`、`onBlur` 和字段 `ref`
+- 父对象自身的错误通过只读 formState 订阅展示
 - 数据通过父表单的 FormContext 自动管理
 - 字段名通过 `pathPrefix` 参数自动添加前缀
 
@@ -778,8 +772,8 @@ NestedFormWidget 使用 `asNestedForm={true}` 模式，数据通过父表单的 
 
 1. 内层 DynamicForm 通过 `useFormContext()` 获取父表单的 FormContext
 2. 字段名通过 `pathPrefix` 自动添加前缀（如 `company.details.name`）
-3. 字段值直接从父表单的 FormContext 中读取和更新
-4. 验证规则也自动注册到父表单中
+3. 叶子字段直接从父表单的 FormContext 中读取和更新
+4. 叶子字段验证注册到父表单；父对象验证由统一 resolver 执行
 
 ### 9.2 验证处理
 
