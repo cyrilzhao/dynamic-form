@@ -55,7 +55,10 @@ interface UILinkageConfig {
   dependencies: string[];
 
   // options 联动发现当前值不在新选项中时的处理策略，默认 'clear'
-  invalidValuePolicy?: 'clear' | 'retain';
+  invalidValuePolicy?: 'clear' | 'retain' | 'fallback';
+
+  // invalidValuePolicy 为 'fallback' 时的替代值，必须存在于最终 options 中
+  fallbackValue?: unknown;
 
   // 条件表达式或函数名（描述"什么时候触发联动"）
   when?: ConditionExpression | string;
@@ -101,7 +104,7 @@ interface LinkageEffect {
 - **灵活性**：支持直接指定值/选项/schema（`value`/`options`/`schema`），也支持函数计算（`function`）
 - **异步支持**：所有联动函数都支持异步操作，系统会自动处理异步竞态条件
 - **缓存优化**：默认禁用联动结果缓存，可通过 `enableCache: true` 为异步联动启用缓存
-- **历史值策略**：`invalidValuePolicy` 仅由 `options` 联动使用。默认 `clear` 会清空单选失效值、过滤多选失效项；`retain` 保留历史值，适用于业务永久禁用但仍允许提交历史数据的字段
+- **历史值策略**：`invalidValuePolicy` 仅由 `options` 联动使用。默认 `clear` 会清空单选失效值、过滤多选失效项；`retain` 保留历史值，适用于业务永久禁用但仍允许提交历史数据的字段；`fallback` 对单选字段写入配置的有效替代值
 
 ### 2.2 条件表达式语法
 
@@ -1278,6 +1281,7 @@ const renderFields = () => {
 |---|---|---|---|
 | `clear`（默认） | 写入 `undefined` | 过滤失效项 | 字段可由用户重新选择，要求提交值始终属于当前 options |
 | `retain` | 保留原值 | 保留全部原数组 | 字段被业务永久禁用，但历史值仍须保存和提交 |
+| `fallback` | 写入 `fallbackValue`，无效时清空 | 按 `clear` 过滤失效项 | 单选字段存在业务明确且安全的替代值 |
 
 示例：
 
@@ -1291,6 +1295,10 @@ const renderFields = () => {
 ```
 
 `retain` 不会把历史值加入当前 options，也不会让用户再次选择该值；它只跳过联动引擎的自动清除。配置方必须确保 Schema 校验和后端接口允许这类历史值提交。
+
+`fallback` 必须同时配置 `fallbackValue`，且该值必须属于本轮最终 options；不满足时联动引擎会清空失效单选值，不会写入非法替代值。多选字段暂不支持自动替代，仍按 `clear` 的过滤语义处理。
+
+异步 options 函数返回 `undefined` 表示结果未就绪。该结果不会覆盖上一轮 options，也不会触发失效值清理，从而保护 Schema 默认值和已有选择。`[]` 仅表示异步加载已完成且确实没有可选项，此时仍按当前策略处理失效值。
 
 同一字段有多条 `options` 联动时，options 结果按配置顺序以后者覆盖，`invalidValuePolicy` 也取最后一条 `options` 联动配置，保证选项与清理策略来自同一最终规则。
 

@@ -326,12 +326,13 @@ export function useLinkageManager({
           const optionsLinkages = linkageArray?.filter(
             (linkage) => linkage.type === "options",
           );
+          const effectiveOptionsLinkage =
+            optionsLinkages?.[optionsLinkages.length - 1];
           const invalidValuePolicy =
-            optionsLinkages?.[optionsLinkages.length - 1]?.invalidValuePolicy ??
-            "clear";
+            effectiveOptionsLinkage?.invalidValuePolicy ?? "clear";
           if (
             hasOptionsLinkage &&
-            invalidValuePolicy === "clear" &&
+            invalidValuePolicy !== "retain" &&
             states[fieldName]?.options
           ) {
             const newOptions = states[fieldName].options;
@@ -360,11 +361,19 @@ export function useLinkageManager({
                   });
                 }
               } else if (!optionValues.includes(currentValue)) {
-                // 单选值不再合法时清空
+                const fallbackValue = effectiveOptionsLinkage?.fallbackValue;
+                const nextValue =
+                  invalidValuePolicy === "fallback" &&
+                  fallbackValue !== undefined &&
+                  optionValues.includes(fallbackValue)
+                    ? fallbackValue
+                    : undefined;
+
+                // 单选值不再合法时使用有效 fallback，否则清空
                 if (!preMarkFields) {
                   taskQueue.markFieldUpdating(fieldName);
                 }
-                setValue(fieldName, undefined, {
+                setValue(fieldName, nextValue, {
                   shouldValidate: false,
                   shouldDirty: false,
                 });
@@ -375,7 +384,29 @@ export function useLinkageManager({
 
         // 更新联动状态（在更新表单值之后，确保值和状态同步）
         if (Object.keys(states).length > 0) {
-          setLinkageStates((prev) => ({ ...prev, ...states }));
+          setLinkageStates((prev) => {
+            const nextStates = { ...prev };
+
+            Object.entries(states).forEach(([fieldName, state]) => {
+              const hasOptionsLinkage = linkages[fieldName]?.some(
+                (linkage) => linkage.type === "options",
+              );
+
+              // options 联动函数返回 undefined 表示尚未就绪；保留上一轮有效 options，
+              // 防止加载中空结果覆盖控件选项，同时不触发失效值清理。
+              if (hasOptionsLinkage && state.options === undefined) {
+                nextStates[fieldName] = {
+                  ...prev[fieldName],
+                  ...state,
+                };
+                return;
+              }
+
+              nextStates[fieldName] = state;
+            });
+
+            return nextStates;
+          });
         }
 
         await new Promise((resolve) => setTimeout(resolve, 0));

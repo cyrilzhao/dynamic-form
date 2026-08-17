@@ -1018,6 +1018,124 @@ describe("useLinkageManager", () => {
       });
     });
 
+    it("options 未就绪时应该保留已有选项和 Schema 默认值", async () => {
+      const linkages: Record<string, LinkageConfig[]> = {
+        city: [
+          {
+            type: "options",
+            dependencies: ["country"],
+            fulfill: { function: "getCityOptions" },
+          },
+        ],
+      };
+
+      const getCityOptions = jest.fn(
+        ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) =>
+          formData.country === "loading"
+            ? undefined
+            : [{ label: "Beijing", value: "beijing" }],
+      );
+      const linkageFunctions = { getCityOptions };
+
+      const { result } = renderHook(() => {
+        const form = useForm({
+          defaultValues: { country: "China", city: "beijing" },
+        });
+        const linkageManager = useLinkageManager({
+          form,
+          linkages,
+          linkageFunctions,
+        });
+        return { form, ...linkageManager };
+      });
+
+      await act(async () => {
+        await result.current.refreshLinkage();
+      });
+
+      expect(result.current.linkageStates.city?.options).toEqual([
+        { label: "Beijing", value: "beijing" },
+      ]);
+
+      await act(async () => {
+        result.current.form.setValue("country", "loading");
+      });
+
+      await waitFor(() => {
+        expect(getCityOptions).toHaveBeenCalledTimes(2);
+        expect(result.current.form.getValues("city")).toBe("beijing");
+        expect(result.current.linkageStates.city?.options).toEqual([
+          { label: "Beijing", value: "beijing" },
+        ]);
+      });
+    });
+
+    it("配置 fallback 时应该以最终选项中的指定值替换失效单选值", async () => {
+      const linkages: Record<string, LinkageConfig[]> = {
+        city: [
+          {
+            type: "options",
+            dependencies: ["country"],
+            invalidValuePolicy: "fallback",
+            fallbackValue: "shanghai",
+            fulfill: {
+              options: [{ label: "Shanghai", value: "shanghai" }],
+            },
+          },
+        ],
+      };
+
+      const { result } = renderHook(() => {
+        const form = useForm({
+          defaultValues: { country: "China", city: "beijing" },
+        });
+        const linkageManager = useLinkageManager({ form, linkages });
+        return { form, ...linkageManager };
+      });
+
+      await act(async () => {
+        await result.current.refreshLinkage();
+      });
+
+      expect(result.current.form.getValues("city")).toBe("shanghai");
+    });
+
+    it("fallback 不在最终选项中时应该清空失效单选值", async () => {
+      const linkages: Record<string, LinkageConfig[]> = {
+        city: [
+          {
+            type: "options",
+            dependencies: ["country"],
+            invalidValuePolicy: "fallback",
+            fallbackValue: "shanghai",
+            fulfill: {
+              options: [{ label: "New York", value: "ny" }],
+            },
+          },
+        ],
+      };
+
+      const { result } = renderHook(() => {
+        const form = useForm({
+          defaultValues: { country: "China", city: "beijing" },
+        });
+        const linkageManager = useLinkageManager({ form, linkages });
+        return { form, ...linkageManager };
+      });
+
+      await act(async () => {
+        await result.current.refreshLinkage();
+      });
+
+      expect(result.current.form.getValues("city")).toBeUndefined();
+    });
+
     it("配置 retain 时，字段持续 disabled 也应该保留失效的单选历史值", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         city: [
