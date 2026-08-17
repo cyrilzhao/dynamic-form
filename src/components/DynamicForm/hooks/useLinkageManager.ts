@@ -142,12 +142,7 @@ function isSameValue(prev: unknown, next: unknown): boolean {
     return true;
   }
 
-  if (
-    prev &&
-    next &&
-    typeof prev === "object" &&
-    typeof next === "object"
-  ) {
+  if (prev && next && typeof prev === "object" && typeof next === "object") {
     try {
       return JSON.stringify(prev) === JSON.stringify(next);
     } catch {
@@ -200,9 +195,7 @@ export function useLinkageManager({
 
   const ownOperationControllerRef = useRef(new LinkageOperationController());
   const controller = operationController ?? ownOperationControllerRef.current;
-  const scopeIdRef = useRef(
-    `linkage-manager-${++linkageManagerScopeCounter}`,
-  );
+  const scopeIdRef = useRef(`linkage-manager-${++linkageManagerScopeCounter}`);
   const scopeId = scopeIdRef.current;
 
   // 创建异步序列号管理器实例（使用 useRef 保持引用稳定）
@@ -329,7 +322,18 @@ export function useLinkageManager({
           const hasOptionsLinkage = linkageArray?.some(
             (linkage) => linkage.type === "options",
           );
-          if (hasOptionsLinkage && states[fieldName]?.options) {
+          // options 结果按配置顺序以后者覆盖，因此失效值策略也取最后一个 options 联动配置。
+          const optionsLinkages = linkageArray?.filter(
+            (linkage) => linkage.type === "options",
+          );
+          const invalidValuePolicy =
+            optionsLinkages?.[optionsLinkages.length - 1]?.invalidValuePolicy ??
+            "clear";
+          if (
+            hasOptionsLinkage &&
+            invalidValuePolicy === "clear" &&
+            states[fieldName]?.options
+          ) {
             const newOptions = states[fieldName].options;
             const currentValue = getValues(fieldName);
 
@@ -1004,7 +1008,13 @@ async function evaluateLinkage({
 
   // 如果没有 when 条件，默认使用 fulfill
   const shouldFulfill = linkage.when
-    ? await evaluateCondition(linkage.when, formData, linkageFunctions, context, helpers)
+    ? await evaluateCondition(
+        linkage.when,
+        formData,
+        linkageFunctions,
+        context,
+        helpers,
+      )
     : true;
 
   const effect = shouldFulfill ? linkage.fulfill : linkage.otherwise;

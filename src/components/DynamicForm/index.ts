@@ -16,6 +16,7 @@ export type {
   ConditionOperator,
   LinkageEffect,
   LinkageType,
+  InvalidValuePolicy,
 } from "./types/linkage";
 
 // Widgets

@@ -54,6 +54,9 @@ interface UILinkageConfig {
   // 依赖的字段
   dependencies: string[];
 
+  // options 联动发现当前值不在新选项中时的处理策略，默认 'clear'
+  invalidValuePolicy?: 'clear' | 'retain';
+
   // 条件表达式或函数名（描述"什么时候触发联动"）
   when?: ConditionExpression | string;
 
@@ -98,6 +101,7 @@ interface LinkageEffect {
 - **灵活性**：支持直接指定值/选项/schema（`value`/`options`/`schema`），也支持函数计算（`function`）
 - **异步支持**：所有联动函数都支持异步操作，系统会自动处理异步竞态条件
 - **缓存优化**：默认禁用联动结果缓存，可通过 `enableCache: true` 为异步联动启用缓存
+- **历史值策略**：`invalidValuePolicy` 仅由 `options` 联动使用。默认 `clear` 会清空单选失效值、过滤多选失效项；`retain` 保留历史值，适用于业务永久禁用但仍允许提交历史数据的字段
 
 ### 2.2 条件表达式语法
 
@@ -1265,6 +1269,30 @@ const renderFields = () => {
 | `schema` | `DynamicForm.tsx` 渲染阶段 | 在渲染字段前合并到 `fieldSchema`，支持所有字段类型 |
 
 **关键设计原则**：`value` 联动的表单写入**只发生在 `useLinkageManager` 中**，`FormField` 不应主动调用 `setValue`。
+
+### 6.9 options 联动的失效值策略
+
+`options` 联动先计算并合并当前选项，再由 `useLinkageManager` 检查既有表单值是否仍在选项集合中。`invalidValuePolicy` 控制这一检查后的写回行为：
+
+| 策略 | 单选失效值 | 多选失效项 | 适用场景 |
+|---|---|---|---|
+| `clear`（默认） | 写入 `undefined` | 过滤失效项 | 字段可由用户重新选择，要求提交值始终属于当前 options |
+| `retain` | 保留原值 | 保留全部原数组 | 字段被业务永久禁用，但历史值仍须保存和提交 |
+
+示例：
+
+```typescript
+{
+  type: 'options',
+  dependencies: ['#/properties/status'],
+  invalidValuePolicy: 'retain',
+  fulfill: { function: 'getAvailableAssignees' },
+}
+```
+
+`retain` 不会把历史值加入当前 options，也不会让用户再次选择该值；它只跳过联动引擎的自动清除。配置方必须确保 Schema 校验和后端接口允许这类历史值提交。
+
+同一字段有多条 `options` 联动时，options 结果按配置顺序以后者覆盖，`invalidValuePolicy` 也取最后一条 `options` 联动配置，保证选项与清理策略来自同一最终规则。
 
 **原因**：`FormField` 中若存在监听 `linkageState.value` 变化并调用 `setValue` 的 useEffect，会绕过任务队列的死循环防护机制，导致：
 

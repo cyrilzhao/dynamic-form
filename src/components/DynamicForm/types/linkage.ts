@@ -10,6 +10,11 @@ export type LinkageType =
   | "schema";
 
 /**
+ * options 联动发现当前值不在新选项中时的处理策略
+ */
+export type InvalidValuePolicy = "clear" | "retain";
+
+/**
  * 条件操作符
  */
 export type ConditionOperator =
@@ -73,6 +78,11 @@ export interface LinkageConfig {
   type: LinkageType;
   dependencies: string[];
 
+  /**
+   * options 联动发现当前值不在新选项中时的处理策略，默认清除失效值
+   */
+  invalidValuePolicy?: InvalidValuePolicy;
+
   // 条件表达式或函数名（描述"什么时候触发联动"）
   when?: ConditionExpression | string;
   // 条件满足时的效果（描述"触发后做什么"）
@@ -113,10 +123,8 @@ export interface LinkageFunctionContext {
 /**
  * 联动函数签名（支持同步和异步函数）
  */
-export type LinkageFunction = (
-  params: {
-    formData: Record<string, any>;
-    context: LinkageFunctionContext;
-    helpers: Record<string, any>;
-  },
-) => any | Promise<any>;
+export type LinkageFunction = (params: {
+  formData: Record<string, any>;
+  context: LinkageFunctionContext;
+  helpers: Record<string, any>;
+}) => any | Promise<any>;
