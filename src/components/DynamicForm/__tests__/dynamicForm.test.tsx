@@ -15,6 +15,36 @@ import {
 beforeAll(setupDynamicFormTest);
 
 describe("DynamicForm", () => {
+  it("应该通过数组字段的 widgetProps 控制新增、删除和排序操作", async () => {
+    const schema: ExtendedJSONSchema = {
+      type: "object",
+      properties: {
+        tags: {
+          type: "array",
+          title: "Tags",
+          items: { type: "string" },
+          ui: {
+            widgetProps: {
+              canAdd: false,
+              canRemove: false,
+              canReorder: false,
+            },
+          },
+        },
+      },
+    };
+
+    const { formRef } = renderDynamicForm({
+      props: { schema, defaultValues: { tags: ["alpha", "beta"] } },
+    });
+    await waitForFormReady({ formRef });
+
+    expect(screen.queryByRole("button", { name: /add/i })).toBeNull();
+    expect(screen.queryByTitle("Delete")).toBeNull();
+    expect(screen.queryByTitle("Move up")).toBeNull();
+    expect(screen.queryByTitle("Move down")).toBeNull();
+  });
+
   it("应该支持 callbackProps 使用内联 script 定义 widget 函数 prop", async () => {
     const schema: ExtendedJSONSchema = {
       type: "object",
@@ -442,11 +472,19 @@ describe("DynamicForm", () => {
     };
 
     const callbacks = {
-      addressToStorage: ({ value }: { value: { street: string; ratio: number } }) => ({
+      addressToStorage: ({
+        value,
+      }: {
+        value: { street: string; ratio: number };
+      }) => ({
         street: value.street,
         ratio: value.ratio / 10,
       }),
-      addressToDisplay: ({ value }: { value: { street: string; ratio: number } }) => ({
+      addressToDisplay: ({
+        value,
+      }: {
+        value: { street: string; ratio: number };
+      }) => ({
         street: value.street,
         ratio: value.ratio * 10,
       }),

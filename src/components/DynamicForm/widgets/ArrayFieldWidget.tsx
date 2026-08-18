@@ -45,6 +45,12 @@ export interface ArrayFieldWidgetProps extends FieldWidgetProps {
    * 默认值：600
    */
   virtualScrollHeight?: number;
+  /** 是否允许新增数组元素，默认 true */
+  canAdd?: boolean;
+  /** 是否允许删除数组元素，默认 true */
+  canRemove?: boolean;
+  /** 是否允许调整数组元素顺序，默认 true */
+  canReorder?: boolean;
 }
 
 /**
@@ -223,6 +229,9 @@ export const ArrayFieldWidget = forwardRef<
       labelWidth,
       enableVirtualScroll = false,
       virtualScrollHeight = 600,
+      canAdd = true,
+      canRemove = true,
+      canReorder = true,
     },
     ref,
   ) => {
@@ -311,8 +320,11 @@ export const ArrayFieldWidget = forwardRef<
     const minItems = schema.minItems || 0;
     const maxItems = schema.maxItems;
 
-    // 判断是否可以增删
-    const canAddRemove = !disabled && !readonly && arrayMode === "dynamic";
+    // 动态数组的操作权限：disabled、readonly 和 static 模式始终优先禁止操作。
+    const canModifyItems = !disabled && !readonly && arrayMode === "dynamic";
+    const canAppendItems = canModifyItems && canAdd;
+    const canDeleteItems = canModifyItems && canRemove;
+    const canMoveItems = canModifyItems && canReorder;
 
     // ✅ 使用 useCallback 缓存回调函数，避免每次渲染都创建新函数
     // 添加新项
@@ -369,9 +381,9 @@ export const ArrayFieldWidget = forwardRef<
           name={`${name}.${index}`}
           index={index}
           schema={itemSchema}
-          onRemove={canAddRemove ? handleRemove : undefined}
-          onMoveUp={canAddRemove ? handleMoveUp : undefined}
-          onMoveDown={canAddRemove ? handleMoveDown : undefined}
+          onRemove={canDeleteItems ? handleRemove : undefined}
+          onMoveUp={canMoveItems ? handleMoveUp : undefined}
+          onMoveDown={canMoveItems ? handleMoveDown : undefined}
           statusMap={statusMaps[index]}
           disabled={disabled}
           readonly={readonly}
@@ -382,7 +394,8 @@ export const ArrayFieldWidget = forwardRef<
       [
         name,
         itemSchema,
-        canAddRemove,
+        canDeleteItems,
+        canMoveItems,
         handleRemove,
         handleMoveUp,
         handleMoveDown,
@@ -503,9 +516,9 @@ export const ArrayFieldWidget = forwardRef<
               name={`${name}.${index}`}
               index={index}
               schema={itemSchema}
-              onRemove={canAddRemove ? handleRemove : undefined}
-              onMoveUp={canAddRemove ? handleMoveUp : undefined}
-              onMoveDown={canAddRemove ? handleMoveDown : undefined}
+              onRemove={canDeleteItems ? handleRemove : undefined}
+              onMoveUp={canMoveItems ? handleMoveUp : undefined}
+              onMoveDown={canMoveItems ? handleMoveDown : undefined}
               statusMap={statusMaps[index]}
               disabled={disabled}
               readonly={readonly}
@@ -526,7 +539,7 @@ export const ArrayFieldWidget = forwardRef<
         )}
 
         {/* 添加按钮 */}
-        {canAddRemove && (
+        {canAppendItems && (
           <Tooltip
             content={
               maxItems && fields.length >= maxItems

@@ -569,10 +569,17 @@ The default widget for all array types. It intelligently chooses the appropriate
   minItems: 1,
   ui: {
     widget: 'array',  // Default: uses ArrayFieldWidget
-    addButtonText: 'Add Contact'
+    addButtonText: 'Add Contact',
+    widgetProps: {
+      canAdd: true,      // default: true
+      canRemove: false,  // hide delete actions
+      canReorder: false  // hide move actions
+    }
   }
 }
 ```
+
+For dynamic arrays, `widgetProps.canAdd`, `widgetProps.canRemove`, and `widgetProps.canReorder` independently control add, delete, and move actions. All default to `true`; `disabled`, `readonly`, and static array mode still take precedence.
 
 **Object Array with Virtual Scroll (Large Dataset)**:
 
