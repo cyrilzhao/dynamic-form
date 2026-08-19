@@ -1,9 +1,14 @@
 import { forwardRef } from "react";
+import type { FocusEventHandler } from "react";
 import { InputGroup } from "@blueprintjs/core";
 import type { FieldWidgetProps } from "../types";
 
-export const TextWidget = forwardRef<HTMLInputElement, FieldWidgetProps>(
-  ({ name, placeholder, disabled, readonly, error, ...rest }, ref) => {
+export interface TextWidgetProps extends FieldWidgetProps {
+  onFocus?: FocusEventHandler<HTMLInputElement>;
+}
+
+export const TextWidget = forwardRef<HTMLInputElement, TextWidgetProps>(
+  ({ name, placeholder, disabled, readonly, error, onFocus, ...rest }, ref) => {
     return (
       <InputGroup
         inputRef={ref}
@@ -12,6 +17,7 @@ export const TextWidget = forwardRef<HTMLInputElement, FieldWidgetProps>(
         disabled={disabled}
         readOnly={readonly}
         intent={error ? "danger" : "none"}
+        onFocus={onFocus}
         {...rest}
       />
     );

@@ -37,6 +37,10 @@ import { WidgetsProvider } from './context/WidgetsContext'
 import { CallbacksProvider } from './context/CallbacksContext'
 import { HelpersProvider } from './context/HelpersContext'
 import {
+  TextFieldFocusProvider,
+  useTextFieldFocus,
+} from './context/TextFieldFocusContext'
+import {
   wrapPrimitiveArrays,
   unwrapPrimitiveArrays,
 } from './utils/arrayTransformer'
@@ -368,6 +372,7 @@ const DynamicFormInner = React.memo(
         defaultValues = {},
         onSubmit,
         onChange,
+        onTextFieldFocus,
         widgets,
         linkageFunctions,
         linkageContext,
@@ -401,6 +406,9 @@ const DynamicFormInner = React.memo(
       // ========== Context 获取（集中管理） ==========
       const parentFormContext = useFormContext()
       const linkageStateContext = useLinkageStateContext()
+      const inheritedTextFieldFocus = useTextFieldFocus()
+      const effectiveTextFieldFocus =
+        onTextFieldFocus ?? inheritedTextFieldFocus
 
       // 只有显式声明 asNestedForm 的 DynamicForm 才能继承父级联动上下文。
       //
@@ -929,6 +937,7 @@ const DynamicFormInner = React.memo(
                   enableVirtualScroll={enableVirtualScroll}
                   virtualScrollHeight={virtualScrollHeight}
                   columnsCount={columnsCount}
+                  onTextFieldFocus={effectiveTextFieldFocus}
                 />
               )
             })}
@@ -949,6 +958,7 @@ const DynamicFormInner = React.memo(
           virtualScrollHeight,
           fieldsWrapperStyle,
           columnsCount,
+          effectiveTextFieldFocus,
         ]
       )
 
@@ -1021,11 +1031,13 @@ const DynamicFormInner = React.memo(
         }
 
         return (
-          <HelpersProvider helpers={mergedHelpers}>
-            <CallbacksProvider callbacks={stableCallbacks}>
-              <WidgetsProvider widgets={stableWidgets}>{content}</WidgetsProvider>
-            </CallbacksProvider>
-          </HelpersProvider>
+          <TextFieldFocusProvider onTextFieldFocus={effectiveTextFieldFocus}>
+            <HelpersProvider helpers={mergedHelpers}>
+              <CallbacksProvider callbacks={stableCallbacks}>
+                <WidgetsProvider widgets={stableWidgets}>{content}</WidgetsProvider>
+              </CallbacksProvider>
+            </HelpersProvider>
+          </TextFieldFocusProvider>
         )
       }, [
         asNestedForm,
@@ -1041,6 +1053,7 @@ const DynamicFormInner = React.memo(
         submitButton,
         stableWidgets,
         stableCallbacks,
+        effectiveTextFieldFocus,
       ])
 
       // 嵌套表单模式下不需要再包裹 FormProvider，因为已经复用了父表单的 context
