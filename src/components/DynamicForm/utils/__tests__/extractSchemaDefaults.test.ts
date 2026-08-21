@@ -821,13 +821,13 @@ describe("extractSchemaDefaults", () => {
       });
     });
 
-    it("对象字段同时有 default 和 properties 时应该优先使用 default", () => {
+    it("对象字段 default 应该覆盖已声明键并补齐子字段默认值", () => {
       const schema: ExtendedJSONSchema = {
         type: "object",
         properties: {
           settings: {
             type: "object",
-            default: { theme: "custom", lang: "zh" },
+            default: { theme: "custom" },
             properties: {
               theme: { type: "string", default: "light" },
               lang: { type: "string", default: "en" },
@@ -838,9 +838,42 @@ describe("extractSchemaDefaults", () => {
 
       const result = extractSchemaDefaults(schema);
 
-      // 应该使用字段级别的 default，而不是递归提取 properties 中的 default
       expect(result).toEqual({
-        settings: { theme: "custom", lang: "zh" },
+        settings: { theme: "custom", lang: "en" },
+      });
+    });
+
+    it("对象 default 中的数组应该保持原子，不使用 items 默认值补齐元素", () => {
+      const schema: ExtendedJSONSchema = {
+        type: "object",
+        properties: {
+          review: {
+            type: "object",
+            default: {
+              sections: [{ title: "Summary" }],
+            },
+            properties: {
+              source: { type: "string", default: "AI" },
+              sections: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string", default: "Untitled" },
+                    confidence: { type: "number", default: 0 },
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      expect(extractSchemaDefaults(schema)).toEqual({
+        review: {
+          source: "AI",
+          sections: [{ title: "Summary" }],
+        },
       });
     });
 

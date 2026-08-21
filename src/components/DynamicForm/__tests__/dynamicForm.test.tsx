@@ -15,6 +15,55 @@ import {
 beforeAll(setupDynamicFormTest);
 
 describe("DynamicForm", () => {
+  it("应该初始化 object default 中的嵌套对象和数组，并补齐缺失子字段默认值", async () => {
+    const schema: ExtendedJSONSchema = {
+      type: "object",
+      properties: {
+        review: {
+          type: "object",
+          title: "Review",
+          default: {
+            metadata: { documentType: "invoice" },
+            sections: [{ title: "Summary", tags: ["AI"] }],
+          },
+          properties: {
+            metadata: {
+              type: "object",
+              properties: {
+                documentType: { type: "string" },
+                source: { type: "string", default: "AI" },
+              },
+            },
+            sections: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  tags: {
+                    type: "array",
+                    items: { type: "string" },
+                  },
+                  confidence: { type: "number", default: 0 },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+
+    const { formRef } = renderDynamicForm({ props: { schema } });
+    await waitForFormReady({ formRef });
+
+    expect(formRef.current!.getValues()).toEqual({
+      review: {
+        metadata: { documentType: "invoice", source: "AI" },
+        sections: [{ title: "Summary", tags: ["AI"], confidence: undefined }],
+      },
+    });
+  });
+
   it("应该通过数组字段的 widgetProps 控制新增、删除和排序操作", async () => {
     const schema: ExtendedJSONSchema = {
       type: "object",

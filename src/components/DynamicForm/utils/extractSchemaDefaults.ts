@@ -1,7 +1,11 @@
 import type { ExtendedJSONSchema } from "../types/schema";
 
 /**
- * 从 JSON Schema 中递归提取所有字段的 default 值
+ * 从 JSON Schema 中递归提取字段的 default 值。
+ *
+ * object 节点的 default 会作为当前层的显式覆盖，并递归补齐缺失的
+ * object 子字段默认值；array 节点的 default 始终作为整体快照保留，
+ * 不会根据 items 默认值自动生成或补齐数组元素。
  *
  * 此函数遍历 schema 的 properties，收集所有设置了 default 的字段值，
  * 并构建一个与 schema 结构匹配的默认值对象。
@@ -38,7 +42,18 @@ export function extractSchemaDefaults(
 
     // 情况1：字段有直接的 default 值
     if (fieldSchema.default !== undefined) {
-      defaults[key] = fieldSchema.default;
+      // object default 作为当前层的显式覆盖：补齐未声明的 object 子字段，
+      // 但不递归进入数组 items，避免按数组索引隐式生成元素或修改数组元素快照。
+      if (
+        fieldSchema.type === "object" &&
+        isPlainObject(fieldSchema.default) &&
+        fieldSchema.properties
+      ) {
+        const nestedDefaults = extractSchemaDefaults(fieldSchema);
+        defaults[key] = mergeDefaults(nestedDefaults, fieldSchema.default);
+      } else {
+        defaults[key] = fieldSchema.default;
+      }
       return;
     }
 
@@ -50,8 +65,8 @@ export function extractSchemaDefaults(
       }
     }
 
-    // 注意：数组类型的 default 由 ArrayFieldWidget 在添加新元素时处理
-    // 这里不处理数组的默认值，因为数组初始通常为空
+    // 没有直接 default 的数组不从 items 推导默认值；数组元素默认值在
+    // 用户新增元素时由 ArrayFieldWidget 根据 items schema 处理。
   });
 
   return defaults;

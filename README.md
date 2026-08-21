@@ -142,6 +142,38 @@ const defaultValues = {
 />
 ```
 
+### 默认值配置与优先级
+
+字段默认值可以写在 Schema 字段的 `default` 中，也可以通过 `DynamicForm.defaultValues` 传入。优先级按字段路径计算：
+
+```text
+DynamicForm.defaultValues
+  > object/array 节点 default 中明确提供的值
+  > object 子字段的 Schema default
+```
+
+object 默认值会和子 object 默认值递归合并。明确写出的键优先，未写出的键继续使用子字段默认值：
+
+```ts
+const schema = {
+  type: 'object',
+  properties: {
+    settings: {
+      type: 'object',
+      default: { theme: 'custom' },
+      properties: {
+        theme: { type: 'string', default: 'light' },
+        language: { type: 'string', default: 'en' },
+      },
+    },
+  },
+};
+
+// { settings: { theme: 'custom', language: 'en' } }
+```
+
+`defaultValues` 可以覆盖任意层级的 Schema 默认值，并与对象默认值深度合并。数组默认值配置在数组节点自身的 `default` 上，作为整体快照使用；不会根据 `items.default` 自动新增数组元素或补齐已有元素的缺失属性。对象、对象数组和嵌套数组都可以作为 object default 的一部分初始化。
+
 ### Listening to Form Changes
 
 ```typescript
