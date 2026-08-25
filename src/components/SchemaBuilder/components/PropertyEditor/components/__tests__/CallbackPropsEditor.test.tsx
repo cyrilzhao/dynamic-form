@@ -116,4 +116,22 @@ describe("CallbackPropsEditor", () => {
     expect(code.value).toContain("return the first argument unchanged");
     expect(code.value).toContain("async function({ args, helpers })");
   });
+
+  it("切换到 Function Name 后应保留编辑区域并显示函数名输入框", () => {
+    render(<CallbackPropsEditor onChange={jest.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Callback Prop" }));
+    fireEvent.change(
+      screen.getByLabelText("Callback Mode", { selector: "select" }),
+      {
+        target: { value: "function-name" },
+      },
+    );
+
+    expect(screen.getByLabelText("Function Name help")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("handleUpload")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Save Callback Prop" }),
+    ).toBeInTheDocument();
+  });
 });
