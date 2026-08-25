@@ -48,11 +48,12 @@ export const FunctionRefEditor: React.FC<FunctionRefEditorProps> = ({
 
   const handleModeChange = (newMode: FunctionRefMode) => {
     setMode(newMode);
-    onChange(
-      newMode === "function-name"
-        ? ""
-        : { type: "script", code: scriptTemplate },
-    );
+    // 不要在切换到函数名模式时立即写入空字符串。部分父级配置会将
+    // 空值视为删除整个配置，导致当前编辑区域被卸载；用户输入名称时
+    // 再通过 InputGroup 的 onChange 提交实际值。
+    if (newMode === "inline-script") {
+      onChange({ type: "script", code: scriptTemplate });
+    }
   };
 
   return (
