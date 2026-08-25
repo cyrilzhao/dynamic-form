@@ -34,120 +34,16 @@ import {
 import { DynamicForm } from "../DynamicForm";
 import { CodeMirrorView } from "../CodeEditor";
 import { isExtendedJSONSchema } from "./utils/validateExtendedJSONSchema";
+import {
+  defaultSchema,
+  ensureHasFirstLevelNode,
+  generateRandomKey,
+  parseJsonPointer,
+  validatePath,
+} from "./utils/schemaBuilderUtils";
 import "./SchemaBuilder.scss";
 
-const defaultSchema: ExtendedJSONSchema = {
-  type: "object",
-  title: "Root",
-  properties: {},
-};
-
 type BuilderViewMode = "edit" | "preview";
-
-// 生成随机字段 key 的辅助函数
-const generateRandomKeyStatic = (properties: Record<string, any>): string => {
-  const chars = "abcdefghijklmnopqrstuvwxyz";
-  let newKey = "";
-  do {
-    let randomStr = "";
-    for (let i = 0; i < 4; i++) {
-      randomStr += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    newKey = `field_${randomStr}`;
-  } while (properties[newKey]);
-  return newKey;
-};
-
-// 确保 schema 至少有一个一级节点
-const ensureHasFirstLevelNodeStatic = (
-  schema: ExtendedJSONSchema | null | undefined,
-): ExtendedJSONSchema => {
-  // 处理 null、undefined 或空对象的情况
-  if (
-    !schema ||
-    typeof schema !== "object" ||
-    Object.keys(schema).length === 0
-  ) {
-    const newSchema: ExtendedJSONSchema = {
-      type: "object",
-      title: "Root",
-      properties: {},
-    };
-
-    const placeholderKey = generateRandomKeyStatic(newSchema.properties!);
-    newSchema.properties![placeholderKey] = {
-      type: "string",
-      title: "New Field",
-    };
-
-    return newSchema;
-  }
-
-  // 处理非 object 类型的情况，强制转换为 object
-  if (schema.type !== "object") {
-    const newSchema: ExtendedJSONSchema = {
-      type: "object",
-      title: schema.title || "Root",
-      properties: {},
-    };
-
-    const placeholderKey = generateRandomKeyStatic(newSchema.properties!);
-    newSchema.properties![placeholderKey] = {
-      type: "string",
-      title: "New Field",
-    };
-
-    return newSchema;
-  }
-
-  // 处理 type 为 object 但没有 properties 或 properties 为空的情况
-  const hasProperties =
-    schema.properties && Object.keys(schema.properties).length > 0;
-
-  if (!hasProperties) {
-    const newSchema = cloneDeep(schema);
-    if (!newSchema.properties) {
-      newSchema.properties = {};
-    }
-
-    // 创建占位节点
-    const placeholderKey = generateRandomKeyStatic(newSchema.properties);
-    newSchema.properties[placeholderKey] = {
-      type: "string",
-      title: "New Field",
-    };
-
-    return newSchema;
-  }
-
-  return schema;
-};
-
-// 将 JSON Pointer 转换为数组路径
-const parseJsonPointer = (pointer: string): string[] => {
-  if (!pointer || !pointer.startsWith("#/")) {
-    return [];
-  }
-  return pointer.slice(2).split("/").filter(Boolean);
-};
-
-// 验证路径是否有效且可编辑
-const validatePath = (schema: ExtendedJSONSchema, path: string[]): boolean => {
-  if (path.length === 0) return true;
-
-  // 不允许直接选中 'items' 节点（它们在 UI 中被标记为不可编辑）
-  if (path[path.length - 1] === "items") {
-    return false;
-  }
-
-  // 检查路径是否存在
-  try {
-    const node = get(schema, path);
-    return node !== undefined;
-  } catch {
-    return false;
-  }
-};
 
 export const SchemaBuilderContext = createContext<
   SchemaBuilderContextType | undefined
@@ -179,7 +75,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
     // 初始化时确保至少有一个一级节点
     const getInitialSchema = () => {
       const initialSchema = defaultValue || defaultSchema;
-      return ensureHasFirstLevelNodeStatic(initialSchema);
+      return ensureHasFirstLevelNode(initialSchema);
     };
 
     // 获取第一个一级节点的路径
@@ -245,7 +141,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
       ref,
       () => ({
         setSchema: (newSchema: ExtendedJSONSchema) => {
-          const schemaToSet = ensureHasFirstLevelNodeStatic(newSchema);
+          const schemaToSet = ensureHasFirstLevelNode(newSchema);
           setSchema(schemaToSet);
           // 保持当前选中路径，如果路径无效则选中第一个节点
           if (!validatePath(schemaToSet, selectedPath)) {
@@ -254,9 +150,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
         },
         getSchema: () => schema,
         reset: () => {
-          const schemaToSet = ensureHasFirstLevelNodeStatic(
-            initialSchemaRef.current,
-          );
+          const schemaToSet = ensureHasFirstLevelNode(initialSchemaRef.current);
           setSchema(schemaToSet);
           setSelectedPath(getInitialSelectedPath(schemaToSet));
           setExpandedPaths({ "": true });
@@ -327,7 +221,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
       try {
         const parsed: unknown = JSON.parse(importText);
         if (!isExtendedJSONSchema(parsed)) throw new Error("Invalid schema");
-        const schemaToSet = ensureHasFirstLevelNodeStatic(parsed);
+        const schemaToSet = ensureHasFirstLevelNode(parsed);
         setSchema(schemaToSet);
         setSelectedPath(getFirstLevelNodePath(schemaToSet));
         setExpandedPaths({ "": true });
@@ -375,7 +269,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
             delete currentNode.required;
 
             if (!currentNode.items) {
-              const newSubFieldKey = generateRandomKeyStatic({});
+              const newSubFieldKey = generateRandomKey({});
 
               currentNode.items = {
                 type: "object",
@@ -392,7 +286,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
             delete currentNode.items;
 
             if (!currentNode.properties) {
-              const newSubFieldKey = generateRandomKeyStatic({});
+              const newSubFieldKey = generateRandomKey({});
 
               currentNode.properties = {
                 [newSubFieldKey]: {
@@ -505,7 +399,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
               targetNode.properties = {};
             }
 
-            const newKey = generateRandomKeyStatic(targetNode.properties);
+            const newKey = generateRandomKey(targetNode.properties);
 
             let newNode: any = {
               type: type,
@@ -560,7 +454,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
             const currentKey = path[path.length - 1];
 
             if (propertiesNode) {
-              const newKey = generateRandomKeyStatic(propertiesNode);
+              const newKey = generateRandomKey(propertiesNode);
               let newNode: any = {
                 type: type,
                 title: `New Field`,
