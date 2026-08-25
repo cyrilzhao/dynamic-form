@@ -22,6 +22,18 @@ JSON Schema 是一种基于 JSON 格式的声明性语言，用于描述、验�
 
 ---
 
+## 默认值配置与优先级
+
+DynamicForm 会先提取 Schema 默认值，再与 `DynamicForm.defaultValues` 深度合并。优先级按字段路径计算：
+
+```text
+DynamicForm.defaultValues
+  > 当前 object/array 节点 default 中明确提供的值
+  > object 子字段或更深层 object 的 Schema default
+```
+
+对象节点的 `default` 是局部覆盖。缺失的 object 子字段会继续使用子 Schema 默认值；数组节点的 `default` 则始终作为整体快照，不会根据 `items` 默认值新增或补齐数组元素。
+
 #### 1. 元数据关键字 (Meta-schema)
 
 这些字段用于描述 Schema 本身，而不是被验证的数据。

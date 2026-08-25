@@ -1,3 +1,4 @@
+import type { FocusEvent } from "react";
 import type { FieldErrors } from "react-hook-form";
 import type { ExtendedJSONSchema, FieldOption } from "./schema";
 import type { LinkageFunction } from "./linkage";
@@ -38,6 +39,16 @@ export type CallbackFunction =
   | WidgetCallback
   | TransformCallback
   | ValidatorCallback;
+
+/**
+ * 文本字段获得焦点时通知页面层的数据。
+ * 页面可基于 name 查询业务元数据，例如文档审核场景中的原文位置。
+ */
+export interface TextFieldFocusPayload {
+  name: string;
+  value: string;
+  event: FocusEvent<HTMLInputElement>;
+}
 
 /**
  * DynamicForm 组件对外暴露的方法
@@ -450,6 +461,11 @@ export interface DynamicFormProps {
   defaultValues?: Record<string, any>;
   onSubmit?: (data: Record<string, any>) => void | Promise<void>;
   onChange?: (data: Record<string, any>) => void;
+  /**
+   * 文本字段获得焦点时触发。
+   * 仅 `text` Widget 会调用该回调，其他 Widget 不受影响。
+   */
+  onTextFieldFocus?: (payload: TextFieldFocusPayload) => void;
 
   // 自定义配置
   widgets?: Record<string, React.ComponentType<any>>;

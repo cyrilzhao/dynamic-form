@@ -72,7 +72,7 @@ Schema 核心  联动系统    字段渲染
 `DynamicForm.tsx` 是系统编排入口，负责：
 
 1. 创建或复用 React Hook Form 上下文。
-2. 合并 Schema 默认值与调用方默认值。
+2. 按字段路径提取并合并 Schema 默认值与调用方默认值：外部 `defaultValues` 优先；object 默认值覆盖其明确键，缺失键由子 Schema 默认值补齐；array 默认值保持整体快照。
 3. 创建 Schema resolver，并在动态 Schema 变化后使用有效 Schema 验证。
 4. 解析静态联动并接入数组动态联动。
 5. 组装 Helpers、Callbacks、Widgets、路径和联动状态 Context。

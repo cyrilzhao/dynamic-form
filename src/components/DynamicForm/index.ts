@@ -4,6 +4,7 @@ export type {
   DynamicFormRef,
   FieldWidgetProps,
   NestedFormWidgetProps,
+  TextFieldFocusPayload,
 } from "./types";
 export { FieldRegistry } from "./core/FieldRegistry";
 export { SchemaParser } from "./core/SchemaParser";

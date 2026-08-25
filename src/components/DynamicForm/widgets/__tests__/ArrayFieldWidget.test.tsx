@@ -128,6 +128,51 @@ describe("ArrayFieldWidget", () => {
       const addButton = screen.getByRole("button", { name: /add/i });
       expect(addButton).toBeDisabled();
     });
+
+    it("canAdd 为 false 时不应该显示添加按钮", () => {
+      render(
+        <FormWrapper defaultValues={{ items: [] }}>
+          <ArrayFieldWidget
+            name="items"
+            schema={simpleStringSchema}
+            canAdd={false}
+          />
+        </FormWrapper>,
+      );
+
+      expect(screen.queryByRole("button", { name: /add/i })).toBeNull();
+    });
+
+    it("canRemove 为 false 时不应该显示删除按钮", () => {
+      render(
+        <FormWrapper defaultValues={{ items: [{ value: "a" }] }}>
+          <ArrayFieldWidget
+            name="items"
+            schema={simpleStringSchema}
+            canRemove={false}
+          />
+        </FormWrapper>,
+      );
+
+      expect(screen.queryByTitle("Delete")).toBeNull();
+    });
+
+    it("canReorder 为 false 时不应该显示移动按钮", () => {
+      render(
+        <FormWrapper
+          defaultValues={{ items: [{ value: "a" }, { value: "b" }] }}
+        >
+          <ArrayFieldWidget
+            name="items"
+            schema={simpleStringSchema}
+            canReorder={false}
+          />
+        </FormWrapper>,
+      );
+
+      expect(screen.queryByTitle("Move up")).toBeNull();
+      expect(screen.queryByTitle("Move down")).toBeNull();
+    });
   });
 
   describe("禁用状态", () => {

@@ -243,6 +243,32 @@ formRef.current?.getValue('users');
 - ⚠️ 批量操作（提案/未实现）
 - ✅ 最小/最大数量限制
 
+#### 操作权限配置
+
+动态数组可通过 `schema.ui.widgetProps` 分别控制三个操作入口：
+
+| 配置 | 默认值 | 效果 |
+|---|---|---|
+| `canAdd` | `true` | 是否显示添加按钮 |
+| `canRemove` | `true` | 是否显示每项的删除按钮 |
+| `canReorder` | `true` | 是否显示每项的上移和下移按钮 |
+
+```typescript
+{
+  type: 'array',
+  items: { type: 'string' },
+  ui: {
+    widgetProps: {
+      canAdd: true,
+      canRemove: false,
+      canReorder: false,
+    },
+  },
+}
+```
+
+这三个配置仅影响动态数组的操作入口。`disabled`、`readonly` 和 `arrayMode: 'static'` 优先级更高，仍会禁止全部动态数组操作；`minItems` 和 `maxItems` 继续分别限制删除和新增。
+
 #### 按钮禁用状态和用户提示
 
 为了提供更好的用户体验，当操作按钮因限制而无法使用时，不会直接隐藏按钮，而是显示为禁用状态，并通过 Tooltip 告知用户原因：
@@ -534,7 +560,7 @@ const schema = {
 
 **重要说明**：
 
-数组特有配置（如 `arrayMode`、`showAddButton`、`addButtonText` 等）**不是通过 Props 直接传递的**，而是通过 `schema.ui` 配置传递。ArrayFieldWidget 内部会从 `schema.ui` 中读取这些配置。
+数组模式和展示文案（如 `arrayMode`、`addButtonText`）通过 `schema.ui` 读取；操作权限（`canAdd`、`canRemove`、`canReorder`）通过 `schema.ui.widgetProps` 展开后直接传入组件。
 
 **实际的 Props 接口**：
 
@@ -564,6 +590,11 @@ export interface ArrayFieldWidgetProps extends FieldWidgetProps {
   // 布局配置（继承自父级或全局配置）
   layout?: 'vertical' | 'horizontal' | 'inline';
   labelWidth?: number | string;
+
+  // 动态数组操作权限（默认均为 true）
+  canAdd?: boolean;
+  canRemove?: boolean;
+  canReorder?: boolean;
 }
 ```
 

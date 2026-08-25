@@ -12,7 +12,7 @@ import { resolveTransformFn } from '../utils/resolveTransformFn'
 import { executeInlineScript } from '../utils/executeInlineScript'
 import type { CallbackPropRef, FieldConfig } from '../types/schema'
 import type { LinkageResult } from '../types/linkage'
-import type { NestedFormWidgetProps } from '../types'
+import type { NestedFormWidgetProps, TextFieldFocusPayload } from '../types'
 
 // 通过 globalThis 访问 Function 构造器，避免静态分析误报
 const DynamicFn = globalThis['Function'] as FunctionConstructor // trusted-dynamic-code
@@ -30,6 +30,7 @@ export interface FormFieldProps {
   enableVirtualScroll?: boolean
   virtualScrollHeight?: number
   columnsCount?: number
+  onTextFieldFocus?: (payload: TextFieldFocusPayload) => void
 }
 
 /**
@@ -285,6 +286,7 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
   enableVirtualScroll,
   virtualScrollHeight,
   columnsCount = 1,
+  onTextFieldFocus,
 }) => {
   const { control } = useFormContext()
 
@@ -377,6 +379,27 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
     ...resolvedCallbacks,
   }
 
+  const mergedTextFieldFocusHandler = useCallback(
+    (event: React.FocusEvent<HTMLInputElement>) => {
+      const widgetOnFocus = resolvedCallbacks.onFocus ?? widgetProps?.onFocus
+      if (typeof widgetOnFocus === 'function') {
+        widgetOnFocus(event)
+      }
+
+      onTextFieldFocus?.({
+        name: field.name,
+        value: event.currentTarget.value,
+        event,
+      })
+    },
+    [field.name, onTextFieldFocus, resolvedCallbacks.onFocus, widgetProps?.onFocus]
+  )
+
+  const textFieldFocusProps =
+    resolvedWidget === 'text' && onTextFieldFocus
+      ? { onFocus: mergedTextFieldFocusHandler }
+      : {}
+
   return (
     <FormGroup
       label={
@@ -414,7 +437,11 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
           rules={field.validation}
           render={({ field: controllerField, fieldState }) => {
             const error = fieldState.error?.message
-            const valueWidgetProps = { error, ...commonWidgetProps }
+            const valueWidgetProps = {
+              error,
+              ...commonWidgetProps,
+              ...textFieldFocusProps,
+            }
 
             return (
               <>
@@ -479,7 +506,8 @@ export function arePropsEqual(
     prevProps.fieldLabelStyle !== nextProps.fieldLabelStyle ||
     prevProps.fieldControlStyle !== nextProps.fieldControlStyle ||
     prevProps.enableVirtualScroll !== nextProps.enableVirtualScroll ||
-    prevProps.virtualScrollHeight !== nextProps.virtualScrollHeight
+    prevProps.virtualScrollHeight !== nextProps.virtualScrollHeight ||
+    prevProps.onTextFieldFocus !== nextProps.onTextFieldFocus
   ) {
     return false
   }
