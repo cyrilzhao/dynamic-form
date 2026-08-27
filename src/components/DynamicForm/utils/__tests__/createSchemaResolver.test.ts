@@ -34,6 +34,27 @@ describe("createSchemaResolver", () => {
     expect((result.errors as any).email?.message).toBe("Email is required");
   });
 
+  it("提交校验应执行 customFormats 并使用自定义错误消息", async () => {
+    const formatSchema: ExtendedJSONSchema = {
+      type: "object",
+      properties: {
+        phone: {
+          type: "string",
+          title: "Phone",
+          format: "phone",
+          ui: { errorMessages: { format: "Invalid phone" } },
+        },
+      },
+    };
+    const resolver = createSchemaResolver(formatSchema, {}, undefined, undefined, {
+      phone: (value: string) => /^1\d{10}$/.test(value),
+    });
+
+    const result = await resolver({ phone: "invalid" }, undefined, {} as any);
+
+    expect((result.errors as any).phone?.message).toBe("Invalid phone");
+  });
+
   it("数组子字段错误转换为嵌套结构", async () => {
     const arraySchema: ExtendedJSONSchema = {
       type: "object",

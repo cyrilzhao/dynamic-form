@@ -510,7 +510,8 @@ const DynamicFormInner = React.memo(
           schema,
           stableCallbacks,
           linkageStatesRef,
-          helpersRef
+          helpersRef,
+          stableCustomFormats,
         ),
       })
 
