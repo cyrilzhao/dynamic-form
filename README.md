@@ -1046,6 +1046,9 @@ JSON Schema provides a rich set of built-in validation keywords:
 - `exclusiveMinimum` / `exclusiveMaximum` - Exclusive range
 - `multipleOf` - Must be a multiple of specified value
 
+Use the matching `ui.errorMessages` keys (`min`, `max`, `exclusiveMinimum`,
+`exclusiveMaximum`, and `multipleOf`) to customize number validation messages.
+
 **Array Validation:**
 
 - `minItems` / `maxItems` - Item count constraints

@@ -874,6 +874,18 @@ describe("PropertyEditor", () => {
       fireEvent.click(screen.getByText("Validation"));
       expect(screen.getByText("Maximum Error Message")).toBeInTheDocument();
     });
+
+    it("应该显示 Multiple Of Error Message 输入框", () => {
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          selectedPath: ["properties", "age"],
+        }),
+      });
+
+      fireEvent.click(screen.getByText("Validation"));
+      expect(screen.getByText("Multiple Of Error Message")).toBeInTheDocument();
+    });
   });
 
   describe("Validation 标签页 - string 类型验证", () => {
@@ -1293,6 +1305,24 @@ describe("PropertyEditor", () => {
         "Custom error message for maximum",
       );
       fireEvent.change(errorMsgInput, { target: { value: "Max error" } });
+      expect(onUpdate).toHaveBeenCalled();
+    });
+
+    it("修改 Multiple Of Error Message 应该调用 onUpdate", () => {
+      const onUpdate = jest.fn();
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          selectedPath: ["properties", "age"],
+          onUpdate,
+        }),
+      });
+
+      fireEvent.click(screen.getByText("Validation"));
+      const errorMsgInput = screen.getByPlaceholderText(
+        "Custom error message for multipleOf",
+      );
+      fireEvent.change(errorMsgInput, { target: { value: "Multiple error" } });
       expect(onUpdate).toHaveBeenCalled();
     });
   });
