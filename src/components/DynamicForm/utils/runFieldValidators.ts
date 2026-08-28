@@ -84,11 +84,13 @@ export async function runAllFieldValidators(
       values,
     );
 
+  // 递归遍历 schema，保留 profile.name、items[0].code 等完整路径以准确定位错误。
   const visit = async (
     currentSchema: ExtendedJSONSchema,
     path: string,
   ): Promise<void> => {
     const validators = currentSchema.ui?.validators;
+    // 当前节点先校验，再递归子节点，确保字段自身规则不会遗漏。
     if (validators?.length) {
       for (const rule of validators) {
         const error = await runValidator(
@@ -115,6 +117,7 @@ export async function runAllFieldValidators(
       );
     }
 
+    // items 代表数组元素 schema；按实际索引递归，并通过路径读取真实值。
     if (currentSchema.items && !Array.isArray(currentSchema.items) && typeof currentSchema.items !== "boolean") {
       const arrayValue = getValue(path);
       if (Array.isArray(arrayValue)) {

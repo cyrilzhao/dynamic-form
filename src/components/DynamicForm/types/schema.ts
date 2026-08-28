@@ -37,6 +37,7 @@ export interface ErrorMessages {
   maxLength?: string;
   min?: string;
   max?: string;
+  /** key 与 SchemaValidator 的规则名对应，用于覆盖默认提示。 */
   exclusiveMinimum?: string;
   exclusiveMaximum?: string;
   multipleOf?: string;

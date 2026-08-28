@@ -118,13 +118,14 @@ export function createSchemaResolver(
     >
   >,
   helpersRef?: RefObject<Record<string, any>>,
+  // 按表单实例传入，避免多个表单共享可变的全局 format 配置。
   customFormats: Record<string, (value: string) => boolean> = {},
 ): Resolver {
   return async (values) => {
     const linkageStates = linkageStatesRef?.current ?? {};
     const helpers = helpersRef?.current ?? {};
 
-    // 构建应用了 schema 联动的动态 schema
+    // 提交时校验联动后的 effective schema，确保动态约束真正生效。
     let effectiveSchema = schema;
 
     // 如果有 schema 联动，需要构建合并后的 schema
@@ -155,6 +156,7 @@ export function createSchemaResolver(
     }
 
     // 使用合并后的 schema 进行验证
+    // 显式传递 customFormats，使动态 schema 的自定义 format 仍可校验。
     const validator = new SchemaValidator(effectiveSchema, undefined, customFormats);
     const schemaErrors = validator.validate(values);
     const fieldValidatorErrors = await runAllFieldValidators(
@@ -163,12 +165,14 @@ export function createSchemaResolver(
       callbacks,
       helpers,
     );
+    // 标准 Schema 规则与 ui.validators 业务规则互补，合并后统一映射给 RHF。
     const errors = { ...schemaErrors, ...fieldValidatorErrors };
 
     if (Object.keys(errors).length === 0) {
       return { values, errors: {} };
     }
 
+    // 先过滤隐藏/禁用字段再构造错误树，避免空的父级错误节点阻塞提交。
     const fieldErrors: FieldErrors = {};
     for (const [field, message] of Object.entries(errors)) {
       if (isHiddenOrDisabled(field, linkageStates, schema)) {

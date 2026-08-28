@@ -1051,6 +1051,7 @@ export const PropertyEditor: React.FC = () => {
                         />
                       </FormGroup>
                       <FormGroup label="Multiple Of Error Message">
+                        {/* 为 ui.errorMessages.multipleOf 提供配置入口，并保留已有错误消息。 */}
                         <Controller
                           name="ui.errorMessages.multipleOf"
                           control={control}
