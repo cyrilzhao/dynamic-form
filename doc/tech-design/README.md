@@ -18,6 +18,7 @@
 ## 核心专题
 
 - [Schema 与验证](./schema-and-validation.md)（现行实现，含能力边界）：项目支持的 Schema 约束、条件验证和自定义字段验证。
+- [多类型字段与可切换 Widget](./polymorphic-field-variants.md)（提案/未实现）：同一字段在不同数据类型、Widget、校验和 transform 模式之间自动识别与手动切换的设计。
 - [联动系统](./linkage.md)（现行实现）：统一联动模型、执行流程、异步控制和数组联动。
 - [字段路径](./field-path.md)（现行实现）：标准点号路径、路径透明化和数组模板路径。
 - [嵌套表单](./nested-form.md)（现行实现）：嵌套对象、动态 Schema 和提交数据过滤。
