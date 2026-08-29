@@ -25,6 +25,8 @@ import { LinkagesEditor } from './components/LinkagesEditor'
 import { TransformEditor } from './components/TransformEditor'
 import { CallbackPropsEditor } from './components/CallbackPropsEditor'
 import { ObjectEditor } from '../../../ObjectEditor'
+import { VariantsEditor } from './components/VariantsEditor'
+import JsonView from '../../../JsonView'
 import type { ExtendedJSONSchema } from '@/components/DynamicForm'
 
 // Helper to get node from path
@@ -205,7 +207,7 @@ const getDefaultWidget = (schema: any): string => {
 }
 
 export const PropertyEditor: React.FC = () => {
-  const { schema, selectedPath, onUpdate } = useSchemaBuilder()
+  const { schema, selectedPath, onUpdate, options } = useSchemaBuilder()
   const currentNode = getNode(schema, selectedPath)
 
   // 将 selectedPath 数组转换为 JSON Pointer 格式
@@ -237,7 +239,7 @@ export const PropertyEditor: React.FC = () => {
   // Determine if it's a schema-level node (only root)
   // 只有根节点应该只显示条件验证配置
   // 其他节点（包括 object 类型）都应该显示完整的字段配置
-  const isSchemaLevelNode = isRoot
+  const isSchemaLevelNode = isRoot && !options?.rootType
 
   const [selectedTabId, setSelectedTabId] = useState(
     isSchemaLevelNode ? 'validation' : 'basic'
@@ -423,11 +425,11 @@ export const PropertyEditor: React.FC = () => {
       'radio',
       'checkbox',
     ],
-    number: [],
-    integer: [],
+    number: ['range'],
+    integer: ['range'],
     boolean: ['checkbox', 'radio'],
     array: ['key-value-array', 'table-array', 'select', 'radio'],
-    object: [],
+    object: ['object-editor'],
   }
 
   const currentType = watch('type') as SchemaNodeType
@@ -440,12 +442,18 @@ export const PropertyEditor: React.FC = () => {
   )
   const showWidgetConfig = currentWidgetOptions.length > 0
   const defaultWidget = getDefaultWidget(currentNode)
+  const editorReadonly = options?.readonly?.all || options?.readonly?.schema || options?.readonly?.propertyEditor
+
+  if (editorReadonly) {
+    return <div className="property-editor"><JsonView title="Schema (Read Only)" data={currentNode} /></div>
+  }
 
   return (
     <div className="property-editor">
       {isSchemaLevelNode ? (
         // Schema 层级节点:只显示条件验证配置
         <div className="editor-panel">
+          {options?.hidden?.rootValidation ? null : <>
           <Callout
             intent="primary"
             icon="info-sign"
@@ -540,6 +548,7 @@ export const PropertyEditor: React.FC = () => {
             }}
             disabled={false}
           />
+          </>}
         </div>
       ) : (
         // 字段级别节点:显示完整的配置标签页
@@ -561,6 +570,7 @@ export const PropertyEditor: React.FC = () => {
                   >
                     <InputGroup
                       value={keyInput}
+                      disabled={options?.readonly?.editFieldKey}
                       intent={keyError ? 'danger' : 'none'}
                       onChange={(e) => setKeyInput(e.target.value)}
                       onBlur={handleKeyChange}
@@ -610,8 +620,8 @@ export const PropertyEditor: React.FC = () => {
                     name="type"
                     control={control}
                     render={({ field }) => (
-                      <Select
-                        value={field.value ?? ''}
+                        <Select
+                          value={field.value ?? ''}
                         onChange={(value) => {
                           field.onChange(value)
                           handleFieldChange('type', value)
@@ -619,7 +629,7 @@ export const PropertyEditor: React.FC = () => {
                           handleFieldChange('default', undefined)
                         }}
                         options={typeOptions}
-                        disabled={isRoot}
+                          disabled={isRoot || options?.readonly?.editFieldType}
                       />
                     )}
                   />
@@ -2029,6 +2039,34 @@ export const PropertyEditor: React.FC = () => {
               </div>
             }
           />
+
+          {!options?.hidden?.variantsTab && !isArrayItems && <Tab
+            id="variants"
+            title="Variants"
+            panel={
+              <div className="editor-panel">
+                <ConfigSection
+                  title="Field Variants"
+                  description="Configure independent data types and widgets for this field."
+                >
+                  <VariantsEditor
+                    value={currentNode.ui?.variants}
+                    defaultVariant={currentNode.ui?.defaultVariant}
+                    onChange={(variants, nextDefaultVariant) => {
+                      onUpdate(selectedPath, {
+                        ui: {
+                          ...currentNode.ui,
+                          variants,
+                          defaultVariant: nextDefaultVariant,
+                        },
+                      })
+                    }}
+                    disabled={isArrayItems}
+                  />
+                </ConfigSection>
+              </div>
+            }
+          />}
         </Tabs>
       )}
     </div>

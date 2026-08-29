@@ -80,6 +80,21 @@ export type ValidatorRule = ScriptValidator;
  */
 export type CallbackPropRef = string | { type: "script"; code: string };
 
+/** 多类型字段的单个编辑模式配置。模式之间默认相互独立，不隐式转换值。 */
+export interface FieldVariant {
+  name: string;
+  label?: string;
+  type: "string" | "number" | "integer" | "boolean" | "array" | "object" | "null";
+  widget?: WidgetType | string;
+  schema?: ExtendedJSONSchema;
+  detect?: { type?: "template" | "predicate"; pattern?: string; callback?: string };
+  transform?: {
+    callback: CallbackPropRef;
+    reverseCallback?: CallbackPropRef;
+    hideConvertedValue?: boolean;
+  };
+}
+
 export interface UIConfig {
   widget?: WidgetType | string;
   placeholder?: string;
@@ -91,6 +106,10 @@ export interface UIConfig {
   style?: React.CSSProperties;
   order?: string[];
   errorMessages?: ErrorMessages;
+  /** 同一字段可选的独立编辑模式，由 VariantWidget 在运行时选择。 */
+  variants?: FieldVariant[];
+  /** 空值或无法自动识别时使用的模式名称。 */
+  defaultVariant?: string;
   linkages?: LinkageConfig[]; // 联动配置（支持多个联动规则）
   labelWidth?: number | string; // 标签宽度（仅在 horizontal layout 下生效）
   layout?: "vertical" | "horizontal" | "inline"; // 布局方式（优先级高于全局配置）

@@ -28,6 +28,10 @@
 - [大规模数据性能优化](./large-scale-data-optimization.md)（提案/未实现）：数千数组项场景的候选优化方案。
 - [自定义 Widget 管理](./custom-widget.md)（部分实现）：当前前端 Mock 管理能力和未来服务端方案。
 
+## SchemaBuilder 设计
+
+- [SchemaBuilder 技术设计索引](./schema-builder/README.md)：SchemaBuilder 组件与 Variants 配置设计。
+
 ## Widget 设计
 
 - [ArrayField](./widgets/array-field.md)（部分实现）

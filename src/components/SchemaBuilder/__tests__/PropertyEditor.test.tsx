@@ -809,7 +809,7 @@ describe("PropertyEditor", () => {
       expect(screen.getByText("Required Error Message")).toBeInTheDocument();
     });
 
-    it("number 类型没有可选 Widget 时应该隐藏 Widget 字段", () => {
+    it("number 类型应该提供可覆盖默认行为的 Widget", () => {
       render(<PropertyEditor />, {
         wrapper: createWrapper({
           ...defaultContextValue,
@@ -819,7 +819,10 @@ describe("PropertyEditor", () => {
 
       fireEvent.click(screen.getByText("UI Config"));
 
-      expect(screen.queryByText("Widget")).not.toBeInTheDocument();
+      expect(screen.getByText("Widget")).toBeInTheDocument();
+      const widgetSelect = getFormGroupSelect("Widget");
+      expect(widgetSelect.options[0]).toHaveTextContent("Default (number)");
+      expect(widgetSelect.options[1]).toHaveTextContent("Range");
       expect(screen.getByText("Placeholder")).toBeInTheDocument();
     });
 
