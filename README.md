@@ -1706,6 +1706,33 @@ When options change, DynamicForm automatically clears the field value if it's no
 // → subcategory is automatically cleared (laptop not in books options)
 ```
 
+Set `invalidValuePolicy: 'retain'` on an options linkage when historical values must remain submittable, such as a permanently disabled field. `retain` keeps both invalid single values and invalid items in a multi-select array; it does not add those values back to the current options list.
+
+Async option functions must return `undefined` while data is still loading. This preserves the previous options and current value; return `[]` only after loading completes and there are truly no options.
+
+Use `invalidValuePolicy: 'fallback'` with `fallbackValue` when a single-select field has a known replacement. DynamicForm writes the fallback only when it is included in the final options; otherwise it clears the invalid value.
+
+```typescript
+{
+  type: 'options',
+  dependencies: ['#/properties/country'],
+  invalidValuePolicy: 'fallback',
+  fallbackValue: 'shanghai',
+  fulfill: { function: 'getCityOptions' },
+}
+```
+
+```typescript
+{
+  type: 'options',
+  dependencies: ['#/properties/category'],
+  invalidValuePolicy: 'retain', // default: 'clear'
+  fulfill: { function: 'getAvailableOptions' },
+}
+```
+
+When multiple options linkages target the same field, the last options linkage determines both the final options and the invalid-value policy. Applications using `retain` must ensure their validation and backend contracts accept retained historical values.
+
 **Using linkageContext for External Data:**
 
 When linkage functions need to access external data (e.g., API responses, page-level state), use `linkageContext` to pass it cleanly without closure issues:
@@ -2998,6 +3025,20 @@ When options change, the form automatically clears the field value if it's no lo
 // If user selects category='electronics' and subcategory='laptop',
 // then changes category to 'books', the subcategory field will be
 // automatically cleared since 'laptop' is not in the books options.
+```
+
+For permanently disabled fields that must submit a historical value, configure `invalidValuePolicy: 'retain'` on the options linkage. The default is `'clear'`; `retain` preserves invalid single values and all invalid items in multi-select values without making them selectable again. Async functions should return `undefined` while options are not ready, which preserves the previous options and value. Return `[]` only for a completed empty result.
+
+For a single-select field with an approved replacement, use `invalidValuePolicy: 'fallback'` and `fallbackValue`. The replacement is written only if it exists in the final options; otherwise the invalid value is cleared.
+
+```typescript
+{
+  type: 'options',
+  dependencies: ['#/properties/category'],
+  invalidValuePolicy: 'fallback',
+  fallbackValue: 'shanghai',
+  fulfill: { function: 'getAvailableOptions' },
+}
 ```
 
 ### Nested Forms
