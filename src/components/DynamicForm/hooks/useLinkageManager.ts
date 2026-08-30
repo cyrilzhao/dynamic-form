@@ -198,21 +198,22 @@ export function useLinkageManager({
   // 获取 helpers
   const helpers = useHelpers();
 
-  const ownOperationControllerRef = useRef(new LinkageOperationController());
-  const controller = operationController ?? ownOperationControllerRef.current;
-  const scopeIdRef = useRef(
-    `linkage-manager-${++linkageManagerScopeCounter}`,
+  const [ownOperationController] = useState(
+    () => new LinkageOperationController(),
   );
-  const scopeId = scopeIdRef.current;
+  const controller = operationController ?? ownOperationController;
+  const [scopeId] = useState(
+    () => `linkage-manager-${++linkageManagerScopeCounter}`,
+  );
 
   // 创建异步序列号管理器实例（使用 useRef 保持引用稳定）
-  const asyncSequenceManager = useRef(new AsyncSequenceManager()).current;
+  const [asyncSequenceManager] = useState(() => new AsyncSequenceManager());
 
   // 创建任务队列管理器实例
-  const taskQueue = useRef(new LinkageTaskQueue()).current;
+  const [taskQueue] = useState(() => new LinkageTaskQueue());
 
   // 创建缓存管理器实例
-  const cache = useRef(new LinkageResultCache()).current;
+  const [cache] = useState(() => new LinkageResultCache());
 
   // 构建依赖图
   // v3.1 更新：支持数组格式的联动配置
@@ -397,12 +398,16 @@ export function useLinkageManager({
     dependencyGraph: DependencyGraph;
     getValues: typeof getValues;
     applyLinkageResults: typeof applyLinkageResults;
+    linkageContext: Record<string, any>;
+    helpers: Record<string, any>;
   }>({
     linkages,
     linkageFunctions,
     dependencyGraph,
     getValues,
     applyLinkageResults,
+    linkageContext,
+    helpers,
   });
   runtimeRef.current = {
     linkages,
@@ -410,6 +415,8 @@ export function useLinkageManager({
     dependencyGraph,
     getValues,
     applyLinkageResults,
+    linkageContext,
+    helpers,
   };
 
   /**
@@ -463,6 +470,8 @@ export function useLinkageManager({
           dependencyGraph: currentDependencyGraph,
           getValues: currentGetValues,
           applyLinkageResults: currentApplyLinkageResults,
+          linkageContext: currentLinkageContext,
+          helpers: currentHelpers,
         } = runtimeRef.current;
 
         const formData =
@@ -480,11 +489,11 @@ export function useLinkageManager({
             linkages: currentLinkages,
             formData,
             linkageFunctions: currentLinkageFunctions,
-            linkageContext,
+            linkageContext: currentLinkageContext,
             asyncSequenceManager,
             dependencyGraph: currentDependencyGraph,
             cache,
-            helpers,
+            helpers: currentHelpers,
             _caller: `processQueue(trigger=${task.fieldName})`,
           });
 
@@ -662,6 +671,8 @@ export function useLinkageManager({
         dependencyGraph: currentDependencyGraph,
         getValues: currentGetValues,
         applyLinkageResults: currentApplyLinkageResults,
+        linkageContext: currentLinkageContext,
+        helpers: currentHelpers,
       } = runtimeRef.current;
 
       const formData = cloneFormData(currentGetValues());
@@ -676,12 +687,12 @@ export function useLinkageManager({
         linkages: currentLinkages,
         formData,
         linkageFunctions: currentLinkageFunctions,
-        linkageContext,
+        linkageContext: currentLinkageContext,
         asyncSequenceManager,
         dependencyGraph: currentDependencyGraph,
         cache,
         skipSequenceCheck: true,
-        helpers,
+        helpers: currentHelpers,
         _caller: "refreshLinkage",
       });
       // 使用公共函数应用联动结果
