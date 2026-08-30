@@ -1,5 +1,11 @@
 import type { ExtendedJSONSchema, ValidatorRule } from "../types/schema";
 import { executeInlineScript } from "./executeInlineScript";
+import {
+  buildVariantSchema,
+  detectVariant,
+  fallbackVariant,
+} from "./resolveVariant";
+import type { FieldVariantStore } from "../context/FieldVariantContext";
 
 // 通过 globalThis 访问 Function 构造器，避免静态分析误报
 const DynamicFn = globalThis["Function"] as FunctionConstructor; // trusted-dynamic-code
@@ -13,7 +19,13 @@ async function runValidator(
 ): Promise<string | null> {
   if (rule.type === "script") {
     // 解析 callback 函数
-    let fn: ((params: { value: any; formValues: Record<string, any>; helpers: Record<string, any> }) => any) | undefined;
+    let fn:
+      | ((params: {
+          value: any;
+          formValues: Record<string, any>;
+          helpers: Record<string, any>;
+        }) => any)
+      | undefined;
 
     if (typeof rule.callback === "string") {
       // 从 callbacks 注册表获取函数
@@ -31,7 +43,11 @@ async function runValidator(
       // 执行内联 JavaScript 函数字符串，使用 executeInlineScript
       const scriptCode = rule.callback.code; // 类型已收窄
       try {
-        fn = (params: { value: any; formValues: Record<string, any>; helpers: Record<string, any> }) =>
+        fn = (params: {
+          value: any;
+          formValues: Record<string, any>;
+          helpers: Record<string, any>;
+        }) =>
           executeInlineScript({
             code: scriptCode,
             params: { value: params.value, formValues: params.formValues },
@@ -75,21 +91,57 @@ export async function runAllFieldValidators(
   schema: ExtendedJSONSchema,
   callbacks: Record<string, (...args: any[]) => any>,
   helpers: Record<string, any> = {},
+  variantStore?: FieldVariantStore,
 ): Promise<Record<string, string>> {
   const errors: Record<string, string> = {};
 
   const getValue = (path: string): any =>
-    path.replace(/\[(\d+)\]/g, ".$1").split(".").reduce(
-      (current: any, key: string) => current?.[key],
-      values,
-    );
+    path
+      .replace(/\[(\d+)\]/g, ".$1")
+      .split(".")
+      .reduce((current: any, key: string) => current?.[key], values);
+
+  const resolveVariant = async (
+    schema: ExtendedJSONSchema,
+    value: unknown,
+    path = "",
+  ): Promise<ExtendedJSONSchema> => {
+    const variants = schema.ui?.variants;
+    if (!variants?.length) return schema;
+    const activeName = variantStore?.getActive(path);
+    console.info("[VariantDebug] validators", {
+      path,
+      value: JSON.stringify(value),
+      activeName,
+      variants: variants.map((variant) => variant.name),
+    });
+    const variant =
+      variants.find((item) => item.name === activeName) ||
+      (await detectVariant({
+        variants,
+        value,
+        formData: values,
+        context: { fieldPath: path },
+        callbacks,
+        helpers,
+      })) ||
+      fallbackVariant(schema, value);
+    console.info("cyril variant: ", variant);
+    if (!variant) return schema;
+    return buildVariantSchema(schema, variant);
+  };
 
   // 递归遍历 schema，保留 profile.name、items[0].code 等完整路径以准确定位错误。
   const visit = async (
     currentSchema: ExtendedJSONSchema,
     path: string,
   ): Promise<void> => {
-    const validators = currentSchema.ui?.validators;
+    const effectiveSchema = await resolveVariant(
+      currentSchema,
+      getValue(path),
+      path,
+    );
+    const validators = effectiveSchema.ui?.validators;
     // 当前节点先校验，再递归子节点，确保字段自身规则不会遗漏。
     if (validators?.length) {
       for (const rule of validators) {
@@ -107,21 +159,34 @@ export async function runAllFieldValidators(
       }
     }
 
-    if (currentSchema.properties) {
+    if (effectiveSchema.properties) {
       await Promise.all(
-        Object.entries(currentSchema.properties).map(async ([name, child]) => {
-          if (typeof child !== "boolean") {
-            await visit(child, path ? `${path}.${name}` : name);
-          }
-        }),
+        Object.entries(effectiveSchema.properties).map(
+          async ([name, child]) => {
+            if (typeof child !== "boolean") {
+              await visit(child, path ? `${path}.${name}` : name);
+            }
+          },
+        ),
       );
     }
 
     // items 代表数组元素 schema；按实际索引递归，并通过路径读取真实值。
-    if (currentSchema.items && !Array.isArray(currentSchema.items) && typeof currentSchema.items !== "boolean") {
+    if (
+      effectiveSchema.items &&
+      !Array.isArray(effectiveSchema.items) &&
+      typeof effectiveSchema.items !== "boolean"
+    ) {
       const arrayValue = getValue(path);
       if (Array.isArray(arrayValue)) {
-        await Promise.all(arrayValue.map((_, index) => visit(currentSchema.items as ExtendedJSONSchema, `${path}[${index}]`)));
+        await Promise.all(
+          arrayValue.map((_, index) =>
+            visit(
+              effectiveSchema.items as ExtendedJSONSchema,
+              `${path}[${index}]`,
+            ),
+          ),
+        );
       }
     }
   };

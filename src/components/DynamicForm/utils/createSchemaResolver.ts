@@ -4,6 +4,12 @@ import { SchemaValidator } from "../core/SchemaValidator";
 import { runAllFieldValidators } from "./runFieldValidators";
 import { mergeSchemaWithLinkage } from "./mergeSchemaWithLinkage";
 import type { ExtendedJSONSchema } from "../types/schema";
+import {
+  buildVariantSchema,
+  detectVariantSync,
+  fallbackVariant,
+} from "./resolveVariant";
+import type { FieldVariantStore } from "../context/FieldVariantContext";
 
 /**
  * 将扁平路径（如 "arr[0].name"）写入嵌套错误对象
@@ -120,7 +126,73 @@ export function createSchemaResolver(
   helpersRef?: RefObject<Record<string, any>>,
   // 按表单实例传入，避免多个表单共享可变的全局 format 配置。
   customFormats: Record<string, (value: string) => boolean> = {},
+  variantStore?: FieldVariantStore,
 ): Resolver {
+  const resolveVariant = (
+    fieldSchema: ExtendedJSONSchema,
+    value: unknown,
+    path = "",
+  ) => {
+    const variants = fieldSchema.ui?.variants;
+    if (!variants?.length) return null;
+    const activeName = variantStore?.getActive(path);
+    console.info("[VariantDebug] resolver", {
+      path,
+      value: JSON.stringify(value),
+      activeName,
+      variants: variants.map((variant) => variant.name),
+    });
+    return (
+      variants.find((variant) => variant.name === activeName) ||
+      detectVariantSync({
+        variants,
+        value,
+        formData: {},
+        context: { fieldPath: path },
+        callbacks,
+        helpers: helpersRef?.current || {},
+      }) ||
+      fallbackVariant(fieldSchema, value) ||
+      null
+    );
+  };
+  const applyVariants = (
+    current: ExtendedJSONSchema,
+    value: unknown,
+    path = "",
+  ): ExtendedJSONSchema => {
+    const variant = resolveVariant(current, value, path);
+    const effective: ExtendedJSONSchema = variant
+      ? buildVariantSchema(current, variant)
+      : current;
+    if (
+      effective.properties &&
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value)
+    ) {
+      effective.properties = Object.fromEntries(
+        Object.entries(effective.properties).map(([name, child]) => [
+          name,
+          typeof child === "boolean"
+            ? child
+            : applyVariants(
+                child,
+                (value as Record<string, unknown>)[name],
+                path ? `${path}.${name}` : name,
+              ),
+        ]),
+      );
+    }
+    if (
+      effective.items &&
+      !Array.isArray(effective.items) &&
+      Array.isArray(value)
+    ) {
+      effective.items = applyVariants(effective.items, value[0], `${path}[0]`);
+    }
+    return effective;
+  };
   return async (values) => {
     const linkageStates = linkageStatesRef?.current ?? {};
     const helpers = helpersRef?.current ?? {};
@@ -157,16 +229,28 @@ export function createSchemaResolver(
 
     // 使用合并后的 schema 进行验证
     // 显式传递 customFormats，使动态 schema 的自定义 format 仍可校验。
-    const validator = new SchemaValidator(effectiveSchema, undefined, customFormats);
+    effectiveSchema = applyVariants(effectiveSchema, values);
+    const validator = new SchemaValidator(
+      effectiveSchema,
+      undefined,
+      customFormats,
+    );
     const schemaErrors = validator.validate(values);
     const fieldValidatorErrors = await runAllFieldValidators(
       values,
       schema,
       callbacks,
       helpers,
+      variantStore,
     );
     // 标准 Schema 规则与 ui.validators 业务规则互补，合并后统一映射给 RHF。
     const errors = { ...schemaErrors, ...fieldValidatorErrors };
+    console.info("[VariantDebug] resolver-errors", {
+      values: JSON.stringify(values),
+      schemaErrors: JSON.stringify(schemaErrors),
+      fieldValidatorErrors: JSON.stringify(fieldValidatorErrors),
+      errors: JSON.stringify(errors),
+    });
 
     if (Object.keys(errors).length === 0) {
       return { values, errors: {} };

@@ -53,6 +53,16 @@ import { resolveTransformFn } from './utils/resolveTransformFn'
 import { mergeSchemaWithLinkage } from './utils/mergeSchemaWithLinkage'
 import { LinkageOperationController } from './utils/linkageOperationController'
 import { builtInHelpers } from './utils/builtInHelpers'
+import {
+  createFieldVariantStore,
+  FieldVariantProvider,
+  useFieldVariantStoreOptional,
+} from './context/FieldVariantContext'
+import {
+  buildVariantSchema,
+  detectVariantSync,
+  fallbackVariant,
+} from './utils/resolveVariant'
 import '@blueprintjs/core/lib/css/blueprint.css'
 
 // 空对象常量，避免每次渲染创建新对象
@@ -177,7 +187,7 @@ function transformFormData(
   },
   shouldFilter: boolean = false
 ): Record<string, any> {
-  // 第一步：解包基本类型数组
+  // 第一步：解包基本类型数组。Variant 解析由调用方提前完成，保持本函数纯粹。
   let processedData = unwrapPrimitiveArrays(data, schema)
 
   // 第二步：根据 schema 过滤数据（仅在需要时执行）
@@ -194,6 +204,91 @@ function transformFormData(
   return processedData
 }
 
+function resolveVariantForValue(
+  fieldSchema: ExtendedJSONSchema,
+  value: unknown,
+  callbacks: Record<string, (...args: any[]) => any> = {},
+  helpers: Record<string, any> = {},
+  path = '',
+  variantStore?: ReturnType<typeof createFieldVariantStore>
+) {
+  const variants = fieldSchema.ui?.variants
+  if (!variants?.length) return null
+  const activeName = variantStore?.getActive(path)
+  const activeVariant = variants.find((variant) => variant.name === activeName)
+  if (activeVariant) return activeVariant
+  const detected = detectVariantSync({
+    variants,
+    value,
+    formData: {},
+    context: {},
+    callbacks,
+    helpers,
+  })
+  return detected || fallbackVariant(fieldSchema, value) || null
+}
+
+function getEffectiveVariantSchema(
+  fieldSchema: ExtendedJSONSchema,
+  value: unknown,
+  callbacks: Record<string, (...args: any[]) => any> = {},
+  helpers: Record<string, any> = {},
+  path = '',
+  variantStore?: ReturnType<typeof createFieldVariantStore>
+): ExtendedJSONSchema {
+  const variant = resolveVariantForValue(
+    fieldSchema,
+    value,
+    callbacks,
+    helpers,
+    path,
+    variantStore
+  )
+  if (!variant) return fieldSchema
+  return buildVariantSchema(fieldSchema, variant)
+}
+
+function buildEffectiveSchemaTree({
+  schema,
+  value,
+  callbacks,
+  helpers,
+  variantStore,
+  path = '',
+}: {
+  schema: ExtendedJSONSchema
+  value: any
+  callbacks: Record<string, (...args: any[]) => any>
+  helpers: Record<string, any>
+  variantStore: ReturnType<typeof createFieldVariantStore>
+  path?: string
+}): ExtendedJSONSchema {
+  const effective = getEffectiveVariantSchema(
+    schema,
+    value,
+    callbacks,
+    helpers,
+    path,
+    variantStore
+  )
+  if (effective.properties && value && typeof value === 'object') {
+    effective.properties = Object.fromEntries(
+      Object.entries(effective.properties).map(([key, child]) => [
+        key,
+        buildEffectiveSchemaTree({
+          schema: child as ExtendedJSONSchema,
+          value: value[key],
+          callbacks,
+          helpers,
+          variantStore,
+          path: path ? `${path}.${key}` : key,
+        }),
+      ])
+    )
+  }
+  return effective
+}
+
 /**
  * 将表单数据中所有配置了 ui.transform.callback 的字段值从展示域转为存储域
  *
@@ -207,6 +302,10 @@ function applyFieldTransforms(
   callbacks: Record<string, (...args: any[]) => any>,
   helpers: Record<string, any>
 ): any {
+  console.info('[VariantDebug] applyFieldTransforms-input', {
+    valueType: Array.isArray(data) ? 'array' : typeof data,
+    value: JSON.stringify(data),
+  })
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return data
   }
@@ -216,18 +315,38 @@ function applyFieldTransforms(
       continue
     }
     const fieldSchema = rawSchema as ExtendedJSONSchema
-    const cb = fieldSchema.ui?.transform?.callback
+    const effectiveSchema = getEffectiveVariantSchema(
+      fieldSchema,
+      result[key],
+      callbacks,
+      helpers
+    )
+    const cb = effectiveSchema.ui?.transform?.callback
     const fn = resolveTransformFn(cb, callbacks)
     if (fn) {
       try {
+        console.info('[VariantDebug] applyFieldTransforms-field', {
+          key,
+          before: JSON.stringify(result[key]),
+          callback: typeof cb === 'string' ? cb : 'inline',
+        })
         result[key] = fn({ value: result[key], helpers })
+        console.info('[VariantDebug] applyFieldTransforms-field-output', {
+          key,
+          after: JSON.stringify(result[key]),
+        })
       } catch {
         /* keep */
       }
       continue
     }
-    if (fieldSchema.type === 'object' && fieldSchema.properties) {
-      result[key] = applyFieldTransforms(result[key], fieldSchema, callbacks, helpers)
+    if (effectiveSchema.type === 'object' && effectiveSchema.properties) {
+      result[key] = applyFieldTransforms(
+        result[key],
+        effectiveSchema,
+        callbacks,
+        helpers
+      )
     }
     if (
       fieldSchema.type === 'array' &&
@@ -296,7 +415,13 @@ function reverseFieldTransforms(
       continue
     }
     const fieldSchema = rawSchema as ExtendedJSONSchema
-    const cb = fieldSchema.ui?.transform?.reverseCallback
+    const effectiveSchema = getEffectiveVariantSchema(
+      fieldSchema,
+      result[key],
+      callbacks,
+      helpers
+    )
+    const cb = effectiveSchema.ui?.transform?.reverseCallback
     const fn = resolveTransformFn(cb, callbacks)
     if (fn) {
       try {
@@ -306,19 +431,24 @@ function reverseFieldTransforms(
       }
       continue
     }
-    if (fieldSchema.type === 'object' && fieldSchema.properties) {
-      result[key] = reverseFieldTransforms(result[key], fieldSchema, callbacks, helpers)
+    if (effectiveSchema.type === 'object' && effectiveSchema.properties) {
+      result[key] = reverseFieldTransforms(
+        result[key],
+        effectiveSchema,
+        callbacks,
+        helpers
+      )
     }
     if (
-      fieldSchema.type === 'array' &&
-      !Array.isArray(fieldSchema.items) &&
-      fieldSchema.items &&
+      effectiveSchema.type === 'array' &&
+      !Array.isArray(effectiveSchema.items) &&
+      effectiveSchema.items &&
       Array.isArray(result[key])
     ) {
       result[key] = (result[key] as any[]).map((item) =>
         reverseFieldTransforms(
           item,
-          fieldSchema.items as ExtendedJSONSchema,
+          effectiveSchema.items as ExtendedJSONSchema,
           callbacks,
           helpers
         )
@@ -436,10 +566,16 @@ const DynamicFormInner = React.memo(
 
       // 合并内置和用户提供的 helpers
       // 用户提供的 helpers 优先级更高，可以覆盖内置 helpers
-      const mergedHelpers = useMemo(() => ({
-        ...builtInHelpers,
-        ...stableHelpers,
-      }), [stableHelpers])
+      const mergedHelpers = useMemo(
+        () => ({
+          ...builtInHelpers,
+          ...stableHelpers,
+        }),
+        [stableHelpers]
+      )
+      const parentVariantStore = useFieldVariantStoreOptional()
+      const ownVariantStore = useMemo(() => createFieldVariantStore(), [])
+      const variantStore = parentVariantStore || ownVariantStore
 
       // 设置自定义格式验证器并解析字段
       // 当 asNestedForm 为 true 时，需要为字段名添加 pathPrefix 前缀
@@ -512,6 +648,7 @@ const DynamicFormInner = React.memo(
           linkageStatesRef,
           helpersRef,
           stableCustomFormats,
+          variantStore
         ),
       })
 
@@ -519,6 +656,7 @@ const DynamicFormInner = React.memo(
       // 嵌套表单模式下复用父表单的 FormContext，否则使用自己的
       const methods =
         asNestedForm && parentFormContext ? parentFormContext : ownMethods
+      const watchedValues = methods.watch()
 
       const ownOperationControllerRef = useRef(new LinkageOperationController())
       // 根表单创建控制器，嵌套表单复用 Context 中的控制器。
@@ -698,8 +836,16 @@ const DynamicFormInner = React.memo(
           setValue: (name, value, options) => {
             operationController.markFormMutation()
             const fieldSchema = getSchemaAtPath(schema, name)
+            const effectiveSchema = fieldSchema
+              ? getEffectiveVariantSchema(
+                  fieldSchema,
+                  value,
+                  callbacksRef.current,
+                  mergedHelpers
+                )
+              : undefined
             const reverseFn = resolveTransformFn(
-              fieldSchema?.ui?.transform?.reverseCallback,
+              effectiveSchema?.ui?.transform?.reverseCallback,
               callbacksRef.current
             )
             methods.setValue(
@@ -711,16 +857,35 @@ const DynamicFormInner = React.memo(
           getValue: (name: string) => {
             const displayValue = methods.getValues(name as any)
             const fieldSchema = getSchemaAtPath(schema, name)
+            const effectiveSchema = fieldSchema
+              ? getEffectiveVariantSchema(
+                  fieldSchema,
+                  displayValue,
+                  callbacksRef.current,
+                  mergedHelpers
+                )
+              : undefined
             const fn = resolveTransformFn(
-              fieldSchema?.ui?.transform?.callback,
+              effectiveSchema?.ui?.transform?.callback,
               callbacksRef.current
             )
-            return fn ? fn({ value: displayValue, helpers: mergedHelpers }) : displayValue
+            return fn
+              ? fn({ value: displayValue, helpers: mergedHelpers })
+              : displayValue
           },
           getValues: () => {
             const displayValues = methods.getValues()
             return applyFieldTransforms(
-              transformFormData(displayValues, schema),
+              transformFormData(
+                displayValues,
+                buildEffectiveSchemaTree({
+                  schema,
+                  value: displayValues,
+                  callbacks: callbacksRef.current,
+                  helpers: mergedHelpers,
+                  variantStore,
+                })
+              ),
               schema,
               callbacksRef.current,
               mergedHelpers
@@ -786,6 +951,7 @@ const DynamicFormInner = React.memo(
             }
           },
           validate: async (name) => {
+            methods.clearErrors(name)
             return methods.trigger(name)
           },
           getErrors: () => {
@@ -812,9 +978,27 @@ const DynamicFormInner = React.memo(
       React.useEffect(() => {
         if (onChange) {
           const subscription = watch((data) => {
-            const processedData = transformFormData(data, schema)
+            console.info('[VariantDebug] watch-data', {
+              valueType: Array.isArray(data) ? 'array' : typeof data,
+              value: JSON.stringify(data),
+            })
+            const processedData = transformFormData(
+              data,
+              buildEffectiveSchemaTree({
+                schema,
+                value: data,
+                callbacks: callbacksRef.current,
+                helpers: mergedHelpers,
+                variantStore,
+              })
+            )
             onChange(
-              applyFieldTransforms(processedData, schema, callbacksRef.current, mergedHelpers)
+              applyFieldTransforms(
+                processedData,
+                schema,
+                callbacksRef.current,
+                mergedHelpers
+              )
             )
           })
           return () => subscription.unsubscribe()
@@ -828,13 +1012,24 @@ const DynamicFormInner = React.memo(
             // 使用公共函数进行数据转换，包含过滤步骤
             const filteredData = transformFormData(
               data,
-              schema,
+              buildEffectiveSchemaTree({
+                schema,
+                value: data,
+                callbacks: stableCallbacks,
+                helpers: mergedHelpers,
+                variantStore,
+              }),
               nestedSchemaRegistry || undefined,
               true // 需要过滤数据
             )
 
             await onSubmit(
-              applyFieldTransforms(filteredData, schema, stableCallbacks, mergedHelpers)
+              applyFieldTransforms(
+                filteredData,
+                schema,
+                stableCallbacks,
+                mergedHelpers
+              )
             )
           }
         },
@@ -880,6 +1075,33 @@ const DynamicFormInner = React.memo(
             }}
           >
             {fields.map((field) => {
+              const currentValue = field.name
+                .split('.')
+                .reduce(
+                  (current: any, key) => current?.[key],
+                  methods.getValues()
+                )
+              const variant =
+                field.schema?.ui?.widget === 'variant'
+                  ? null
+                  : resolveVariantForValue(
+                      field.schema || {},
+                      currentValue,
+                      callbacksRef.current,
+                      mergedHelpers
+                    )
+              if (variant) {
+                const variantSchema = buildVariantSchema(
+                  field.schema || {},
+                  variant
+                )
+                field = {
+                  ...field,
+                  type: variant.type,
+                  widget: variant.widget || field.widget,
+                  schema: variantSchema,
+                }
+              }
               const linkageState = linkageStates[field.name]
 
               // 如果联动状态指定不可见，则不渲染该字段
@@ -948,6 +1170,7 @@ const DynamicFormInner = React.memo(
           disabled,
           enableVirtualScroll,
           fields,
+          watchedValues,
           fieldControlStyle,
           fieldLabelStyle,
           fieldRowStyle,
@@ -1032,13 +1255,17 @@ const DynamicFormInner = React.memo(
         }
 
         return (
-          <TextFieldFocusProvider onTextFieldFocus={effectiveTextFieldFocus}>
-            <HelpersProvider helpers={mergedHelpers}>
-              <CallbacksProvider callbacks={stableCallbacks}>
-                <WidgetsProvider widgets={stableWidgets}>{content}</WidgetsProvider>
-              </CallbacksProvider>
-            </HelpersProvider>
-          </TextFieldFocusProvider>
+          <FieldVariantProvider store={variantStore}>
+            <TextFieldFocusProvider onTextFieldFocus={effectiveTextFieldFocus}>
+              <HelpersProvider helpers={mergedHelpers}>
+                <CallbacksProvider callbacks={stableCallbacks}>
+                  <WidgetsProvider widgets={stableWidgets}>
+                    {content}
+                  </WidgetsProvider>
+                </CallbacksProvider>
+              </HelpersProvider>
+            </TextFieldFocusProvider>
+          </FieldVariantProvider>
         )
       }, [
         asNestedForm,

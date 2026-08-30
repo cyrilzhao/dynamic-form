@@ -1,6 +1,6 @@
 # 多类型字段与可切换 Widget 设计
 
-> **文档状态：提案/未实现。** 本文描述未来为同一字段提供多种数据类型、Widget、校验和 transform 的设计；当前 DynamicForm 尚不支持 `schema.type` 数组或本设计中的 `ui.variants` API。
+> **文档状态：已实现核心运行时。** 当前 DynamicForm 已支持 `ui.variants`、VariantWidget、独立值缓存、active variant、Variant 级校验和 transform。本文件同时保留设计约束与后续扩展说明。
 
 ## 1. 背景与目标
 
@@ -58,10 +58,6 @@ interface FieldVariant {
     pattern?: string
     callback?: string
   }
-  transform?: {
-    callback?: CallbackPropRef
-    reverseCallback?: CallbackPropRef
-  }
 }
 ```
 
@@ -109,7 +105,7 @@ const schema: ExtendedJSONSchema = {
 }
 ```
 
-`variant.schema` 是该模式的完整子 Schema，模式专属的 `ui.validators`、`ui.errorMessages` 和 `format` 均从这里读取。顶层字段可保留公共 `title`、`description` 等元数据，但不应再同时定义会与 variant 冲突的类型约束。
+`variant.schema` 是该模式的完整子 Schema，模式专属的 `ui.validators`、`ui.errorMessages` 和 `format` 均从这里读取。运行时通过统一的 `buildVariantSchema` 构造有效 Schema：公共 UI 元数据继续继承，而 `validators`、`transform`、`widget` 以及 `format`、`pattern`、`enum`、`const`、长度/数值约束、`required`、`properties`、`items` 等 Variant 专属配置采用替代语义，未声明时清除基础或上一个 Variant 的配置，防止校验规则泄漏。
 
 ### 4.1 SchemaBuilder 配置设计
 
@@ -146,7 +142,7 @@ SchemaBuilder 当前以 `PropertyEditor` 编辑字段的基础属性、Widget、
 
 - **子 Schema**：使用嵌入式 Schema 编辑器或复用现有 SchemaTree/PropertyEditor 能力，编辑 `variant.schema`。对象模式可新增 properties，数组模式可编辑 items；基础类型展示对应约束。
 - **校验**：复用 SchemaValidationEditor 与当前字段级校验编辑能力，但读写目标限定为 `variant.schema`。`required`、`format`、`ui.errorMessages`、`ui.validators` 只作用于当前模式。
-- **transform**：复用 TransformEditor，读写 `variant.transform`，并在说明中标明它只处理当前模式的展示值和存储值。
+- **transform**：复用 TransformEditor，读写 `variant.schema.ui.transform`，并在说明中标明它只处理当前模式的展示值和存储值。
 - **模式切换行为**：模式之间默认没有转换关系。切换时保存当前模式的编辑内容，并优先恢复目标模式此前编辑过的内容；目标模式没有内容时使用其默认值或空值。这样可以避免把没有业务依据的对象/字符串转换误认为合法数据转换。
 
 变体子 Schema 不应进入顶层 SchemaTree 的普通字段树。它们是同一字段的替代结构，而不是同时存在的子字段；直接混入会让字段路径、required 和联动目标产生歧义。第一版使用独立的嵌入编辑器，后续再评估是否需要可切换的 SchemaTree 子视图。
