@@ -5,6 +5,14 @@ import {
 import type { ExtendedJSONSchema } from "../../types/schema";
 
 describe("arrayTransformer", () => {
+  it("schema 为 object 但值为字符串时应保持原始字符串", () => {
+    const result = unwrapPrimitiveArrays("Demo@Example.com", {
+      type: "object",
+      properties: { name: { type: "string" } },
+    });
+    expect(result).toBe("Demo@Example.com");
+  });
+
   describe("wrapPrimitiveArrays - 内部函数边界情况", () => {
     it("应该处理非数组输入时返回空数组（覆盖第 16 行）", () => {
       const schema: ExtendedJSONSchema = {

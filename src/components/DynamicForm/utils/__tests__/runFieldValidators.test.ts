@@ -81,6 +81,45 @@ describe("runAllFieldValidators", () => {
   });
 
   describe("callbacks 注册表校验器", () => {
+    it("应该递归执行嵌套对象和数组元素的 validators", async () => {
+      const schema: ExtendedJSONSchema = {
+        type: "object",
+        properties: {
+          profile: {
+            type: "object",
+            properties: {
+              name: createField([createScriptRule("validateName")]),
+            },
+          },
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                code: createField([createScriptRule("validateCode")]),
+              },
+            },
+          },
+        },
+      };
+      const callbacks = {
+        validateName: () => "Invalid name",
+        validateCode: ({ value }: { value: string }) =>
+          value === "ok" ? null : "Invalid code",
+      };
+
+      const errors = await runAllFieldValidators(
+        { profile: { name: "bad" }, items: [{ code: "bad" }, { code: "ok" }] },
+        schema,
+        callbacks,
+      );
+
+      expect(errors).toEqual({
+        "profile.name": "Invalid name",
+        "items[0].code": "Invalid code",
+      });
+    });
+
     it("字符串 callback 校验通过时应该返回空错误对象", async () => {
       const schema = createSchema({
         name: createField([createScriptRule("requiredName")]),

@@ -14,6 +14,9 @@ import {
   KeyValueArrayWidget,
   TableArrayWidget,
   SchemaBuilderWidget,
+  VariantWidget,
+  CodeEditorWidget,
+  ObjectEditorWidget,
 } from "../widgets";
 import type { WidgetPreset } from "../types/widgets";
 
@@ -38,4 +41,7 @@ export const blueprintPreset: WidgetPreset = {
   array: ArrayFieldWidget,
   "key-value-array": KeyValueArrayWidget,
   "table-array": TableArrayWidget,
+  variant: VariantWidget,
+  "code-editor": CodeEditorWidget,
+  "object-editor": ObjectEditorWidget,
 };

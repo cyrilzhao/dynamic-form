@@ -90,6 +90,7 @@ const groups = [
       { id: 'dynamic-icon', label: '动态图标', component: namedLazy(() => import('./examples/DynamicIconExample'), 'DynamicIconExample') },
       { id: 'virtual-scroll', label: '虚拟滚动', component: namedLazy(() => import('./examples/VirtualScrollExample'), 'VirtualScrollExample') },
       { id: 'error-scroll', label: '错误滚动', component: namedLazy(() => import('./examples/ErrorScrollExample'), 'ErrorScrollExample') },
+      { id: 'variants', label: 'Variants 类型字段', component: namedLazy(() => import('./examples/VariantsExample'), 'VariantsExample') },
     ],
   },
   {

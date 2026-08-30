@@ -89,6 +89,11 @@ export function wrapPrimitiveArrays(
 
   // 处理对象
   if (schema.type === "object" && schema.properties) {
+    // Schema 可能因 Variant/联动暂时与当前值类型不一致；字符串等原始值
+    // 不能使用 Object.keys，否则会被拆成字符索引对象。
+    if (typeof data !== "object" || Array.isArray(data)) {
+      return data;
+    }
     const result: any = {};
     Object.keys(data).forEach((key) => {
       const fieldSchema = schema.properties![key] as ExtendedJSONSchema;
@@ -151,6 +156,9 @@ export function unwrapPrimitiveArrays(
 
   // 处理对象
   if (schema.type === "object" && schema.properties) {
+    if (typeof data !== "object" || Array.isArray(data)) {
+      return data;
+    }
     const result: any = {};
     Object.keys(data).forEach((key) => {
       const fieldSchema = schema.properties![key] as ExtendedJSONSchema;

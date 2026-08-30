@@ -37,9 +37,23 @@ export interface ErrorMessages {
   maxLength?: string;
   min?: string;
   max?: string;
+  /** key 与 SchemaValidator 的规则名对应，用于覆盖默认提示。 */
+  exclusiveMinimum?: string;
+  exclusiveMaximum?: string;
+  multipleOf?: string;
   pattern?: string;
   [key: string]: string | undefined;
 }
+
+/**
+ * Widget 回调函数引用
+ *
+ * - string：从 DynamicForm callbacks 注册表获取函数
+ * - { type: 'script'; code: string }：内联 JavaScript 函数字符串
+ *
+ * ⚠️ 内联 script 仅适用于受信任的内部工具环境
+ */
+export type CallbackPropRef = string | { type: "script"; code: string };
 
 /**
  * Script 校验器：执行自定义 JS 函数进行验证
@@ -61,20 +75,33 @@ export interface ErrorMessages {
  */
 export interface ScriptValidator {
   type: "script";
-  callback: string | { type: "script"; code: string };
+  callback: CallbackPropRef;
 }
 
 export type ValidatorRule = ScriptValidator;
 
-/**
- * Widget 回调函数引用
- *
- * - string：从 DynamicForm callbacks 注册表获取函数
- * - { type: 'script'; code: string }：内联 JavaScript 函数字符串
- *
- * ⚠️ 内联 script 仅适用于受信任的内部工具环境
- */
-export type CallbackPropRef = string | { type: "script"; code: string };
+/** 多类型字段的单个编辑模式配置。模式之间默认相互独立，不隐式转换值。 */
+export interface FieldVariant {
+  /** Variant 的稳定名称，用于 defaultVariant 和运行时展示。 */
+  name: string;
+  /** 可选的用户界面标签。 */
+  label?: string;
+  /** 当前 Variant 的 JSON Schema 类型。 */
+  type:
+    | "string"
+    | "number"
+    | "integer"
+    | "boolean"
+    | "array"
+    | "object"
+    | "null";
+  /** 当前 Variant 使用的 Widget。 */
+  widget?: WidgetType | string;
+  /** 覆盖基础字段的 schema 配置。 */
+  schema?: ExtendedJSONSchema;
+  /** 注册函数名或 inline script，接收 { value, formData, context, helpers }，truthy 表示匹配。 */
+  detect?: { callback: CallbackPropRef };
+}
 
 export interface UIConfig {
   widget?: WidgetType | string;
@@ -87,6 +114,10 @@ export interface UIConfig {
   style?: React.CSSProperties;
   order?: string[];
   errorMessages?: ErrorMessages;
+  /** 同一字段可选的独立编辑模式，由 VariantWidget 在运行时选择。 */
+  variants?: FieldVariant[];
+  /** 空值或无法自动识别时使用的模式名称。 */
+  defaultVariant?: string;
   linkages?: LinkageConfig[]; // 联动配置（支持多个联动规则）
   labelWidth?: number | string; // 标签宽度（仅在 horizontal layout 下生效）
   layout?: "vertical" | "horizontal" | "inline"; // 布局方式（优先级高于全局配置）

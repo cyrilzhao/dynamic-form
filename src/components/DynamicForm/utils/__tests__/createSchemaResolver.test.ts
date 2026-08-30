@@ -1,6 +1,7 @@
 import { createSchemaResolver } from "../createSchemaResolver";
 import type { ExtendedJSONSchema } from "../../types/schema";
 import { createRef } from "react";
+import { createFieldVariantStore } from "../../context/FieldVariantContext";
 
 const schema: ExtendedJSONSchema = {
   type: "object",
@@ -12,6 +13,101 @@ const schema: ExtendedJSONSchema = {
 };
 
 describe("createSchemaResolver", () => {
+  it("应使用 active variant 的 schema 校验约束和嵌套属性", async () => {
+    const variantStore = createFieldVariantStore();
+    variantStore.setActive("value", "object");
+    const variantSchema: ExtendedJSONSchema = {
+      type: "string",
+      properties: {
+        value: {
+          type: "string",
+          title: "Value",
+          ui: {
+            widget: "variant",
+            variants: [
+              {
+                name: "text",
+                type: "string",
+                schema: { minLength: 5 },
+              },
+              {
+                name: "object",
+                type: "object",
+                schema: {
+                  type: "object",
+                  required: ["name"],
+                  properties: { name: { type: "string", title: "Name" } },
+                },
+              },
+            ],
+          },
+        },
+      },
+    };
+    const resolver = createSchemaResolver(
+      variantSchema,
+      {},
+      undefined,
+      undefined,
+      {},
+      variantStore,
+    );
+
+    const result = await resolver({ value: {} }, undefined, {} as any);
+
+    expect((result.errors as any).value?.name?.message).toBe(
+      "Name is required",
+    );
+  });
+
+  it("手动 active variant 存在时不应根据当前值重新 detect", async () => {
+    const variantStore = createFieldVariantStore();
+    variantStore.setActive("value", "object");
+    const detectString = jest.fn(() => true);
+    const variantSchema: ExtendedJSONSchema = {
+      type: "object",
+      properties: {
+        value: {
+          type: "string",
+          ui: {
+            widget: "variant",
+            variants: [
+              {
+                name: "text",
+                type: "string",
+                detect: { callback: "detectString" },
+                schema: { pattern: "^text$" },
+              },
+              {
+                name: "object",
+                type: "object",
+                schema: {
+                  type: "object",
+                  properties: { name: { type: "string" } },
+                },
+              },
+            ],
+          },
+        },
+      },
+    };
+    const resolver = createSchemaResolver(
+      variantSchema,
+      { detectString },
+      undefined,
+      undefined,
+      {},
+      variantStore,
+    );
+
+    const result = await resolver({ value: "text" }, undefined, {} as any);
+
+    expect((result.errors as any).value?.message).toBe(
+      "value must be of type object",
+    );
+    expect(detectString).not.toHaveBeenCalled();
+  });
+
   it("校验通过时返回 values 且 errors 为空", async () => {
     const resolver = createSchemaResolver(schema);
     const result = await resolver(
@@ -32,6 +128,33 @@ describe("createSchemaResolver", () => {
     );
     expect((result.errors as any).name?.message).toBe("Name is required");
     expect((result.errors as any).email?.message).toBe("Email is required");
+  });
+
+  it("提交校验应执行 customFormats 并使用自定义错误消息", async () => {
+    const formatSchema: ExtendedJSONSchema = {
+      type: "object",
+      properties: {
+        phone: {
+          type: "string",
+          title: "Phone",
+          format: "phone",
+          ui: { errorMessages: { format: "Invalid phone" } },
+        },
+      },
+    };
+    const resolver = createSchemaResolver(
+      formatSchema,
+      {},
+      undefined,
+      undefined,
+      {
+        phone: (value: string) => /^1\d{10}$/.test(value),
+      },
+    );
+
+    const result = await resolver({ phone: "invalid" }, undefined, {} as any);
+
+    expect((result.errors as any).phone?.message).toBe("Invalid phone");
   });
 
   it("数组子字段错误转换为嵌套结构", async () => {
