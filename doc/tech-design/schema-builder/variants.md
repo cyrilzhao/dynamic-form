@@ -1,6 +1,6 @@
 # SchemaBuilder 多类型字段（Variants）设计
 
-> **状态：部分实现。** 当前 SchemaBuilder 已提供 `Variants` 最后 Tab、Card 列表、独立编辑态、`Select` Widget 选择、Schema 预览和嵌套 SchemaBuilder 弹窗；DynamicForm 运行时尚未消费 `ui.variants`。稳定名称对象结构、完整类型约束编辑和运行时接入仍属于后续工作。
+> **状态：已实现编辑能力。** 当前 SchemaBuilder 已提供 `Variants` Tab、列表与独立编辑态、Widget 选择、detect callback 编辑、Schema 编辑弹窗以及嵌套 SchemaBuilder 能力；DynamicForm 已消费 `ui.variants`。稳定名称对象结构和更细粒度的约束编辑仍属于后续扩展。
 
 ## 1. 目标与问题
 
@@ -14,24 +14,26 @@ Variants 将一个字段拆成多个互斥编辑模式。用户可以在 SchemaB
 
 ```ts
 interface FieldVariant {
-  name: string
-  label?: string
-  type: 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object' | 'null'
-  widget?: string
-  schema?: ExtendedJSONSchema
-  detect?: {
-    type?: 'template' | 'predicate'
-    pattern?: string
-    callback?: string
-  }
-  transform?: UIConfig['transform']
+  name: string;
+  label?: string;
+  type:
+    | "string"
+    | "number"
+    | "integer"
+    | "boolean"
+    | "array"
+    | "object"
+    | "null";
+  widget?: string;
+  schema?: ExtendedJSONSchema;
+  detect?: { callback: CallbackPropRef };
 }
 ```
 
-`variant.type` 是根类型和渲染类型的唯一 UI 来源；`variant.schema` 保存该类型的约束。运行时构造 effective schema 时强制写入：
+`variant.type` 是根类型来源，`variant.widget` 是根 Widget 覆盖来源；`variant.schema` 保存该类型的约束及 Variant 专属 UI 配置，包括 `ui.validators`、`ui.errorMessages` 和 `ui.transform`。运行时构造 effective schema 时强制写入：
 
 ```ts
-const effectiveSchema = { ...variant.schema, type: variant.type }
+const effectiveSchema = { ...variant.schema, type: variant.type };
 ```
 
 `variant.schema.type` 不作为独立可编辑来源，避免与 `variant.type` 产生冲突。后续若要去除重复字段，必须先让 SchemaBuilder 支持固定类型的根编辑器，再进行数据迁移。
@@ -132,7 +134,7 @@ Variants 作为最后一个 Tab，避免影响普通字段的常用编辑流程�
 
 嵌套 SchemaBuilder 的 `Cancel/Apply` 与外层 Variant 编辑态分离：弹窗 Apply 只更新 Variant 临时副本，外层 Save 才更新字段 Schema。这样可以避免取消外层编辑时已经污染主 Schema。
 
-当前实现通过 `options.rootType` 固定嵌套 SchemaBuilder 根节点类型，并将根节点按字段编辑，因此 primitive variant 也能显示 UI Config；根类型选择被禁用。后续仍应为 primitive variant 提供更聚焦的约束编辑器，减少不必要的结构编辑入口。
+当前实现通过 `options.rootType` 固定嵌套 SchemaBuilder 根节点类型，并将根节点按字段编辑，因此 primitive variant 也能显示 UI Config；根类型选择被禁用。
 
 ## 6. options 能力边界
 
@@ -140,26 +142,33 @@ SchemaBuilder 的扩展统一放在 `options`：
 
 ```ts
 interface SchemaBuilderOptions {
-  rootType?: 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object' | 'null'
+  rootType?:
+    | "string"
+    | "number"
+    | "integer"
+    | "boolean"
+    | "array"
+    | "object"
+    | "null";
   hidden?: {
-    tree?: boolean
-    preview?: boolean
-    importExport?: boolean
-    propertyEditor?: boolean
-    rootValidation?: boolean
-    variantsTab?: boolean
-  }
+    tree?: boolean;
+    preview?: boolean;
+    importExport?: boolean;
+    propertyEditor?: boolean;
+    rootValidation?: boolean;
+    variantsTab?: boolean;
+  };
   readonly?: {
-    all?: boolean
-    schema?: boolean
-    propertyEditor?: boolean
-    tree?: boolean
-    addFieldActions?: boolean
-    deleteFieldActions?: boolean
-    reorderFieldActions?: boolean
-    editFieldKey?: boolean
-    editFieldType?: boolean
-  }
+    all?: boolean;
+    schema?: boolean;
+    propertyEditor?: boolean;
+    tree?: boolean;
+    addFieldActions?: boolean;
+    deleteFieldActions?: boolean;
+    reorderFieldActions?: boolean;
+    editFieldKey?: boolean;
+    editFieldType?: boolean;
+  };
 }
 ```
 
@@ -178,7 +187,7 @@ interface SchemaBuilderOptions {
 
 ## 7. 运行时生效方式
 
-当前配置编辑能力已部分实现，但 DynamicForm 运行时接入仍属于后续工作。目标数据流为：
+DynamicForm 当前运行时数据流为：
 
 ```text
 外部值
@@ -186,7 +195,7 @@ interface SchemaBuilderOptions {
 active variant
   ↓ variant.widget + variant.schema
 当前 Widget 与校验
-  ↓ variant.transform
+  ↓ variant.schema.ui.transform
 提交值
 ```
 
@@ -206,12 +215,9 @@ active variant
 
 ## 9. 实施顺序
 
-1. 统一 `ui.variants` 稳定标识结构和迁移兼容层；
-2. 完善 SchemaBuilder 的 Variants 列表、编辑态和校验；
-3. 为 primitive/object/array 实现受限的 Variant Schema 编辑器；
-4. 在 DynamicForm 中接入 active variant、Widget、校验和 transform；
-5. 补充嵌套、数组、联动和错误树集成测试；
-6. 更新 README 和 SchemaBuilder 使用指南。
+1. 完善 primitive/object/array 的专用约束编辑器；
+2. 评估稳定名称对象结构的迁移兼容层；
+3. 补充 SchemaBuilder 端到端交互测试和 README 使用指南。
 
 ## 10. 结论
 

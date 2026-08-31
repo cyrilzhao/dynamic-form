@@ -27,6 +27,7 @@
 - [性能优化](./performance.md)（部分实现）：已实施优化、当前限制和后续计划。
 - [大规模数据性能优化](./large-scale-data-optimization.md)（提案/未实现）：数千数组项场景的候选优化方案。
 - [自定义 Widget 管理](./custom-widget.md)（部分实现）：当前前端 Mock 管理能力和未来服务端方案。
+- [Widget 输出 Schema 自动生成](./widget-schema-presets.md)（提案/未实现）：结构化 Widget 的值契约、SchemaBuilder 自动补全和冲突处理。
 
 ## SchemaBuilder 设计
 

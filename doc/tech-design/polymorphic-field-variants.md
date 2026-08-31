@@ -48,16 +48,23 @@ JSON Schema 可以用 `type: ["object", "string"]`、`anyOf` 或 `oneOf` 表达�
 
 ```ts
 interface FieldVariant {
-  name: string
-  label?: string
-  type: 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object' | 'null'
-  widget?: WidgetType | string
-  schema?: ExtendedJSONSchema
+  name: string;
+  label?: string;
+  type:
+    | "string"
+    | "number"
+    | "integer"
+    | "boolean"
+    | "array"
+    | "object"
+    | "null";
+  widget?: WidgetType | string;
+  schema?: ExtendedJSONSchema;
   detect?: {
-    type?: 'template' | 'predicate'
-    pattern?: string
-    callback?: string
-  }
+    type?: "template" | "predicate";
+    pattern?: string;
+    callback?: string;
+  };
 }
 ```
 
@@ -65,51 +72,51 @@ interface FieldVariant {
 
 ```ts
 const schema: ExtendedJSONSchema = {
-  type: 'object',
+  type: "object",
   properties: {
     data: {
-      title: 'Data',
+      title: "Data",
       ui: {
-        widget: 'variant',
-        defaultVariant: 'object',
+        widget: "variant",
+        defaultVariant: "object",
         variants: [
           {
-            name: 'object',
-            label: 'Object',
-            type: 'object',
-            widget: 'nested-form',
+            name: "object",
+            label: "Object",
+            type: "object",
+            widget: "nested-form",
             schema: {
-              type: 'object',
+              type: "object",
               properties: {
-                source: { type: 'string', title: 'Source' },
-                enabled: { type: 'boolean', title: 'Enabled' },
+                source: { type: "string", title: "Source" },
+                enabled: { type: "boolean", title: "Enabled" },
               },
-              required: ['source'],
+              required: ["source"],
             },
           },
           {
-            name: 'variable',
-            label: 'Variable',
-            type: 'string',
-            widget: 'text',
-            detect: { type: 'template', pattern: '^\\$\\{[^}]+\\}$' },
+            name: "variable",
+            label: "Variable",
+            type: "string",
+            widget: "text",
+            detect: { type: "template", pattern: "^\\$\\{[^}]+\\}$" },
             schema: {
-              type: 'string',
-              pattern: '^\\$\\{[^}]+\\}$',
+              type: "string",
+              pattern: "^\\$\\{[^}]+\\}$",
             },
           },
         ],
       },
     },
   },
-}
+};
 ```
 
 `variant.schema` 是该模式的完整子 Schema，模式专属的 `ui.validators`、`ui.errorMessages` 和 `format` 均从这里读取。运行时通过统一的 `buildVariantSchema` 构造有效 Schema：公共 UI 元数据继续继承，而 `validators`、`transform`、`widget` 以及 `format`、`pattern`、`enum`、`const`、长度/数值约束、`required`、`properties`、`items` 等 Variant 专属配置采用替代语义，未声明时清除基础或上一个 Variant 的配置，防止校验规则泄漏。
 
 ### 4.1 SchemaBuilder 配置设计
 
-SchemaBuilder 当前以 `PropertyEditor` 编辑字段的基础属性、Widget、验证、transform 和联动。引入 variants 后，应在该编辑器新增独立的 **Variants** 配置区，而不是把每个模式的配置平铺到当前字段的普通属性中。平铺会使用户难以判断某项校验、Widget 或 transform 属于哪个模式，也容易把顶层公共配置误当成某个模式的专属配置。
+SchemaBuilder 的 Variants 编辑器设计与实现见独立文档：[SchemaBuilder Variants 设计](./schema-builder/variants.md)。本文只约定运行时数据模型，不重复描述编辑器交互。
 
 配置区分为两个层级：
 
@@ -155,7 +162,7 @@ SchemaBuilder 保存前应执行配置期校验，不等待表单运行时才暴
 - `type` 必填，且 `variant.schema.type` 缺失时由编辑器写入该 type；若两者冲突则阻止保存；
 - `defaultVariant` 必须引用现有模式；只有一个模式时可自动选中它；
 - 使用 `widget` 时校验该 Widget 是否支持该 variant type；自定义 Widget 允许通过现有注册机制放行；
-- `detect.pattern` 必须是可编译的正则；多个模式的识别规则重叠时显示警告，因为运行时将按列表顺序选择第一个匹配项；
+- `detect.callback` 必须引用已注册函数或合法 inline script；多个模式的识别规则重叠时按列表顺序选择第一个匹配项；
 - 启用 variants 后，顶层 `type` 数组、顶层 `ui.widget`、顶层 `ui.transform` 与 variant 专属配置同时出现时显示冲突提示，并提供“迁移到默认模式”的显式操作，不能静默覆盖。
 
 SchemaBuilder 预览应提供模式选择器，使用户可以在设计阶段分别检查每个 Widget、默认值和错误消息；预览不应把非当前模式的校验错误混入当前模式。
@@ -282,14 +289,14 @@ active variant 展示值
 - SchemaBuilder 编辑当前模式的子 Schema、校验和 transform 时，不影响其他模式或顶层公共字段配置；
 - SchemaBuilder 能阻止重复模式名、无效正则、悬空默认模式和不兼容 Widget 等无效配置。
 
-## 12. 分阶段实施建议
+## 12. 当前实现状态
 
-1. 增加 `FieldVariant` 类型和 SchemaParser 的静态配置解析，不改变现有字段。
-2. 实现 `VariantWidget` 的模式状态、自动识别、手动切换和各模式独立编辑内容缓存。
-3. 将 active variant 子 Schema 接入 resolver、SchemaValidator 和 `runAllFieldValidators`。
-4. 接入 variant 级 transform 与 switch transform。
-5. 补充嵌套字段、数组字段、联动和错误树的集成测试。
-6. 在 README 增加配置文档和迁移示例；暂不把 `type` 数组标为渲染层已支持。
+1. 已实现 `ui.variants`、`VariantWidget`、独立值缓存和 `FieldVariantContext`。
+2. 已实现 active variant 优先、detect callback、默认 Variant 和类型 fallback。
+3. 已将 Variant effective schema 接入 Widget、resolver、validators、transform 和表单 API。
+4. 已支持嵌套对象、数组路径以及 Variant 专属 `properties/items`。
+5. 已补充 Variants、resolver、validators 和数组转换测试。
+6. `detect` 当前仅支持 `callback`，callback 可以是注册函数名或 inline script；旧的 `detect.type/pattern` 不属于当前 API。
 
 ## 13. 结论
 

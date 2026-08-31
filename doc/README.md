@@ -14,8 +14,9 @@
 
 1. [DynamicForm 使用指南](../README.md)
 2. [字段路径指南](./guides/field-path.md)
-3. [Widget 使用指南](./guides/README.md#widget-指南)
-4. [联动系统设计](./tech-design/linkage.md)
+3. [SchemaBuilder 使用指南](./guides/schema-builder.md)
+4. [Widget 使用指南](./guides/README.md#widget-指南)
+5. [联动系统设计](./tech-design/linkage.md)
 
 ### 组件维护者
 

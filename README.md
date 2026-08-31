@@ -6,17 +6,31 @@
 2. [Installation](#installation)
 3. [Quick Start](#quick-start)
 4. [Basic Usage](#basic-usage)
-5. [Inline Script Helpers](#inline-script-helpers)
-6. [Schema Definition](#schema-definition)
+5. [Schema Definition](#schema-definition)
    - [Basic Field Types](#1-basic-field-types)
    - [Field Validation](#2-field-validation)
    - [Field Linkage](#3-field-linkage)
    - [UI Configuration](#4-ui-configuration)
-7. [Advanced Features](#advanced-features)
-8. [API Reference](#api-reference)
-9. [Examples](#examples)
-10. [Best Practices](#best-practices)
-11. [Troubleshooting](#troubleshooting)
+   - [UI Extensions](#ui-extensions)
+   - [Variants](#variants-polymorphic-fields)
+6. [Advanced Features](#advanced-features)
+   - [Advanced Patterns](#advanced-patterns)
+     - [Nested Forms](#nested-forms)
+     - [Field Path Flattening](#field-path-flattening)
+   - [Inline Script Helpers](#inline-script-helpers)
+     - [Built-in Helpers](#built-in-helpers)
+     - [Custom Helpers](#custom-helpers)
+     - [Function Signatures](#function-signatures)
+     - [Validation with Zod](#validation-with-zod)
+     - [Async Validation with ofetch](#async-validation-with-ofetch)
+     - [Transform with Lodash](#transform-with-lodash)
+     - [Linkage with Helpers](#linkage-with-helpers)
+     - [callbackProps with Helpers](#callbackprops-with-helpers)
+     - [Security Boundary](#security-boundary)
+7. [API Reference](#api-reference)
+8. [Examples](#examples)
+9. [Best Practices](#best-practices)
+10. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -142,28 +156,28 @@ const defaultValues = {
 />
 ```
 
-### 默认值配置与优先级
+### Default Value Configuration and Precedence
 
-字段默认值可以写在 Schema 字段的 `default` 中，也可以通过 `DynamicForm.defaultValues` 传入。优先级按字段路径计算：
+Field defaults can be declared in a schema field's `default` property or provided through `DynamicForm.defaultValues`. Precedence is calculated per field path:
 
 ```text
 DynamicForm.defaultValues
-  > object/array 节点 default 中明确提供的值
-  > object 子字段的 Schema default
+  > Explicit values in an object/array node's default
+  > Child field schema defaults
 ```
 
-object 默认值会和子 object 默认值递归合并。明确写出的键优先，未写出的键继续使用子字段默认值：
+Object defaults are recursively merged with child object defaults. Explicit keys take precedence; missing keys continue to use child field defaults:
 
 ```ts
 const schema = {
-  type: 'object',
+  type: "object",
   properties: {
     settings: {
-      type: 'object',
-      default: { theme: 'custom' },
+      type: "object",
+      default: { theme: "custom" },
       properties: {
-        theme: { type: 'string', default: 'light' },
-        language: { type: 'string', default: 'en' },
+        theme: { type: "string", default: "light" },
+        language: { type: "string", default: "en" },
       },
     },
   },
@@ -172,7 +186,7 @@ const schema = {
 // { settings: { theme: 'custom', language: 'en' } }
 ```
 
-`defaultValues` 可以覆盖任意层级的 Schema 默认值，并与对象默认值深度合并。数组默认值配置在数组节点自身的 `default` 上，作为整体快照使用；不会根据 `items.default` 自动新增数组元素或补齐已有元素的缺失属性。对象、对象数组和嵌套数组都可以作为 object default 的一部分初始化。
+`defaultValues` can override schema defaults at any depth and are deeply merged with object defaults. An array default is configured on the array node itself and used as a complete snapshot; `items.default` does not create new array elements or fill missing properties in existing elements. Objects, arrays of objects, and nested arrays can all be initialized as part of an object default.
 
 ### Listening to Form Changes
 
@@ -236,253 +250,6 @@ DynamicForm supports three layout modes:
 
 ---
 
-## Inline Script Helpers
-
-Inline scripts and registered callback functions can access shared helper utilities through the `helpers` parameter. Helpers are available in:
-
-- `ui.validators`
-- `ui.transform`
-- `ui.linkages.fulfill` / `ui.linkages.otherwise`
-- `ui.callbackProps`
-
-This guide keeps helper usage in one place because the same helper object is shared by all inline script entry points.
-
-### Built-in Helpers
-
-DynamicForm provides these helpers by default:
-
-| Helper | Description | Example |
-| ------ | ----------- | ------- |
-| `helpers.ofetch` | Cross-browser and Node.js request utility based on `ofetch` | `await helpers.ofetch('/api/users')` |
-| `helpers._` | Lodash utilities | `helpers._.sumBy(items, 'price')` |
-| `helpers.z` | Zod runtime validation utilities | `helpers.z.string().parse(value)` |
-
-### Custom Helpers
-
-Use the `helpers` prop to add application-specific utilities. DynamicForm merges them with the built-in helpers:
-
-```typescript
-const mergedHelpers = {
-  ...builtInHelpers,
-  ...userHelpers,
-};
-```
-
-User-provided helpers take priority, so you can override a built-in helper when needed. Keep the `helpers` object stable with `useMemo` to avoid unnecessary recalculation and rerenders.
-
-```typescript
-import React, { useMemo } from 'react';
-import { ofetch } from 'ofetch';
-import dayjs from 'dayjs';
-
-function App({ token }: { token: string }) {
-  const helpers = useMemo(() => ({
-    // Override the built-in ofetch with an app-specific instance
-    ofetch: ofetch.create({
-      baseURL: '/api',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }),
-
-    // Add custom dependencies and business utilities
-    dayjs,
-    money: {
-      dollarsToCents: (value: number) => Math.round(value * 100),
-    },
-    userService: {
-      isReservedUsername: (value: string) =>
-        ['admin', 'root', 'system'].includes(value.toLowerCase()),
-    },
-  }), [token]);
-
-  return (
-    <DynamicForm
-      schema={schema}
-      helpers={helpers}
-      onSubmit={handleSubmit}
-    />
-  );
-}
-```
-
-Custom helpers are available in every helper-aware function:
-
-```typescript
-const callbacks = {
-  validateUsername: ({ value, helpers }) => {
-    if (helpers.userService.isReservedUsername(value)) {
-      return 'This username is reserved';
-    }
-    return null;
-  },
-};
-```
-
-Inline scripts can use the same custom helpers:
-
-```typescript
-{
-  type: 'number',
-  title: 'Price',
-  ui: {
-    transform: {
-      callback: {
-        type: 'script',
-        code: `function({ value, helpers }) {
-          return helpers.money.dollarsToCents(value);
-        }`,
-      },
-    },
-  },
-}
-```
-
-### Function Signatures
-
-All helper-aware functions use an object parameter:
-
-| Entry Point | Signature |
-| ----------- | --------- |
-| `ui.validators` | `({ value, formValues, helpers }) => string \| null \| Promise<string \| null>` |
-| `ui.transform` | `({ value, helpers }) => any` |
-| `ui.linkages.*.function` | `({ formData, context, helpers }) => any \| Promise<any>` |
-| `ui.callbackProps` | `({ args, helpers }) => any \| Promise<any>` |
-
-`ui.transform` is intentionally synchronous. Use value linkages for asynchronous computed values.
-
-### Validation with Zod
-
-```typescript
-{
-  type: 'string',
-  title: 'Username',
-  ui: {
-    validators: [
-      {
-        type: 'script',
-        callback: {
-          type: 'script',
-          code: `function({ value, helpers }) {
-            if (!value) return 'Username is required';
-
-            const schema = helpers.z.string()
-              .min(3)
-              .regex(/^[a-zA-Z0-9_]+$/);
-
-            const result = schema.safeParse(value);
-            return result.success
-              ? null
-              : 'Username must be at least 3 characters and contain only letters, numbers, or underscores';
-          }`,
-        },
-      },
-    ],
-  },
-}
-```
-
-### Async Validation with ofetch
-
-```typescript
-const callbacks = {
-  checkUsernameAvailability: async ({ value, helpers }) => {
-    if (!value) return null;
-
-    const result = await helpers.ofetch('/check-username', {
-      method: 'POST',
-      body: { username: value },
-    });
-
-    return result.available ? null : 'Username is already taken';
-  },
-};
-
-<DynamicForm
-  schema={schema}
-  callbacks={callbacks}
-/>
-```
-
-### Transform with Lodash
-
-```typescript
-{
-  type: 'string',
-  title: 'Currency',
-  ui: {
-    transform: {
-      callback: {
-        type: 'script',
-        code: `function({ value, helpers }) {
-          return helpers._.toUpper(helpers._.trim(value));
-        }`,
-      },
-    },
-  },
-}
-```
-
-### Linkage with Helpers
-
-```typescript
-const linkageFunctions = {
-  loadCityOptions: async ({ formData, helpers }) => {
-    if (!formData.country) return [];
-
-    const cities = await helpers.ofetch('/cities', {
-      query: { country: formData.country },
-    });
-
-    return helpers._.map(cities, (city) => ({
-      label: city.name,
-      value: city.id,
-    }));
-  },
-};
-```
-
-### callbackProps with Helpers
-
-```typescript
-{
-  type: 'string',
-  title: 'Avatar',
-  ui: {
-    widget: 'upload',
-    callbackProps: {
-      onUpload: {
-        type: 'script',
-        code: `async function({ args, helpers }) {
-          const [file] = args;
-          const mimeSchema = helpers.z.string()
-            .regex(/^image\//);
-
-          if (!mimeSchema.safeParse(file.type).success) {
-            throw new Error('Only images are allowed');
-          }
-
-          const body = new FormData();
-          body.append('file', file);
-          const result = await helpers.ofetch('/upload', {
-            method: 'POST',
-            body,
-          });
-
-          return result.url;
-        }`,
-      },
-    },
-  },
-}
-```
-
-### Security Boundary
-
-Helpers are dependency injection, not a sandbox. Inline scripts still use dynamic JavaScript execution and should only be used with trusted schema sources. Do not accept inline scripts from untrusted user input.
-
----
-
 ## Schema Definition
 
 This section explains how to define form schemas using JSON Schema with DynamicForm-specific extensions.
@@ -519,7 +286,9 @@ This section explains how to define form schemas using JSON Schema with DynamicF
   default: 18,
   ui: {
     widget: 'number',  // or 'range' for slider
-    step: 1
+    widgetProps: {
+      step: 1           // Widget input step; validation uses multipleOf above
+    }
   }
 }
 ```
@@ -1090,21 +859,21 @@ Fields that are hidden or disabled via **linkage** are automatically excluded fr
 // Example: creditCardNumber is hidden when paymentMethod !== 'credit_card'
 // → creditCardNumber will NOT be validated when hidden, even if it's in `required`
 const schema = {
-  type: 'object',
+  type: "object",
   properties: {
-    paymentMethod: { type: 'string', title: 'Payment Method' },
+    paymentMethod: { type: "string", title: "Payment Method" },
     creditCardNumber: {
-      type: 'string',
-      title: 'Card Number',
+      type: "string",
+      title: "Card Number",
       ui: {
         linkages: [
           {
-            type: 'visibility',
-            dependencies: ['#/properties/paymentMethod'],
+            type: "visibility",
+            dependencies: ["#/properties/paymentMethod"],
             when: {
-              field: '#/properties/paymentMethod',
-              operator: '==',
-              value: 'credit_card',
+              field: "#/properties/paymentMethod",
+              operator: "==",
+              value: "credit_card",
             },
             fulfill: { state: { visible: true } },
             otherwise: { state: { visible: false } },
@@ -1113,8 +882,8 @@ const schema = {
       },
     },
   },
-  required: ['creditCardNumber'],
-}
+  required: ["creditCardNumber"],
+};
 ```
 
 **Rules:**
@@ -1156,20 +925,20 @@ Use JSON Schema's conditional validation keywords:
 For complex validation logic beyond JSON Schema's built-in rules, you can use custom validation functions:
 
 ```typescript
-const formRef = useRef<DynamicFormRef>(null)
+const formRef = useRef<DynamicFormRef>(null);
 
 // Add custom validation after form creation
 const handleValidatePasswords = () => {
-  const password = formRef.current?.getValue('password')
-  const confirmPassword = formRef.current?.getValue('confirmPassword')
+  const password = formRef.current?.getValue("password");
+  const confirmPassword = formRef.current?.getValue("confirmPassword");
 
   if (password !== confirmPassword) {
-    formRef.current?.setError('confirmPassword', {
-      type: 'manual',
-      message: 'Passwords do not match',
-    })
+    formRef.current?.setError("confirmPassword", {
+      type: "manual",
+      message: "Passwords do not match",
+    });
   }
-}
+};
 ```
 
 #### Custom Format Validators
@@ -1303,7 +1072,7 @@ Provide a complete JavaScript function string for simple, one-off validation.
             // formValues: entire form data object
             // helpers: built-in helper utilities
             // Return null for valid, error message string for invalid
-            
+
             if (value !== formValues.password) {
               return 'Passwords do not match';
             }
@@ -1319,19 +1088,25 @@ Provide a complete JavaScript function string for simple, one-off validation.
 **Function signature:**
 
 ```typescript
-({ value, formValues, helpers }: {
+({
+  value,
+  formValues,
+  helpers,
+}: {
   value: any;
   formValues: Record<string, any>;
   helpers: Record<string, any>;
-}) => string | null | Promise<string | null>
+}) => string | null | Promise<string | null>;
 ```
 
 **Parameters:**
+
 - `value`: Current field value
 - `formValues`: Entire form data object
 - `helpers`: Built-in and user-provided helper utilities
 
 **Return value:**
+
 - `null` → Validation passes
 - `string` → Validation fails with the returned string as error message
 - `Promise<string | null>` → Async validation is supported
@@ -1388,7 +1163,7 @@ const schema: ExtendedJSONSchema = {
               code: `function({ value, helpers }) {
                 // Async validation is supported
                 if (!value) return null; // Optional field
-                
+
                 // Example: validate coupon format
                 const schema = helpers.z.string()
                   .regex(/^[A-Z0-9]{6,10}$/);
@@ -1413,21 +1188,21 @@ const schema: ExtendedJSONSchema = {
 />
 ```
 
-⚠️ **Security note**: 
+⚠️ **Security note**:
 
 - **Inline Script Mode** uses `Function` constructor to execute dynamic code. Only use it in trusted internal environments. Never accept script code from untrusted user input.
 - **Function Name Mode** is safer as functions are explicitly registered in your code. Use this for production applications.
 
 **Common use cases:**
 
-| Scenario                                             | Recommended Approach                              |
-| ---------------------------------------------------- | ------------------------------------------------- |
-| Password confirmation                                | ScriptValidator (inline or callback)              |
-| Cross-field validation (e.g., end date > start date) | ScriptValidator (inline or callback)              |
-| Complex business rules using form data               | ScriptValidator with callback                     |
-| Format validation that can't be done with `pattern`  | ScriptValidator (inline or callback)              |
-| Check username availability (server-side)            | ScriptValidator with async callback + API call    |
-| Validate coupon code against database                | ScriptValidator with async callback + API call    |
+| Scenario                                             | Recommended Approach                           |
+| ---------------------------------------------------- | ---------------------------------------------- |
+| Password confirmation                                | ScriptValidator (inline or callback)           |
+| Cross-field validation (e.g., end date > start date) | ScriptValidator (inline or callback)           |
+| Complex business rules using form data               | ScriptValidator with callback                  |
+| Format validation that can't be done with `pattern`  | ScriptValidator (inline or callback)           |
+| Check username availability (server-side)            | ScriptValidator with async callback + API call |
+| Validate coupon code against database                | ScriptValidator with async callback + API call |
 
 **Example: Server-side validation with callback**
 
@@ -1438,7 +1213,7 @@ const checkUsernameAvailability = async ({ value, helpers }: {
   helpers: Record<string, any>;
 }) => {
   if (!value) return null;
-  
+
   try {
     const result = await helpers.ofetch('/api/check-username', {
       method: 'POST',
@@ -1615,46 +1390,46 @@ Options linkage supports both static and dynamic (function-based) configurations
 
 ```typescript
 const schema = {
-  type: 'object',
+  type: "object",
   properties: {
     country: {
-      type: 'string',
-      title: 'Country',
-      enum: ['china', 'usa'],
-      enumNames: ['China', 'USA'],
+      type: "string",
+      title: "Country",
+      enum: ["china", "usa"],
+      enumNames: ["China", "USA"],
     },
     province: {
-      type: 'string',
-      title: 'Province/State',
+      type: "string",
+      title: "Province/State",
       ui: {
         linkages: [
           {
-            type: 'options',
-            dependencies: ['#/properties/country'],
-            fulfill: { function: 'getProvinceOptions' },
+            type: "options",
+            dependencies: ["#/properties/country"],
+            fulfill: { function: "getProvinceOptions" },
           },
         ],
       },
     },
   },
-}
+};
 
 const linkageFunctions = {
   getProvinceOptions: ({ formData }: { formData: Record<string, any> }) => {
-    if (formData.country === 'china') {
+    if (formData.country === "china") {
       return [
-        { label: 'Beijing', value: 'beijing' },
-        { label: 'Shanghai', value: 'shanghai' },
-      ]
-    } else if (formData.country === 'usa') {
+        { label: "Beijing", value: "beijing" },
+        { label: "Shanghai", value: "shanghai" },
+      ];
+    } else if (formData.country === "usa") {
       return [
-        { label: 'California', value: 'ca' },
-        { label: 'New York', value: 'ny' },
-      ]
+        { label: "California", value: "ca" },
+        { label: "New York", value: "ny" },
+      ];
     }
-    return []
+    return [];
   },
-}
+};
 ```
 
 **Using Static Values:**
@@ -1722,9 +1497,9 @@ const linkageFunctions = {
   loadCityOptions: (formData, context) => {
     const { apiData } = context.externalData;
     const country = formData.country;
-    
+
     if (!apiData || !country) return [];
-    
+
     return apiData[country].map(city => ({
       label: city,
       value: city
@@ -1743,6 +1518,7 @@ const linkageContext = useMemo(() => ({ apiData }), [apiData]);
 ```
 
 **Benefits:**
+
 - ✅ **Pure functions**: Linkage functions don't depend on closures
 - ✅ **Automatic refresh**: When `linkageContext` changes, linkage automatically re-executes
 - ✅ **Type-safe**: Full TypeScript support for context data
@@ -1758,52 +1534,52 @@ Dynamically change nested form structure based on field values:
 ```typescript
 const userSchemas = {
   personal: {
-    type: 'object',
+    type: "object",
     properties: {
-      firstName: { type: 'string', title: 'First Name' },
-      lastName: { type: 'string', title: 'Last Name' },
+      firstName: { type: "string", title: "First Name" },
+      lastName: { type: "string", title: "Last Name" },
     },
   },
   company: {
-    type: 'object',
+    type: "object",
     properties: {
-      companyName: { type: 'string', title: 'Company Name' },
-      taxId: { type: 'string', title: 'Tax ID' },
+      companyName: { type: "string", title: "Company Name" },
+      taxId: { type: "string", title: "Tax ID" },
     },
   },
-}
+};
 
 const schema = {
-  type: 'object',
+  type: "object",
   properties: {
     userType: {
-      type: 'string',
-      title: 'User Type',
-      enum: ['personal', 'company'],
-      enumNames: ['Personal', 'Company'],
+      type: "string",
+      title: "User Type",
+      enum: ["personal", "company"],
+      enumNames: ["Personal", "Company"],
     },
     details: {
-      type: 'object',
-      title: 'Details',
+      type: "object",
+      title: "Details",
       ui: {
-        widget: 'nested-form',
+        widget: "nested-form",
         linkages: [
           {
-            type: 'schema',
-            dependencies: ['userType'],
-            fulfill: { function: 'loadUserSchema' },
+            type: "schema",
+            dependencies: ["userType"],
+            fulfill: { function: "loadUserSchema" },
           },
         ],
       },
     },
   },
-}
+};
 
 const linkageFunctions = {
   loadUserSchema: ({ formData }: { formData: Record<string, any> }) => {
-    return userSchemas[formData.userType] || { type: 'object', properties: {} }
+    return userSchemas[formData.userType] || { type: "object", properties: {} };
   },
-}
+};
 ```
 
 **Effective Schema After Linkage:**
@@ -1899,23 +1675,23 @@ Schema linkage also works on primitive field types (string, number, boolean) to 
 ```typescript
 // Change validation pattern based on document type
 const schema = {
-  type: 'object',
+  type: "object",
   properties: {
     documentType: {
-      type: 'string',
-      title: 'Document Type',
-      enum: ['passport', 'id_card', 'license'],
-      enumNames: ['Passport', 'ID Card', 'Driver License'],
+      type: "string",
+      title: "Document Type",
+      enum: ["passport", "id_card", "license"],
+      enumNames: ["Passport", "ID Card", "Driver License"],
     },
     documentNumber: {
-      type: 'string',
-      title: 'Document Number',
+      type: "string",
+      title: "Document Number",
       ui: {
         linkages: [
           {
-            type: 'schema',
-            dependencies: ['#/properties/documentType'],
-            fulfill: { function: 'getDocumentValidation' },
+            type: "schema",
+            dependencies: ["#/properties/documentType"],
+            fulfill: { function: "getDocumentValidation" },
           },
         ],
       },
@@ -1926,35 +1702,35 @@ const schema = {
 const linkageFunctions = {
   getDocumentValidation: (context: any) => {
     const { documentType } = context.formData;
-    
+
     // Return different validation rules based on document type
-    if (documentType === 'passport') {
+    if (documentType === "passport") {
       return {
-        pattern: '^[A-Z]{2}[0-9]{7}$',
+        pattern: "^[A-Z]{2}[0-9]{7}$",
         minLength: 9,
         maxLength: 9,
-        ui: { placeholder: 'e.g., AB1234567' },
+        ui: { placeholder: "e.g., AB1234567" },
       };
     }
-    
-    if (documentType === 'id_card') {
+
+    if (documentType === "id_card") {
       return {
-        pattern: '^[0-9]{9}$',
+        pattern: "^[0-9]{9}$",
         minLength: 9,
         maxLength: 9,
-        ui: { placeholder: 'e.g., 123456789' },
+        ui: { placeholder: "e.g., 123456789" },
       };
     }
-    
-    if (documentType === 'license') {
+
+    if (documentType === "license") {
       return {
-        pattern: '^[A-Z]{1}[0-9]{8}$',
+        pattern: "^[A-Z]{1}[0-9]{8}$",
         minLength: 9,
         maxLength: 9,
-        ui: { placeholder: 'e.g., D12345678' },
+        ui: { placeholder: "e.g., D12345678" },
       };
     }
-    
+
     return {};
   },
 };
@@ -1965,23 +1741,23 @@ const linkageFunctions = {
 ```typescript
 // Change widget based on input type
 const schema = {
-  type: 'object',
+  type: "object",
   properties: {
     inputType: {
-      type: 'string',
-      title: 'Input Type',
-      enum: ['short', 'long', 'formatted'],
-      enumNames: ['Short Text', 'Long Text', 'Formatted Text'],
+      type: "string",
+      title: "Input Type",
+      enum: ["short", "long", "formatted"],
+      enumNames: ["Short Text", "Long Text", "Formatted Text"],
     },
     content: {
-      type: 'string',
-      title: 'Content',
+      type: "string",
+      title: "Content",
       ui: {
         linkages: [
           {
-            type: 'schema',
-            dependencies: ['#/properties/inputType'],
-            fulfill: { function: 'getContentWidget' },
+            type: "schema",
+            dependencies: ["#/properties/inputType"],
+            fulfill: { function: "getContentWidget" },
           },
         ],
       },
@@ -1992,27 +1768,27 @@ const schema = {
 const linkageFunctions = {
   getContentWidget: (context: any) => {
     const { inputType } = context.formData;
-    
-    if (inputType === 'short') {
+
+    if (inputType === "short") {
       return {
-        ui: { widget: 'input', placeholder: 'Enter short text' },
+        ui: { widget: "input", placeholder: "Enter short text" },
         maxLength: 100,
       };
     }
-    
-    if (inputType === 'long') {
+
+    if (inputType === "long") {
       return {
-        ui: { widget: 'textarea', placeholder: 'Enter long text' },
+        ui: { widget: "textarea", placeholder: "Enter long text" },
         maxLength: 1000,
       };
     }
-    
-    if (inputType === 'formatted') {
+
+    if (inputType === "formatted") {
       return {
-        ui: { widget: 'markdown', placeholder: 'Enter markdown text' },
+        ui: { widget: "markdown", placeholder: "Enter markdown text" },
       };
     }
-    
+
     return {};
   },
 };
@@ -2022,14 +1798,14 @@ const linkageFunctions = {
 
 A single field can have multiple linkage configs of the same type in its `linkages` array. When multiple configs of the same type produce results, they are merged using the following strategy (derived from `evaluateLinkagesByLayers`):
 
-| Linkage Type | Merge Strategy                                                                      | Example                                                    |
-| ------------ | ----------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `visibility` | **AND** — field is visible only if **all** configs resolve to `visible: true`       | Two visibility rules: both must pass for the field to show |
-| `disabled`   | **OR** — field is disabled if **any** config resolves to `disabled: true`           | Two disabled rules: either one disabling is enough         |
-| `readonly`   | **OR** — field is readonly if **any** config resolves to `readonly: true`           | Two readonly rules: either one is enough                   |
+| Linkage Type | Merge Strategy                                                                           | Example                                                    |
+| ------------ | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `visibility` | **AND** — field is visible only if **all** configs resolve to `visible: true`            | Two visibility rules: both must pass for the field to show |
+| `disabled`   | **OR** — field is disabled if **any** config resolves to `disabled: true`                | Two disabled rules: either one disabling is enough         |
+| `readonly`   | **OR** — field is readonly if **any** config resolves to `readonly: true`                | Two readonly rules: either one is enough                   |
 | `value`      | **Last wins** — the last config (by definition order) that produces a value takes effect | Useful for fallback chaining                               |
 | `options`    | **Last wins** — the last config (by definition order) that produces options takes effect | Useful for fallback chaining                               |
-| `schema`     | **Shallow merge** — later configs' schema properties override earlier ones          | `{ ...schema1, ...schema2 }`                               |
+| `schema`     | **Shallow merge** — later configs' schema properties override earlier ones               | `{ ...schema1, ...schema2 }`                               |
 
 **Example — `visibility` AND logic:**
 
@@ -2038,20 +1814,20 @@ A single field can have multiple linkage configs of the same type in its `linkag
 ui: {
   linkages: [
     {
-      type: 'visibility',
-      dependencies: ['#/properties/isLoggedIn'],
-      when: { field: '#/properties/isLoggedIn', operator: '==', value: true },
+      type: "visibility",
+      dependencies: ["#/properties/isLoggedIn"],
+      when: { field: "#/properties/isLoggedIn", operator: "==", value: true },
       fulfill: { state: { visible: true } },
       otherwise: { state: { visible: false } },
     },
     {
-      type: 'visibility',
-      dependencies: ['#/properties/role'],
-      when: { field: '#/properties/role', operator: '==', value: 'admin' },
+      type: "visibility",
+      dependencies: ["#/properties/role"],
+      when: { field: "#/properties/role", operator: "==", value: "admin" },
       fulfill: { state: { visible: true } },
       otherwise: { state: { visible: false } },
     },
-  ]
+  ];
 }
 // → visible only when isLoggedIn === true AND role === 'admin'
 ```
@@ -2063,24 +1839,24 @@ ui: {
 ui: {
   linkages: [
     {
-      type: 'disabled',
-      dependencies: ['#/properties/isReadonlyMode'],
+      type: "disabled",
+      dependencies: ["#/properties/isReadonlyMode"],
       when: {
-        field: '#/properties/isReadonlyMode',
-        operator: '==',
+        field: "#/properties/isReadonlyMode",
+        operator: "==",
         value: true,
       },
       fulfill: { state: { disabled: true } },
       otherwise: { state: { disabled: false } },
     },
     {
-      type: 'disabled',
-      dependencies: ['#/properties/userRole'],
-      when: { field: '#/properties/userRole', operator: '==', value: 'guest' },
+      type: "disabled",
+      dependencies: ["#/properties/userRole"],
+      when: { field: "#/properties/userRole", operator: "==", value: "guest" },
       fulfill: { state: { disabled: true } },
       otherwise: { state: { disabled: false } },
     },
-  ]
+  ];
 }
 // → disabled when isReadonlyMode === true OR userRole === 'guest'
 ```
@@ -2099,33 +1875,33 @@ When multiple linkage configs of the same type use **async linkage functions** (
 
 ```typescript
 const schema = {
-  type: 'object',
+  type: "object",
   properties: {
     price: {
-      type: 'number',
-      title: 'Price',
+      type: "number",
+      title: "Price",
       ui: {
         linkages: [
           {
-            type: 'value',
-            dependencies: ['country'],
-            fulfill: { function: 'fetchPriceFromAPI1' },
+            type: "value",
+            dependencies: ["country"],
+            fulfill: { function: "fetchPriceFromAPI1" },
           }, // async, returns 100
           {
-            type: 'value',
-            dependencies: ['country'],
-            fulfill: { function: 'fetchPriceFromAPI2' },
+            type: "value",
+            dependencies: ["country"],
+            fulfill: { function: "fetchPriceFromAPI2" },
           }, // async, returns 200
           {
-            type: 'value',
-            dependencies: ['country'],
-            fulfill: { function: 'fetchPriceFromAPI3' },
+            type: "value",
+            dependencies: ["country"],
+            fulfill: { function: "fetchPriceFromAPI3" },
           }, // async, returns 300
         ],
       },
     },
   },
-}
+};
 
 // Result: price = 300 (always the last defined linkage, regardless of which completes first)
 ```
@@ -2190,14 +1966,14 @@ Inline linkage scripts must be complete JavaScript functions. They receive:
 
 The return value is applied according to the linkage type:
 
-| Linkage Type | Inline Script Return Value                       |
-| ------------ | ------------------------------------------------ |
-| `value`      | Assigned to the target field value               |
-| `options`    | Used as the target field options array           |
-| `schema`     | Used as the dynamic schema result                |
-| `visibility` | Converted to boolean and assigned to `visible`   |
-| `disabled`   | Converted to boolean and assigned to `disabled`  |
-| `readonly`   | Converted to boolean and assigned to `readonly`  |
+| Linkage Type | Inline Script Return Value                      |
+| ------------ | ----------------------------------------------- |
+| `value`      | Assigned to the target field value              |
+| `options`    | Used as the target field options array          |
+| `schema`     | Used as the dynamic schema result               |
+| `visibility` | Converted to boolean and assigned to `visible`  |
+| `disabled`   | Converted to boolean and assigned to `disabled` |
+| `readonly`   | Converted to boolean and assigned to `readonly` |
 
 The same `function` forms can also be used in `otherwise` effects.
 
@@ -2212,62 +1988,68 @@ Linkage functions can be asynchronous, which is useful for fetching data from AP
 ```typescript
 const linkageFunctions = {
   // Async function to load options from API
-  loadCityOptions: async ({ formData, helpers }: {
+  loadCityOptions: async ({
+    formData,
+    helpers,
+  }: {
     formData: Record<string, any>;
     helpers: Record<string, any>;
   }) => {
-    const countryId = formData.country
-    if (!countryId) return []
+    const countryId = formData.country;
+    if (!countryId) return [];
 
-    const cities = await helpers.ofetch('/api/cities', {
+    const cities = await helpers.ofetch("/api/cities", {
       query: { country: countryId },
-    })
+    });
 
     return helpers._.map(cities, (city: any) => ({
       label: city.name,
       value: city.id,
-    }))
+    }));
   },
 
   // Async function to validate and compute value
-  calculateShipping: async ({ formData, helpers }: {
+  calculateShipping: async ({
+    formData,
+    helpers,
+  }: {
     formData: Record<string, any>;
     helpers: Record<string, any>;
   }) => {
-    const { weight, destination } = formData
-    if (!weight || !destination) return 0
+    const { weight, destination } = formData;
+    if (!weight || !destination) return 0;
 
-    const result = await helpers.ofetch('/api/calculate-shipping', {
-      method: 'POST',
+    const result = await helpers.ofetch("/api/calculate-shipping", {
+      method: "POST",
       body: { weight, destination },
-    })
+    });
 
-    return result.cost
+    return result.cost;
   },
-}
+};
 
 const schema = {
-  type: 'object',
+  type: "object",
   properties: {
     country: {
-      type: 'string',
-      title: 'Country',
+      type: "string",
+      title: "Country",
     },
     city: {
-      type: 'string',
-      title: 'City',
+      type: "string",
+      title: "City",
       ui: {
         linkages: [
           {
-            type: 'options',
-            dependencies: ['#/properties/country'],
-            fulfill: { function: 'loadCityOptions' },
+            type: "options",
+            dependencies: ["#/properties/country"],
+            fulfill: { function: "loadCityOptions" },
           },
         ],
       },
     },
   },
-}
+};
 ```
 
 **Important:** Async functions are automatically handled - just return a Promise or use `async/await`.
@@ -2281,12 +2063,12 @@ Control when linkage effects are applied using the `when`/`fulfill`/`otherwise` 
   ui: {
     linkages: [
       {
-        type: 'visibility',
-        dependencies: ['#/properties/userType'],
+        type: "visibility",
+        dependencies: ["#/properties/userType"],
         when: {
-          field: '#/properties/userType',
-          operator: '==',
-          value: 'premium',
+          field: "#/properties/userType",
+          operator: "==",
+          value: "premium",
         },
         fulfill: {
           state: { visible: true },
@@ -2295,7 +2077,7 @@ Control when linkage effects are applied using the `when`/`fulfill`/`otherwise` 
           state: { visible: false },
         },
       },
-    ]
+    ];
   }
 }
 ```
@@ -2326,15 +2108,15 @@ Declare which fields the linkage depends on using JSON Pointer format:
   ui: {
     linkages: [
       {
-        type: 'value',
+        type: "value",
         dependencies: [
-          '#/properties/price', // Top-level field
-          '#/properties/address/city', // Nested object field
-          '#/properties/items', // Entire array (to react to any item change)
+          "#/properties/price", // Top-level field
+          "#/properties/address/city", // Nested object field
+          "#/properties/items", // Entire array (to react to any item change)
         ],
-        fulfill: { function: 'calculate' },
+        fulfill: { function: "calculate" },
       },
-    ]
+    ];
   }
 }
 ```
@@ -2444,8 +2226,8 @@ const schema = {
 };
 
 function MyForm() {
-  // ✅ 必须用 useMemo 稳定引用，否则每次渲染都创建新对象，
-  //    导致 CallbacksContext 持续触发所有 Widget 重渲染
+  // Keep this reference stable with useMemo. A new object on every render
+  // would continuously re-render all widgets in CallbacksContext.
   const callbacks = useMemo(() => ({
     handleAvatarUpload: async ({ args }: { args: any[] }) => {
       const [file] = args as [File];
@@ -2457,7 +2239,7 @@ function MyForm() {
       const url = await uploadResumeAPI(file);
       return url;
     }
-  }), []); // 若函数依赖外部状态，将其加入依赖数组
+  }), []); // Add external dependencies here when the functions use them.
 
   return (
     <DynamicForm
@@ -2474,26 +2256,26 @@ function MyForm() {
 
 ```typescript
 const schema = {
-  type: 'object',
+  type: "object",
   properties: {
     avatar: {
-      type: 'string',
-      title: 'Avatar',
+      type: "string",
+      title: "Avatar",
       ui: {
-        widget: 'upload',
+        widget: "upload",
         callbackProps: {
           onFormatFileName: {
-            type: 'script',
+            type: "script",
             code: `function({ args, helpers }) {
               const [file] = args;
               return file.name.toUpperCase();
-            }`
-          }
+            }`,
+          },
         },
-        widgetProps: { accept: 'image/*' }
-      }
-    }
-  }
+        widgetProps: { accept: "image/*" },
+      },
+    },
+  },
 };
 ```
 
@@ -2510,6 +2292,7 @@ const schema = {
 Control form layout at global or field level:
 
 **Global Layout:**
+
 ```typescript
 <DynamicForm
   schema={schema}
@@ -2517,7 +2300,7 @@ Control form layout at global or field level:
   labelWidth={120}
   onSubmit={handleSubmit}
 />
-````
+```
 
 **Field-Level Override:**
 
@@ -2622,25 +2405,25 @@ Additional UI customization options:
 
 **All UI Options:**
 
-| Option          | Type      | Description                                                                        |
-| --------------- | --------- | ---------------------------------------------------------------------------------- |
-| `widget`        | `string`  | Widget type                                                                        |
-| `placeholder`   | `string`  | Input placeholder text                                                             |
-| `className`     | `string`  | Custom CSS class                                                                   |
-| `disabled`      | `boolean` | Disable field                                                                      |
-| `readonly`      | `boolean` | Make field readonly                                                                |
-| `hidden`        | `boolean` | Hide field                                                                         |
-| `layout`        | `string`  | Layout override                                                                    |
-| `labelWidth`    | `number`  | Label width (horizontal layout)                                                    |
-| `columnsCount`  | `number`  | Multi-column layout count for `object` schemas only                                |
-| `colSpan`       | `number`  | Number of columns a child field spans in an object multi-column layout             |
-| `linkages`      | `array`   | Field linkage configurations                                                       |
-| `flattenPath`   | `boolean` | Flatten nested path                                                                |
-| `flattenPrefix` | `boolean` | Add parent title as prefix                                                         |
-| `errorMessages` | `object`  | Custom error messages                                                              |
-| `widgetProps`   | `object`  | Props passed to widget component                                                   |
+| Option          | Type      | Description                                                                                                |
+| --------------- | --------- | ---------------------------------------------------------------------------------------------------------- |
+| `widget`        | `string`  | Widget type                                                                                                |
+| `placeholder`   | `string`  | Input placeholder text                                                                                     |
+| `className`     | `string`  | Custom CSS class                                                                                           |
+| `disabled`      | `boolean` | Disable field                                                                                              |
+| `readonly`      | `boolean` | Make field readonly                                                                                        |
+| `hidden`        | `boolean` | Hide field                                                                                                 |
+| `layout`        | `string`  | Layout override                                                                                            |
+| `labelWidth`    | `number`  | Label width (horizontal layout)                                                                            |
+| `columnsCount`  | `number`  | Multi-column layout count for `object` schemas only                                                        |
+| `colSpan`       | `number`  | Number of columns a child field spans in an object multi-column layout                                     |
+| `linkages`      | `array`   | Field linkage configurations                                                                               |
+| `flattenPath`   | `boolean` | Flatten nested path                                                                                        |
+| `flattenPrefix` | `boolean` | Add parent title as prefix                                                                                 |
+| `errorMessages` | `object`  | Custom error messages                                                                                      |
+| `widgetProps`   | `object`  | Props passed to widget component                                                                           |
 | `callbackProps` | `object`  | Callback function refs (key=prop name, value=function name from `callbacks` or `{ type: 'script', code }`) |
-| `transform`     | `object`  | Value transform config (see below)                                                 |
+| `transform`     | `object`  | Value transform config (see below)                                                                         |
 
 **Note:** Help text should be set using the top-level `description` field (JSON Schema standard), not `ui.help`.
 
@@ -2808,7 +2591,149 @@ const schema: ExtendedJSONSchema = {
 
 ---
 
+### Variants (Polymorphic Fields)
+
+Use `ui.variants` when one field needs to be edited using different data shapes. For example,
+an `identifier` field may be an email string, a phone string, or an object. A regular
+`type: ['string', 'object']` declaration describes allowed data types, but cannot select the
+Widget or keep validation, error messages, and transforms independent for each mode.
+
+#### Basic Configuration
+
+Each Variant requires a `name` and `type`. You can specify its root `widget` and define the
+mode-specific JSON Schema and UI configuration in `schema`:
+
+```typescript
+const schema = {
+  type: "object",
+  properties: {
+    identifier: {
+      type: "string",
+      title: "Identifier",
+      ui: {
+        widget: "variant",
+        defaultVariant: "email",
+        variants: [
+          {
+            name: "email",
+            label: "Email",
+            type: "string",
+            widget: "email",
+            schema: {
+              type: "string",
+              format: "email",
+              ui: {
+                placeholder: "name@example.com",
+                validators: [{ type: "script", callback: "validateEmail" }],
+                transform: {
+                  callback: "normalizeEmail",
+                  reverseCallback: "restoreEmail",
+                },
+              },
+            },
+          },
+          {
+            name: "object",
+            label: "Object",
+            type: "object",
+            widget: "object-editor",
+            schema: {
+              type: "object",
+              properties: {
+                name: { type: "string", title: "Name" },
+              },
+            },
+          },
+        ],
+      },
+    },
+  },
+};
+```
+
+#### What the Effective Schema Looks Like
+
+When the user selects the `object` Variant, DynamicForm builds an effective schema for that
+field before rendering and validating it. The base field's `type: "string"` is replaced by the
+Variant type, while public metadata such as the field title is preserved:
+
+```typescript
+// Base field declaration
+{
+  type: "string",
+  title: "Identifier",
+  ui: {
+    widget: "variant",
+    placeholder: "Enter an email or phone number",
+    variants: [/* ... */],
+  },
+}
+
+// Effective schema while the "object" Variant is active
+{
+  type: "object",
+  title: "Identifier",
+  properties: {
+    name: {
+      type: "string",
+      title: "Name",
+    },
+  },
+  ui: {
+    widget: "object-editor",
+    // Shared UI settings from the base field can still be inherited.
+    placeholder: "Enter an email or phone number",
+  },
+}
+```
+
+The `object-editor` Widget receives this effective schema, so it edits an object instead of a
+string. Only the active Variant's `properties`, validation rules, error messages, and transform
+are used; settings belonging to the previous Variant are cleared. If the user switches back to
+`email`, the effective schema changes back to `type: "string"`, `widget: "email"`, and the email
+Variant's own `format`, validators, and transform configuration.
+
+`variant.type` is the root type and `variant.widget` is the root Widget for the mode. Put
+mode-specific validation, error messages, and transforms in `variant.schema` (for example,
+`variant.schema.ui.validators` and `variant.schema.ui.transform`). Unspecified mode-specific
+settings are not inherited from another Variant.
+
+#### Automatic Detection and Manual Switching
+
+`detect` currently supports only `callback`. It can reference a function in the `callbacks`
+registry or use an inline script. The callback receives `{ value, formData, context, helpers }`
+and returns a truthy value when the Variant matches:
+
+```typescript
+const callbacks = {
+  detectEmail: ({ value }) =>
+    typeof value === "string" && /^[^@]+@[^@]+\\.[^@]+$/.test(value),
+};
+```
+
+DynamicForm attempts detection during initialization and when external values change. After a
+user switches the Variant through `VariantWidget`, the active Variant takes precedence over
+detection, so later typing does not switch modes unexpectedly. Each Variant keeps its own edit
+value; switching back restores it, while submission outputs only the active Variant's value.
+
+#### Validation, Transforms, and Form APIs
+
+The active Variant's `schema` is used for standard JSON Schema validation and `ui.validators`.
+Switching modes clears errors from the previous mode. `ui.transform.callback` runs at external
+data outputs such as `getValue`, `getValues`, `onChange`, and `onSubmit`; `reverseCallback` runs
+when values are written through `setValue`, `setValues`, or `reset`.
+
+Inline scripts should only be used with trusted schema sources. See
+`src/examples/VariantsExample.tsx` for a complete interactive example and
+`doc/tech-design/schema-builder/variants.md` for SchemaBuilder configuration details.
+
 ## Advanced Features
+
+Advanced capabilities are grouped here by purpose. The following patterns combine the schema primitives above into complete form behaviors.
+
+### Advanced Patterns
+
+The following patterns are covered in the Schema Definition sections above. They are kept here as end-to-end recipes for combining those primitives:
 
 #### Field Visibility
 
@@ -2899,48 +2824,48 @@ const linkageFunctions = {
 
 ```typescript
 const schema = {
-  type: 'object',
+  type: "object",
   properties: {
     country: {
-      type: 'string',
-      title: 'Country',
-      enum: ['china', 'usa'],
-      enumNames: ['China', 'USA'],
+      type: "string",
+      title: "Country",
+      enum: ["china", "usa"],
+      enumNames: ["China", "USA"],
     },
     province: {
-      type: 'string',
-      title: 'Province/State',
+      type: "string",
+      title: "Province/State",
       ui: {
         linkages: [
           {
-            type: 'options',
-            dependencies: ['#/properties/country'],
+            type: "options",
+            dependencies: ["#/properties/country"],
             fulfill: {
-              function: 'getProvinceOptions',
+              function: "getProvinceOptions",
             },
           },
         ],
       },
     },
   },
-}
+};
 
 const linkageFunctions = {
   getProvinceOptions: ({ formData }: { formData: Record<string, any> }) => {
-    if (formData.country === 'china') {
+    if (formData.country === "china") {
       return [
-        { label: 'Beijing', value: 'beijing' },
-        { label: 'Shanghai', value: 'shanghai' },
-      ]
-    } else if (formData.country === 'usa') {
+        { label: "Beijing", value: "beijing" },
+        { label: "Shanghai", value: "shanghai" },
+      ];
+    } else if (formData.country === "usa") {
       return [
-        { label: 'California', value: 'ca' },
-        { label: 'New York', value: 'ny' },
-      ]
+        { label: "California", value: "ca" },
+        { label: "New York", value: "ny" },
+      ];
     }
-    return []
+    return [];
   },
-}
+};
 ```
 
 **Using Static Values:**
@@ -2949,37 +2874,37 @@ You can also set options directly without using functions:
 
 ```typescript
 const schema = {
-  type: 'object',
+  type: "object",
   properties: {
     category: {
-      type: 'string',
-      title: 'Category',
-      enum: ['electronics', 'books'],
-      enumNames: ['Electronics', 'Books'],
+      type: "string",
+      title: "Category",
+      enum: ["electronics", "books"],
+      enumNames: ["Electronics", "Books"],
     },
     subcategory: {
-      type: 'string',
-      title: 'Subcategory',
+      type: "string",
+      title: "Subcategory",
       ui: {
         linkages: [
           {
-            type: 'options',
-            dependencies: ['#/properties/category'],
+            type: "options",
+            dependencies: ["#/properties/category"],
             when: {
-              field: '#/properties/category',
-              operator: '==',
-              value: 'electronics',
+              field: "#/properties/category",
+              operator: "==",
+              value: "electronics",
             },
             fulfill: {
               options: [
-                { label: 'Laptop', value: 'laptop' },
-                { label: 'Phone', value: 'phone' },
+                { label: "Laptop", value: "laptop" },
+                { label: "Phone", value: "phone" },
               ],
             },
             otherwise: {
               options: [
-                { label: 'Fiction', value: 'fiction' },
-                { label: 'Non-Fiction', value: 'nonfiction' },
+                { label: "Fiction", value: "fiction" },
+                { label: "Non-Fiction", value: "nonfiction" },
               ],
             },
           },
@@ -2987,7 +2912,7 @@ const schema = {
       },
     },
   },
-}
+};
 ```
 
 **Automatic Value Cleanup:**
@@ -3000,30 +2925,30 @@ When options change, the form automatically clears the field value if it's no lo
 // automatically cleared since 'laptop' is not in the books options.
 ```
 
-### Nested Forms
+#### Nested Forms
 
 #### Static Nested Forms
 
 ```typescript
 const schema = {
-  type: 'object',
+  type: "object",
   properties: {
     name: {
-      type: 'string',
-      title: 'Name',
+      type: "string",
+      title: "Name",
     },
     address: {
-      type: 'object',
-      title: 'Address',
+      type: "object",
+      title: "Address",
       properties: {
-        street: { type: 'string', title: 'Street' },
-        city: { type: 'string', title: 'City' },
-        zipCode: { type: 'string', title: 'Zip Code' },
+        street: { type: "string", title: "Street" },
+        city: { type: "string", title: "City" },
+        zipCode: { type: "string", title: "Zip Code" },
       },
-      required: ['city'],
+      required: ["city"],
     },
   },
-}
+};
 ```
 
 #### Dynamic Nested Forms
@@ -3092,41 +3017,288 @@ const schema = {
 />
 ```
 
-### Field Path Flattening
+#### Field Path Flattening Pattern
 
 Simplify deeply nested parameter display:
 
 ```typescript
 const schema = {
-  type: 'object',
+  type: "object",
   properties: {
     auth: {
-      type: 'object',
-      title: 'Authentication',
+      type: "object",
+      title: "Authentication",
       ui: {
         flattenPath: true,
         flattenPrefix: true,
       },
       properties: {
         content: {
-          type: 'object',
+          type: "object",
           ui: {
             flattenPath: true,
           },
           properties: {
             apiKey: {
-              type: 'string',
-              title: 'API Key',
+              type: "string",
+              title: "API Key",
             },
           },
         },
       },
     },
   },
-}
+};
 // Display: "Authentication - API Key"
 // Submit: { auth: { content: { apiKey: 'xxx' } } }
 ```
+
+---
+
+### Inline Script Helpers
+
+Inline scripts and registered callback functions can access shared helper utilities through the `helpers` parameter. Helpers are available in:
+
+- `ui.validators`
+- `ui.transform`
+- `ui.linkages.fulfill` / `ui.linkages.otherwise`
+- `ui.callbackProps`
+
+This guide keeps helper usage in one place because the same helper object is shared by all inline script entry points.
+
+#### Built-in Helpers
+
+DynamicForm provides these helpers by default:
+
+| Helper           | Description                                                 | Example                              |
+| ---------------- | ----------------------------------------------------------- | ------------------------------------ |
+| `helpers.ofetch` | Cross-browser and Node.js request utility based on `ofetch` | `await helpers.ofetch('/api/users')` |
+| `helpers._`      | Lodash utilities                                            | `helpers._.sumBy(items, 'price')`    |
+| `helpers.z`      | Zod runtime validation utilities                            | `helpers.z.string().parse(value)`    |
+
+#### Custom Helpers
+
+Use the `helpers` prop to add application-specific utilities. DynamicForm merges them with the built-in helpers:
+
+```typescript
+const mergedHelpers = {
+  ...builtInHelpers,
+  ...userHelpers,
+};
+```
+
+User-provided helpers take priority, so you can override a built-in helper when needed. Keep the `helpers` object stable with `useMemo` to avoid unnecessary recalculation and rerenders.
+
+```typescript
+import React, { useMemo } from 'react';
+import { ofetch } from 'ofetch';
+import dayjs from 'dayjs';
+
+function App({ token }: { token: string }) {
+  const helpers = useMemo(() => ({
+    // Override the built-in ofetch with an app-specific instance
+    ofetch: ofetch.create({
+      baseURL: '/api',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }),
+
+    // Add custom dependencies and business utilities
+    dayjs,
+    money: {
+      dollarsToCents: (value: number) => Math.round(value * 100),
+    },
+    userService: {
+      isReservedUsername: (value: string) =>
+        ['admin', 'root', 'system'].includes(value.toLowerCase()),
+    },
+  }), [token]);
+
+  return (
+    <DynamicForm
+      schema={schema}
+      helpers={helpers}
+      onSubmit={handleSubmit}
+    />
+  );
+}
+```
+
+Custom helpers are available in every helper-aware function:
+
+```typescript
+const callbacks = {
+  validateUsername: ({ value, helpers }) => {
+    if (helpers.userService.isReservedUsername(value)) {
+      return "This username is reserved";
+    }
+    return null;
+  },
+};
+```
+
+Inline scripts can use the same custom helpers:
+
+```typescript
+{
+  type: 'number',
+  title: 'Price',
+  ui: {
+    transform: {
+      callback: {
+        type: 'script',
+        code: `function({ value, helpers }) {
+          return helpers.money.dollarsToCents(value);
+        }`,
+      },
+    },
+  },
+}
+```
+
+#### Function Signatures
+
+All helper-aware functions use an object parameter:
+
+| Entry Point              | Signature                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| `ui.validators`          | `({ value, formValues, helpers }) => string \| null \| Promise<string \| null>` |
+| `ui.transform`           | `({ value, helpers }) => any`                                                   |
+| `ui.linkages.*.function` | `({ formData, context, helpers }) => any \| Promise<any>`                       |
+| `ui.callbackProps`       | `({ args, helpers }) => any \| Promise<any>`                                    |
+
+`ui.transform` is intentionally synchronous. Use value linkages for asynchronous computed values.
+
+#### Validation with Zod
+
+```typescript
+{
+  type: 'string',
+  title: 'Username',
+  ui: {
+    validators: [
+      {
+        type: 'script',
+        callback: {
+          type: 'script',
+          code: `function({ value, helpers }) {
+            if (!value) return 'Username is required';
+
+            const schema = helpers.z.string()
+              .min(3)
+              .regex(/^[a-zA-Z0-9_]+$/);
+
+            const result = schema.safeParse(value);
+            return result.success
+              ? null
+              : 'Username must be at least 3 characters and contain only letters, numbers, or underscores';
+          }`,
+        },
+      },
+    ],
+  },
+}
+```
+
+#### Async Validation with ofetch
+
+```typescript
+const callbacks = {
+  checkUsernameAvailability: async ({ value, helpers }) => {
+    if (!value) return null;
+
+    const result = await helpers.ofetch('/check-username', {
+      method: 'POST',
+      body: { username: value },
+    });
+
+    return result.available ? null : 'Username is already taken';
+  },
+};
+
+<DynamicForm
+  schema={schema}
+  callbacks={callbacks}
+/>
+```
+
+#### Transform with Lodash
+
+```typescript
+{
+  type: 'string',
+  title: 'Currency',
+  ui: {
+    transform: {
+      callback: {
+        type: 'script',
+        code: `function({ value, helpers }) {
+          return helpers._.toUpper(helpers._.trim(value));
+        }`,
+      },
+    },
+  },
+}
+```
+
+#### Linkage with Helpers
+
+```typescript
+const linkageFunctions = {
+  loadCityOptions: async ({ formData, helpers }) => {
+    if (!formData.country) return [];
+
+    const cities = await helpers.ofetch("/cities", {
+      query: { country: formData.country },
+    });
+
+    return helpers._.map(cities, (city) => ({
+      label: city.name,
+      value: city.id,
+    }));
+  },
+};
+```
+
+#### callbackProps with Helpers
+
+```typescript
+{
+  type: 'string',
+  title: 'Avatar',
+  ui: {
+    widget: 'upload',
+    callbackProps: {
+      onUpload: {
+        type: 'script',
+        code: `async function({ args, helpers }) {
+          const [file] = args;
+          const mimeSchema = helpers.z.string()
+            .regex(/^image\//);
+
+          if (!mimeSchema.safeParse(file.type).success) {
+            throw new Error('Only images are allowed');
+          }
+
+          const body = new FormData();
+          body.append('file', file);
+          const result = await helpers.ofetch('/upload', {
+            method: 'POST',
+            body,
+          });
+
+          return result.url;
+        }`,
+      },
+    },
+  },
+}
+```
+
+#### Security Boundary
+
+Helpers are dependency injection, not a sandbox. Inline scripts still use dynamic JavaScript execution and should only be used with trusted schema sources. Do not accept inline scripts from untrusted user input.
 
 ---
 
@@ -3134,27 +3306,27 @@ const schema = {
 
 ### DynamicForm Props
 
-| Prop               | Type                                            | Required | Default      | Description                                                      |
-| ------------------ | ----------------------------------------------- | -------- | ------------ | ---------------------------------------------------------------- |
-| `schema`           | `ExtendedJSONSchema`                            | Yes      | -            | JSON Schema definition                                           |
-| `defaultValues`    | `Record<string, any>`                           | No       | `{}`         | Initial form values                                              |
-| `onSubmit`         | `(data: any) => void \| Promise<void>`          | No       | -            | Submit handler                                                   |
-| `onChange`         | `(data: any) => void`                           | No       | -            | Change handler                                                   |
-| `widgets`          | `Record<string, ComponentType>`                 | No       | `{}`         | Custom widgets                                                   |
-| `helpers`          | `Record<string, any>`                           | No       | built-in helpers | Helper utilities available in inline scripts and callbacks    |
-| `linkageFunctions` | `Record<string, Function>`                      | No       | `{}`         | Helper-aware linkage functions                                   |
-| `callbacks`        | `Record<string, Function>`                      | No       | `{}`         | Helper-aware callback registry used by validators, transforms, and `ui.callbackProps` |
-| `customFormats`    | `Record<string, Function>`                      | No       | `{}`         | Custom format validators                                         |
-| `layout`           | `'vertical' \| 'horizontal' \| 'inline'`        | No       | `'vertical'` | Form layout                                                      |
-| `labelWidth`       | `number \| string`                              | No       | -            | Label width (horizontal layout)                                  |
-| `showSubmitButton` | `boolean`                                       | No       | `true`       | Show submit button                                               |
-| `renderAsForm`     | `boolean`                                       | No       | `true`       | Render as `<form>` tag                                           |
-| `validateMode`     | `'onSubmit' \| 'onBlur' \| 'onChange' \| 'all'` | No       | `'onSubmit'` | Validation mode                                                  |
-| `loading`          | `boolean`                                       | No       | `false`      | Loading state                                                    |
-| `disabled`         | `boolean`                                       | No       | `false`      | Disable all fields                                               |
-| `readonly`         | `boolean`                                       | No       | `false`      | Make all fields readonly                                         |
-| `className`        | `string`                                        | No       | -            | CSS class name                                                   |
-| `style`            | `React.CSSProperties`                           | No       | -            | Inline styles                                                    |
+| Prop               | Type                                            | Required | Default          | Description                                                                           |
+| ------------------ | ----------------------------------------------- | -------- | ---------------- | ------------------------------------------------------------------------------------- |
+| `schema`           | `ExtendedJSONSchema`                            | Yes      | -                | JSON Schema definition                                                                |
+| `defaultValues`    | `Record<string, any>`                           | No       | `{}`             | Initial form values                                                                   |
+| `onSubmit`         | `(data: any) => void \| Promise<void>`          | No       | -                | Submit handler                                                                        |
+| `onChange`         | `(data: any) => void`                           | No       | -                | Change handler                                                                        |
+| `widgets`          | `Record<string, ComponentType>`                 | No       | `{}`             | Custom widgets                                                                        |
+| `helpers`          | `Record<string, any>`                           | No       | built-in helpers | Helper utilities available in inline scripts and callbacks                            |
+| `linkageFunctions` | `Record<string, Function>`                      | No       | `{}`             | Helper-aware linkage functions                                                        |
+| `callbacks`        | `Record<string, Function>`                      | No       | `{}`             | Helper-aware callback registry used by validators, transforms, and `ui.callbackProps` |
+| `customFormats`    | `Record<string, Function>`                      | No       | `{}`             | Custom format validators                                                              |
+| `layout`           | `'vertical' \| 'horizontal' \| 'inline'`        | No       | `'vertical'`     | Form layout                                                                           |
+| `labelWidth`       | `number \| string`                              | No       | -                | Label width (horizontal layout)                                                       |
+| `showSubmitButton` | `boolean`                                       | No       | `true`           | Show submit button                                                                    |
+| `renderAsForm`     | `boolean`                                       | No       | `true`           | Render as `<form>` tag                                                                |
+| `validateMode`     | `'onSubmit' \| 'onBlur' \| 'onChange' \| 'all'` | No       | `'onSubmit'`     | Validation mode                                                                       |
+| `loading`          | `boolean`                                       | No       | `false`          | Loading state                                                                         |
+| `disabled`         | `boolean`                                       | No       | `false`          | Disable all fields                                                                    |
+| `readonly`         | `boolean`                                       | No       | `false`          | Make all fields readonly                                                              |
+| `className`        | `string`                                        | No       | -                | CSS class name                                                                        |
+| `style`            | `React.CSSProperties`                           | No       | -                | Inline styles                                                                         |
 
 ### DynamicFormRef Methods
 
@@ -3175,23 +3347,23 @@ DynamicForm exposes several methods via ref that allow you to programmatically c
 Set a single field value programmatically.
 
 ```typescript
-const formRef = useRef<DynamicFormRef>(null)
+const formRef = useRef<DynamicFormRef>(null);
 
 // Set a simple field
-formRef.current?.setValue('username', 'john_doe')
+formRef.current?.setValue("username", "john_doe");
 
 // Set with validation
-formRef.current?.setValue('email', 'john@example.com', {
+formRef.current?.setValue("email", "john@example.com", {
   shouldValidate: true, // Trigger validation
   shouldDirty: true, // Mark field as dirty
   shouldTouch: true, // Mark field as touched
-})
+});
 
 // Set nested field
-formRef.current?.setValue('address.city', 'Beijing')
+formRef.current?.setValue("address.city", "Beijing");
 
 // Set array element
-formRef.current?.setValue('contacts.0.name', 'Alice')
+formRef.current?.setValue("contacts.0.name", "Alice");
 ```
 
 **`getValue(name)` - Get Field Value**
@@ -3199,9 +3371,9 @@ formRef.current?.setValue('contacts.0.name', 'Alice')
 Get a single field value by name.
 
 ```typescript
-const username = formRef.current?.getValue('username')
-const city = formRef.current?.getValue('address.city')
-const firstContact = formRef.current?.getValue('contacts.0')
+const username = formRef.current?.getValue("username");
+const city = formRef.current?.getValue("address.city");
+const firstContact = formRef.current?.getValue("contacts.0");
 ```
 
 **`getValues()` - Get All Values**
@@ -3209,8 +3381,8 @@ const firstContact = formRef.current?.getValue('contacts.0')
 Get all form values as an object.
 
 ```typescript
-const allValues = formRef.current?.getValues()
-console.log(allValues)
+const allValues = formRef.current?.getValues();
+console.log(allValues);
 // { username: 'john_doe', email: 'john@example.com', address: { city: 'Beijing' } }
 ```
 
@@ -3219,84 +3391,84 @@ console.log(allValues)
 Set multiple field values at once. Supports nested objects, deep nesting, and arrays.
 
 ```typescript
-// 设置顶层字段
+// Set top-level fields
 formRef.current?.setValues(
   {
-    username: 'jane_doe',
-    email: 'jane@example.com',
+    username: "jane_doe",
+    email: "jane@example.com",
   },
-  { shouldValidate: true }
-)
+  { shouldValidate: true },
+);
 
-// 设置嵌套对象（自动递归展开，确保嵌套表单子字段正确更新）
+// Set a nested object (recursively expanded so nested form fields update correctly)
 formRef.current?.setValues({
   address: {
-    street: '123 Main St',
-    city: 'Shanghai',
-    zipCode: '200000',
+    street: "123 Main St",
+    city: "Shanghai",
+    zipCode: "200000",
   },
-})
+});
 
-// 设置深层嵌套对象
+// Set a deeply nested object
 formRef.current?.setValues({
   company: {
-    companyName: 'Acme Inc',
+    companyName: "Acme Inc",
     location: {
-      country: 'China',
-      city: 'Beijing',
+      country: "China",
+      city: "Beijing",
     },
   },
-})
+});
 
-// 设置数组（基本类型数组会自动包装为内部格式）
+// Set an array (primitive arrays are automatically wrapped internally)
 formRef.current?.setValues({
-  tags: ['frontend', 'react', 'typescript'],
+  tags: ["frontend", "react", "typescript"],
   contacts: [
-    { contactName: 'Alice', phone: '123-4567' },
-    { contactName: 'Bob', phone: '890-1234' },
+    { contactName: "Alice", phone: "123-4567" },
+    { contactName: "Bob", phone: "890-1234" },
   ],
-})
+});
 
-// 混合设置：顶层 + 嵌套 + 数组
+// Set mixed data: top-level fields, nested objects, and arrays
 formRef.current?.setValues({
-  username: 'john_doe',
-  address: { street: '456 Oak Ave', city: 'Shenzhen' },
-  tags: ['vue', 'angular'],
-})
+  username: "john_doe",
+  address: { street: "456 Oak Ave", city: "Shenzhen" },
+  tags: ["vue", "angular"],
+});
 ```
 
-> **实现细节**：`setValues` 内部会：
+> **Implementation details**: `setValues` internally:
 >
-> 1. 使用 `wrapPrimitiveArrays` 将基本类型数组（如 `string[]`）转换为 `useFieldArray` 所需的对象数组格式
-> 2. 递归展开嵌套对象，对每一层级的路径都调用 `setValue`，确保嵌套表单（`NestedFormWidget`）内部的子 Controller 都能收到新值
+> 1. Uses `wrapPrimitiveArrays` to convert primitive arrays such as `string[]` into the object-array format required by `useFieldArray`.
+> 2. Recursively expands nested objects and calls `setValue` for every path level so child Controllers inside `NestedFormWidget` receive the update.
 
 **`reset(values?)` - Reset Form**
 
 Reset form to default values or provided values. Supports nested objects and arrays.
 
 ```typescript
-// 清空表单（所有字段重置为类型恰当的空值）
-// string → '', array → [], object → 递归空对象, number/boolean → undefined
-formRef.current?.reset()
-formRef.current?.reset({})
+// Clear the form (each field is reset to a type-appropriate empty value)
+// string -> '', array -> [], object -> recursively empty object, number/boolean -> undefined
+formRef.current?.reset();
+formRef.current?.reset({});
 
-// 用完整数据重置（支持嵌套对象和数组）
+// Reset with complete data (supports nested objects and arrays)
 formRef.current?.reset({
-  username: 'john_doe',
-  email: 'john@example.com',
+  username: "john_doe",
+  email: "john@example.com",
   address: {
-    street: '123 Main St',
-    city: 'Beijing',
+    street: "123 Main St",
+    city: "Beijing",
   },
-  tags: ['frontend', 'react'],
-  contacts: [{ contactName: 'Alice', phone: '123-4567' }],
-})
+  tags: ["frontend", "react"],
+  contacts: [{ contactName: "Alice", phone: "123-4567" }],
+});
 ```
 
-> **注意**：
+> **Note**:
 >
-> - `reset()` 或 `reset({})` 会根据 schema 结构为每个字段生成类型恰当的空值，确保 React 受控组件能正确清除显示值
-> - `reset(values)` 会自动处理基本类型数组的包装，并递归设置嵌套对象的子路径，确保嵌套表单内的字段正确更新
+> - `reset()` or `reset({})` generates type-appropriate empty values from the schema, so controlled React components clear their displayed values correctly.
+> - `reset(values)` automatically handles primitive-array wrapping and recursively sets nested object paths so fields inside nested forms update correctly.
 
 #### Validation Methods
 
@@ -3314,22 +3486,22 @@ Trigger validation for a specific field, multiple fields, or the entire form.
 
 ```typescript
 // Validate entire form
-const isValid = await formRef.current?.validate()
+const isValid = await formRef.current?.validate();
 if (isValid) {
-  console.log('Form is valid')
+  console.log("Form is valid");
 }
 
 // Validate specific field
-const isEmailValid = await formRef.current?.validate('email')
+const isEmailValid = await formRef.current?.validate("email");
 
 // Validate multiple fields
 const areFieldsValid = await formRef.current?.validate([
-  'email',
-  'username',
-  'password',
-])
+  "email",
+  "username",
+  "password",
+]);
 if (areFieldsValid) {
-  console.log('All specified fields are valid')
+  console.log("All specified fields are valid");
 }
 ```
 
@@ -3338,8 +3510,8 @@ if (areFieldsValid) {
 Get all current validation errors.
 
 ```typescript
-const errors = formRef.current?.getErrors()
-console.log(errors)
+const errors = formRef.current?.getErrors();
+console.log(errors);
 // { email: { type: 'pattern', message: 'Invalid email format' } }
 ```
 
@@ -3349,13 +3521,13 @@ Clear validation errors for a specific field, multiple fields, or entire form.
 
 ```typescript
 // Clear specific field error
-formRef.current?.clearErrors('email')
+formRef.current?.clearErrors("email");
 
 // Clear multiple fields' errors
-formRef.current?.clearErrors(['email', 'username', 'password'])
+formRef.current?.clearErrors(["email", "username", "password"]);
 
 // Clear all errors
-formRef.current?.clearErrors()
+formRef.current?.clearErrors();
 ```
 
 **`setError(name, error)` - Set Error**
@@ -3364,64 +3536,64 @@ Manually set a validation error for a field. Useful for async validation, server
 
 ```typescript
 // Basic usage: Set a manual error
-formRef.current?.setError('username', {
-  type: 'manual',
-  message: 'This username is already taken',
-})
+formRef.current?.setError("username", {
+  type: "manual",
+  message: "This username is already taken",
+});
 
 // Async validation example: Check username availability
 const handleCheckUsername = async () => {
-  const username = formRef.current?.getValue('username')
+  const username = formRef.current?.getValue("username");
 
   try {
-    const response = await fetch(`/api/check-username?username=${username}`)
-    const { available } = await response.json()
+    const response = await fetch(`/api/check-username?username=${username}`);
+    const { available } = await response.json();
 
     if (!available) {
-      formRef.current?.setError('username', {
-        type: 'manual',
-        message: 'This username is already taken',
-      })
+      formRef.current?.setError("username", {
+        type: "manual",
+        message: "This username is already taken",
+      });
     } else {
-      formRef.current?.clearErrors('username')
+      formRef.current?.clearErrors("username");
     }
   } catch (error) {
-    formRef.current?.setError('username', {
-      type: 'manual',
-      message: 'Failed to check username availability',
-    })
+    formRef.current?.setError("username", {
+      type: "manual",
+      message: "Failed to check username availability",
+    });
   }
-}
+};
 
 // Server-side validation example: Handle API errors
 const handleSubmit = async (data: any) => {
   try {
-    await api.createUser(data)
+    await api.createUser(data);
   } catch (error: any) {
     // Set errors from server response
     if (error.response?.data?.errors) {
       Object.entries(error.response.data.errors).forEach(([field, message]) => {
         formRef.current?.setError(field, {
-          type: 'server',
+          type: "server",
           message: message as string,
-        })
-      })
+        });
+      });
     }
   }
-}
+};
 
 // Custom business logic validation
 const handleValidatePassword = () => {
-  const password = formRef.current?.getValue('password')
-  const confirmPassword = formRef.current?.getValue('confirmPassword')
+  const password = formRef.current?.getValue("password");
+  const confirmPassword = formRef.current?.getValue("confirmPassword");
 
   if (password !== confirmPassword) {
-    formRef.current?.setError('confirmPassword', {
-      type: 'manual',
-      message: 'Passwords do not match',
-    })
+    formRef.current?.setError("confirmPassword", {
+      type: "manual",
+      message: "Passwords do not match",
+    });
   }
-}
+};
 ```
 
 **`getFormState()` - Get Form State**
@@ -3429,8 +3601,8 @@ const handleValidatePassword = () => {
 Get current form state information.
 
 ```typescript
-const formState = formRef.current?.getFormState()
-console.log(formState)
+const formState = formRef.current?.getFormState();
+console.log(formState);
 // {
 //   isDirty: true,      // Has any field been modified
 //   isValid: false,     // Are all fields valid
@@ -3841,13 +4013,13 @@ properties: {
 ```typescript
 const schema = useMemo(
   () => ({
-    type: 'object',
+    type: "object",
     properties: {
       // ... schema definition
     },
   }),
-  []
-)
+  [],
+);
 ```
 
 **2. Debounce onChange Callbacks**
@@ -3891,11 +4063,11 @@ For forms with 50+ fields, consider splitting into multiple steps.
 ```typescript
 const handleSubmit = async (data: any) => {
   try {
-    await api.submitForm(data)
+    await api.submitForm(data);
   } catch (error) {
-    toast.error('Submission failed. Please try again.')
+    toast.error("Submission failed. Please try again.");
   }
-}
+};
 ```
 
 ---
