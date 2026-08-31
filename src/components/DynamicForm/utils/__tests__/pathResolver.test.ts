@@ -353,5 +353,18 @@ describe("PathResolver", () => {
       const result = PathResolver.resolve("group.category", formData);
       expect(result).toBe("test value");
     });
+
+    it("当嵌套路径经过基本类型值时应返回 undefined 而不抛错", () => {
+      const formData = {
+        permissions: [{ users: ["Alan Zhao"] }],
+      };
+
+      expect(() =>
+        PathResolver.getNestedValue(formData, "permissions.0.users.0.value"),
+      ).not.toThrow();
+      expect(
+        PathResolver.getNestedValue(formData, "permissions.0.users.0.value"),
+      ).toBeUndefined();
+    });
   });
 });

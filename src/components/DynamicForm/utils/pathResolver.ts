@@ -112,7 +112,7 @@ export class PathResolver {
    * 会智能匹配最长的 key 前缀，然后继续解析剩余路径。
    */
   static getNestedValue(obj: Record<string, any>, path: string): any {
-    if (!obj || !path) {
+    if (!obj || !path || typeof obj !== "object") {
       return undefined;
     }
 
