@@ -19,5 +19,6 @@ if [ -z "$prettier_files" ]; then
 fi
 
 echo "Running Prettier on staged files..."
-printf '%s\n' "$prettier_files" | xargs ./node_modules/.bin/prettier --write
+# 显式读取仓库配置，确保命令行规则与 VS Code 保存时的 Prettier 规则一致。
+printf '%s\n' "$prettier_files" | xargs ./node_modules/.bin/prettier --config .prettierrc --write
 printf '%s\n' "$prettier_files" | xargs git add --

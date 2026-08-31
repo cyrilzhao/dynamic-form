@@ -4,75 +4,75 @@ import React, {
   useImperativeHandle,
   forwardRef,
   useRef,
-} from "react";
+} from 'react'
 import {
   useForm,
   FormProvider,
   useFormContext,
   type UseFormReturn,
-} from "react-hook-form";
-import { Button } from "@blueprintjs/core";
-import { SchemaParser } from "./core/SchemaParser";
-import { FormField } from "./layout/FormField";
-import { ErrorList } from "./components/ErrorList";
-import type { DynamicFormProps, DynamicFormRef } from "./types";
-import type { FieldChangeSource, FormChangeMeta } from "./types";
+} from 'react-hook-form'
+import { Button } from '@blueprintjs/core'
+import { SchemaParser } from './core/SchemaParser'
+import { FormField } from './layout/FormField'
+import { ErrorList } from './components/ErrorList'
+import type { DynamicFormProps, DynamicFormRef } from './types'
+import type { FieldChangeSource, FormChangeMeta } from './types'
 import {
   parseSchemaLinkages,
   transformToAbsolutePaths,
-} from "./utils/schemaLinkageParser";
-import { useArrayLinkageManager } from "./hooks/useArrayLinkageManager";
-import type { LinkageConfig } from "./types/linkage";
-import type { ExtendedJSONSchema } from "./types/schema";
-import { filterValueWithNestedSchemas } from "./utils/filterValueWithNestedSchemas";
+} from './utils/schemaLinkageParser'
+import { useArrayLinkageManager } from './hooks/useArrayLinkageManager'
+import type { LinkageConfig } from './types/linkage'
+import type { ExtendedJSONSchema } from './types/schema'
+import { filterValueWithNestedSchemas } from './utils/filterValueWithNestedSchemas'
 import {
   NestedSchemaProvider,
   useNestedSchemaRegistryOptional,
-} from "./context/NestedSchemaContext";
-import { PathPrefixProvider } from "./context/PathPrefixContext";
+} from './context/NestedSchemaContext'
+import { PathPrefixProvider } from './context/PathPrefixContext'
 import {
   LinkageStateProvider,
   useLinkageStateContext,
-} from "./context/LinkageStateContext";
-import { WidgetsProvider } from "./context/WidgetsContext";
-import { CallbacksProvider } from "./context/CallbacksContext";
-import { HelpersProvider } from "./context/HelpersContext";
+} from './context/LinkageStateContext'
+import { WidgetsProvider } from './context/WidgetsContext'
+import { CallbacksProvider } from './context/CallbacksContext'
+import { HelpersProvider } from './context/HelpersContext'
 import {
   TextFieldFocusProvider,
   useTextFieldFocus,
-} from "./context/TextFieldFocusContext";
+} from './context/TextFieldFocusContext'
 import {
   wrapPrimitiveArrays,
   unwrapPrimitiveArrays,
-} from "./utils/arrayTransformer";
+} from './utils/arrayTransformer'
 import {
   extractSchemaDefaults,
   mergeDefaults,
-} from "./utils/extractSchemaDefaults";
-import { createSchemaResolver } from "./utils/createSchemaResolver";
-import { resolveTransformFn } from "./utils/resolveTransformFn";
-import { PathResolver } from "./utils/pathResolver";
-import { mergeSchemaWithLinkage } from "./utils/mergeSchemaWithLinkage";
-import { LinkageOperationController } from "./utils/linkageOperationController";
-import { builtInHelpers } from "./utils/builtInHelpers";
+} from './utils/extractSchemaDefaults'
+import { createSchemaResolver } from './utils/createSchemaResolver'
+import { resolveTransformFn } from './utils/resolveTransformFn'
+import { PathResolver } from './utils/pathResolver'
+import { mergeSchemaWithLinkage } from './utils/mergeSchemaWithLinkage'
+import { LinkageOperationController } from './utils/linkageOperationController'
+import { builtInHelpers } from './utils/builtInHelpers'
 import {
   createFieldVariantStore,
   FieldVariantProvider,
   useFieldVariantStoreOptional,
-} from "./context/FieldVariantContext";
+} from './context/FieldVariantContext'
 import {
   buildVariantSchema,
   detectVariantSync,
   fallbackVariant,
-} from "./utils/resolveVariant";
-import "@blueprintjs/core/lib/css/blueprint.css";
+} from './utils/resolveVariant'
+import '@blueprintjs/core/lib/css/blueprint.css'
 
 // 空对象常量，避免每次渲染创建新对象
-const EMPTY_LINKAGE_FUNCTIONS = {};
-const EMPTY_WIDGETS = {};
-const EMPTY_CUSTOM_FORMATS = {};
-const EMPTY_CALLBACKS = {};
-const EMPTY_HELPERS = {};
+const EMPTY_LINKAGE_FUNCTIONS = {}
+const EMPTY_WIDGETS = {}
+const EMPTY_CUSTOM_FORMATS = {}
+const EMPTY_CALLBACKS = {}
+const EMPTY_HELPERS = {}
 
 /**
  * 根据数组前后快照推断结构动作。
@@ -84,39 +84,39 @@ function inferArrayAction(
   path: string,
   previousValue: unknown,
   value: unknown,
-): "append" | "remove" | "moveUp" | "moveDown" | undefined {
+): 'append' | 'remove' | 'moveUp' | 'moveDown' | undefined {
   // 仅对动态数组结构推断动作；Select 多选数组属于值更新，不应标记数组结构操作。
-  const fieldSchema = getSchemaAtPath(schema, path);
+  const fieldSchema = getSchemaAtPath(schema, path)
   if (
-    fieldSchema?.type !== "array" ||
-    fieldSchema.ui?.widget === "select" ||
+    fieldSchema?.type !== 'array' ||
+    fieldSchema.ui?.widget === 'select' ||
     !Array.isArray(previousValue) ||
     !Array.isArray(value)
   ) {
-    return undefined;
+    return undefined
   }
-  if (value.length > previousValue.length) return "append";
-  if (value.length < previousValue.length) return "remove";
+  if (value.length > previousValue.length) return 'append'
+  if (value.length < previousValue.length) return 'remove'
   // 首个差异位置用于判断相邻元素发生了上移还是下移。
   const changedIndex = value.findIndex(
     (item, index) => !Object.is(item, previousValue[index]),
-  );
-  if (changedIndex < 0) return undefined;
+  )
+  if (changedIndex < 0) return undefined
   if (
     changedIndex < value.length - 1 &&
     Object.is(value[changedIndex], previousValue[changedIndex + 1]) &&
     Object.is(value[changedIndex + 1], previousValue[changedIndex])
   ) {
-    return "moveUp";
+    return 'moveUp'
   }
   if (
     changedIndex > 0 &&
     Object.is(value[changedIndex], previousValue[changedIndex - 1]) &&
     Object.is(value[changedIndex - 1], previousValue[changedIndex])
   ) {
-    return "moveDown";
+    return 'moveDown'
   }
-  return undefined;
+  return undefined
 }
 
 /**
@@ -131,24 +131,24 @@ function setValuesRecursive(
   methods: UseFormReturn,
   obj: Record<string, any>,
   options?: {
-    shouldValidate?: boolean;
-    shouldDirty?: boolean;
-    shouldTouch?: boolean;
+    shouldValidate?: boolean
+    shouldDirty?: boolean
+    shouldTouch?: boolean
   },
-  prefix = "",
+  prefix = '',
 ) {
   Object.entries(obj || {}).forEach(([key, value]) => {
-    const path = prefix ? `${prefix}.${key}` : key;
+    const path = prefix ? `${prefix}.${key}` : key
     // 设置当前路径的值
-    methods.setValue(path, value, options);
+    methods.setValue(path, value, options)
     // 普通对象递归展开（数组和 null 除外）：
     // NestedFormWidget 内部只有叶子字段注册 Controller（如 address.street）。
     // 对每一层路径调用 setValue，确保嵌套表单的已挂载叶子字段同步更新。
     // 数组由 useFieldArray 管理，直接设置整体即可，无需递归展开。
-    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-      setValuesRecursive(methods, value, options, path);
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      setValuesRecursive(methods, value, options, path)
     }
-  });
+  })
 }
 
 /**
@@ -165,28 +165,28 @@ function setValuesRecursive(
  * - object → 递归构建空对象
  */
 function buildEmptyValues(schema: ExtendedJSONSchema): Record<string, any> {
-  if (schema.type !== "object" || !schema.properties) {
-    return {};
+  if (schema.type !== 'object' || !schema.properties) {
+    return {}
   }
 
-  const result: Record<string, any> = {};
+  const result: Record<string, any> = {}
 
   Object.entries(schema.properties).forEach(([key, fieldSchema]) => {
-    const typedSchema = fieldSchema as ExtendedJSONSchema;
+    const typedSchema = fieldSchema as ExtendedJSONSchema
 
-    if (typedSchema.type === "array") {
-      result[key] = [];
-    } else if (typedSchema.type === "object" && typedSchema.properties) {
-      result[key] = buildEmptyValues(typedSchema);
-    } else if (typedSchema.type === "string") {
-      result[key] = "";
+    if (typedSchema.type === 'array') {
+      result[key] = []
+    } else if (typedSchema.type === 'object' && typedSchema.properties) {
+      result[key] = buildEmptyValues(typedSchema)
+    } else if (typedSchema.type === 'string') {
+      result[key] = ''
     } else {
       // number/integer/boolean 等：undefined 是合法的空状态
-      result[key] = undefined;
+      result[key] = undefined
     }
-  });
+  })
 
-  return result;
+  return result
 }
 
 /**
@@ -198,19 +198,19 @@ function setFormValues({
   schema,
   options,
 }: {
-  methods: UseFormReturn;
-  values: Record<string, any>;
-  schema: ExtendedJSONSchema;
+  methods: UseFormReturn
+  values: Record<string, any>
+  schema: ExtendedJSONSchema
   options?: {
-    shouldValidate?: boolean;
-    shouldDirty?: boolean;
-    shouldTouch?: boolean;
-  };
+    shouldValidate?: boolean
+    shouldDirty?: boolean
+    shouldTouch?: boolean
+  }
 }) {
   // 步骤1：基本类型数组包装
-  const wrapped = wrapPrimitiveArrays(values, schema);
+  const wrapped = wrapPrimitiveArrays(values, schema)
   // 步骤2：递归设置值
-  setValuesRecursive(methods, wrapped, options);
+  setValuesRecursive(methods, wrapped, options)
 }
 
 /**
@@ -230,12 +230,12 @@ function transformFormData(
   data: Record<string, any>,
   schema: ExtendedJSONSchema,
   nestedSchemaRegistry?: {
-    getAllSchemas: () => Map<string, ExtendedJSONSchema>;
+    getAllSchemas: () => Map<string, ExtendedJSONSchema>
   },
   shouldFilter: boolean = false,
 ): Record<string, any> {
   // 第一步：解包基本类型数组。Variant 解析由调用方提前完成，保持本函数纯粹。
-  let processedData = unwrapPrimitiveArrays(data, schema);
+  let processedData = unwrapPrimitiveArrays(data, schema)
 
   // 第二步：根据 schema 过滤数据（仅在需要时执行）
   if (shouldFilter) {
@@ -245,10 +245,10 @@ function transformFormData(
           schema,
           nestedSchemaRegistry.getAllSchemas(),
         )
-      : filterValueWithNestedSchemas(processedData, schema, new Map());
+      : filterValueWithNestedSchemas(processedData, schema, new Map())
   }
 
-  return processedData;
+  return processedData
 }
 
 function resolveVariantForValue(
@@ -256,14 +256,14 @@ function resolveVariantForValue(
   value: unknown,
   callbacks: Record<string, (...args: any[]) => any> = {},
   helpers: Record<string, any> = {},
-  path = "",
+  path = '',
   variantStore?: ReturnType<typeof createFieldVariantStore>,
 ) {
-  const variants = fieldSchema.ui?.variants;
-  if (!variants?.length) return null;
-  const activeName = variantStore?.getActive(path);
-  const activeVariant = variants.find((variant) => variant.name === activeName);
-  if (activeVariant) return activeVariant;
+  const variants = fieldSchema.ui?.variants
+  if (!variants?.length) return null
+  const activeName = variantStore?.getActive(path)
+  const activeVariant = variants.find((variant) => variant.name === activeName)
+  if (activeVariant) return activeVariant
   const detected = detectVariantSync({
     variants,
     value,
@@ -271,8 +271,8 @@ function resolveVariantForValue(
     context: {},
     callbacks,
     helpers,
-  });
-  return detected || fallbackVariant(fieldSchema, value) || null;
+  })
+  return detected || fallbackVariant(fieldSchema, value) || null
 }
 
 function getEffectiveVariantSchema(
@@ -280,7 +280,7 @@ function getEffectiveVariantSchema(
   value: unknown,
   callbacks: Record<string, (...args: any[]) => any> = {},
   helpers: Record<string, any> = {},
-  path = "",
+  path = '',
   variantStore?: ReturnType<typeof createFieldVariantStore>,
 ): ExtendedJSONSchema {
   const variant = resolveVariantForValue(
@@ -290,9 +290,9 @@ function getEffectiveVariantSchema(
     helpers,
     path,
     variantStore,
-  );
-  if (!variant) return fieldSchema;
-  return buildVariantSchema(fieldSchema, variant);
+  )
+  if (!variant) return fieldSchema
+  return buildVariantSchema(fieldSchema, variant)
 }
 
 function buildEffectiveSchemaTree({
@@ -301,14 +301,14 @@ function buildEffectiveSchemaTree({
   callbacks,
   helpers,
   variantStore,
-  path = "",
+  path = '',
 }: {
-  schema: ExtendedJSONSchema;
-  value: any;
-  callbacks: Record<string, (...args: any[]) => any>;
-  helpers: Record<string, any>;
-  variantStore: ReturnType<typeof createFieldVariantStore>;
-  path?: string;
+  schema: ExtendedJSONSchema
+  value: any
+  callbacks: Record<string, (...args: any[]) => any>
+  helpers: Record<string, any>
+  variantStore: ReturnType<typeof createFieldVariantStore>
+  path?: string
 }): ExtendedJSONSchema {
   const effective = getEffectiveVariantSchema(
     schema,
@@ -317,8 +317,8 @@ function buildEffectiveSchemaTree({
     helpers,
     path,
     variantStore,
-  );
-  if (effective.properties && value && typeof value === "object") {
+  )
+  if (effective.properties && value && typeof value === 'object') {
     effective.properties = Object.fromEntries(
       Object.entries(effective.properties).map(([key, child]) => [
         key,
@@ -331,9 +331,9 @@ function buildEffectiveSchemaTree({
           path: path ? `${path}.${key}` : key,
         }),
       ]),
-    );
+    )
   }
-  return effective;
+  return effective
 }
 
 /**
@@ -349,41 +349,41 @@ function applyFieldTransforms(
   callbacks: Record<string, (...args: any[]) => any>,
   helpers: Record<string, any>,
 ): any {
-  if (!data || typeof data !== "object" || Array.isArray(data)) {
-    return data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return data
   }
-  const result: Record<string, any> = { ...data };
+  const result: Record<string, any> = { ...data }
   for (const [key, rawSchema] of Object.entries(schema.properties || {})) {
     if (!(key in result)) {
-      continue;
+      continue
     }
-    const fieldSchema = rawSchema as ExtendedJSONSchema;
+    const fieldSchema = rawSchema as ExtendedJSONSchema
     const effectiveSchema = getEffectiveVariantSchema(
       fieldSchema,
       result[key],
       callbacks,
       helpers,
-    );
-    const cb = effectiveSchema.ui?.transform?.callback;
-    const fn = resolveTransformFn(cb, callbacks);
+    )
+    const cb = effectiveSchema.ui?.transform?.callback
+    const fn = resolveTransformFn(cb, callbacks)
     if (fn) {
       try {
-        result[key] = fn({ value: result[key], helpers });
+        result[key] = fn({ value: result[key], helpers })
       } catch {
         /* keep */
       }
-      continue;
+      continue
     }
-    if (effectiveSchema.type === "object" && effectiveSchema.properties) {
+    if (effectiveSchema.type === 'object' && effectiveSchema.properties) {
       result[key] = applyFieldTransforms(
         result[key],
         effectiveSchema,
         callbacks,
         helpers,
-      );
+      )
     }
     if (
-      fieldSchema.type === "array" &&
+      fieldSchema.type === 'array' &&
       !Array.isArray(fieldSchema.items) &&
       fieldSchema.items &&
       Array.isArray(result[key])
@@ -395,10 +395,10 @@ function applyFieldTransforms(
           callbacks,
           helpers,
         ),
-      );
+      )
     }
   }
-  return result;
+  return result
 }
 
 /**
@@ -411,20 +411,20 @@ function getSchemaAtPath(
   schema: ExtendedJSONSchema,
   path: string,
 ): ExtendedJSONSchema | undefined {
-  const parts = path.split(".");
-  let current: ExtendedJSONSchema = schema;
+  const parts = path.split('.')
+  let current: ExtendedJSONSchema = schema
   for (const part of parts) {
     const next =
       current.properties?.[part] ??
       (!isNaN(parseInt(part)) && !Array.isArray(current.items)
         ? current.items
-        : undefined);
+        : undefined)
     if (!next) {
-      return undefined;
+      return undefined
     }
-    current = next as ExtendedJSONSchema;
+    current = next as ExtendedJSONSchema
   }
-  return current;
+  return current
 }
 
 /**
@@ -440,41 +440,41 @@ function reverseFieldTransforms(
   callbacks: Record<string, (...args: any[]) => any>,
   helpers: Record<string, any>,
 ): any {
-  if (!data || typeof data !== "object" || Array.isArray(data)) {
-    return data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return data
   }
-  const result: Record<string, any> = { ...data };
+  const result: Record<string, any> = { ...data }
   for (const [key, rawSchema] of Object.entries(schema.properties || {})) {
     if (!(key in result)) {
-      continue;
+      continue
     }
-    const fieldSchema = rawSchema as ExtendedJSONSchema;
+    const fieldSchema = rawSchema as ExtendedJSONSchema
     const effectiveSchema = getEffectiveVariantSchema(
       fieldSchema,
       result[key],
       callbacks,
       helpers,
-    );
-    const cb = effectiveSchema.ui?.transform?.reverseCallback;
-    const fn = resolveTransformFn(cb, callbacks);
+    )
+    const cb = effectiveSchema.ui?.transform?.reverseCallback
+    const fn = resolveTransformFn(cb, callbacks)
     if (fn) {
       try {
-        result[key] = fn({ value: result[key], helpers });
+        result[key] = fn({ value: result[key], helpers })
       } catch {
         /* keep */
       }
-      continue;
+      continue
     }
-    if (effectiveSchema.type === "object" && effectiveSchema.properties) {
+    if (effectiveSchema.type === 'object' && effectiveSchema.properties) {
       result[key] = reverseFieldTransforms(
         result[key],
         effectiveSchema,
         callbacks,
         helpers,
-      );
+      )
     }
     if (
-      effectiveSchema.type === "array" &&
+      effectiveSchema.type === 'array' &&
       !Array.isArray(effectiveSchema.items) &&
       effectiveSchema.items &&
       Array.isArray(result[key])
@@ -486,10 +486,10 @@ function reverseFieldTransforms(
           callbacks,
           helpers,
         ),
-      );
+      )
     }
   }
-  return result;
+  return result
 }
 
 /**
@@ -509,21 +509,21 @@ function isFieldHiddenByLinkage(
 ): boolean {
   // 检查字段自身的联动状态
   if (linkageStates[fieldPath]?.visible === false) {
-    return true;
+    return true
   }
 
   // 使用标准的 . 分隔符拆分路径
-  const parts = fieldPath.split(".");
+  const parts = fieldPath.split('.')
 
   // 检查每个父级路径的联动状态
   for (let i = 1; i < parts.length; i++) {
-    const parentPath = parts.slice(0, i).join(".");
+    const parentPath = parts.slice(0, i).join('.')
     if (linkageStates[parentPath]?.visible === false) {
-      return true;
+      return true
     }
   }
 
-  return false;
+  return false
 }
 
 // 内层组件：实际的表单逻辑
@@ -543,14 +543,14 @@ const DynamicFormInner = React.memo(
         callbacks,
         customFormats,
         helpers,
-        layout = "vertical",
+        layout = 'vertical',
         labelWidth,
         columnsCount = 1,
         showErrorList = false,
         showSubmitButton = true,
         renderAsForm = true,
-        validateMode = "onSubmit",
-        reValidateMode = "onChange",
+        validateMode = 'onSubmit',
+        reValidateMode = 'onChange',
         loading = false,
         disabled = false,
         readonly = false,
@@ -560,7 +560,7 @@ const DynamicFormInner = React.memo(
         fieldRowStyle,
         fieldLabelStyle,
         fieldControlStyle,
-        pathPrefix = "",
+        pathPrefix = '',
         asNestedForm = false,
         enableVirtualScroll = false,
         virtualScrollHeight = 600,
@@ -568,11 +568,11 @@ const DynamicFormInner = React.memo(
       ref,
     ) => {
       // ========== Context 获取（集中管理） ==========
-      const parentFormContext = useFormContext();
-      const linkageStateContext = useLinkageStateContext();
-      const inheritedTextFieldFocus = useTextFieldFocus();
+      const parentFormContext = useFormContext()
+      const linkageStateContext = useLinkageStateContext()
+      const inheritedTextFieldFocus = useTextFieldFocus()
       const effectiveTextFieldFocus =
-        onTextFieldFocus ?? inheritedTextFieldFocus;
+        onTextFieldFocus ?? inheritedTextFieldFocus
 
       // 只有显式声明 asNestedForm 的 DynamicForm 才能继承父级联动上下文。
       //
@@ -587,17 +587,16 @@ const DynamicFormInner = React.memo(
       // form/linkage state/operationController；默认 DynamicForm 则完全按独立表单处理。
       const inheritedLinkageStateContext = asNestedForm
         ? linkageStateContext
-        : null;
-      const nestedSchemaRegistry = useNestedSchemaRegistryOptional();
+        : null
+      const nestedSchemaRegistry = useNestedSchemaRegistryOptional()
 
       // ========== 空对象常量处理（统一管理） ==========
-      const stableLinkageFunctions =
-        linkageFunctions || EMPTY_LINKAGE_FUNCTIONS;
-      const stableLinkageContext = linkageContext || {};
-      const stableWidgets = widgets || EMPTY_WIDGETS;
-      const stableCustomFormats = customFormats || EMPTY_CUSTOM_FORMATS;
-      const stableCallbacks = callbacks || EMPTY_CALLBACKS;
-      const stableHelpers = helpers || EMPTY_HELPERS;
+      const stableLinkageFunctions = linkageFunctions || EMPTY_LINKAGE_FUNCTIONS
+      const stableLinkageContext = linkageContext || {}
+      const stableWidgets = widgets || EMPTY_WIDGETS
+      const stableCustomFormats = customFormats || EMPTY_CUSTOM_FORMATS
+      const stableCallbacks = callbacks || EMPTY_CALLBACKS
+      const stableHelpers = helpers || EMPTY_HELPERS
 
       // 合并内置和用户提供的 helpers
       // 用户提供的 helpers 优先级更高，可以覆盖内置 helpers
@@ -607,10 +606,10 @@ const DynamicFormInner = React.memo(
           ...stableHelpers,
         }),
         [stableHelpers],
-      );
-      const parentVariantStore = useFieldVariantStoreOptional();
-      const ownVariantStore = useMemo(() => createFieldVariantStore(), []);
-      const variantStore = parentVariantStore || ownVariantStore;
+      )
+      const parentVariantStore = useFieldVariantStoreOptional()
+      const ownVariantStore = useMemo(() => createFieldVariantStore(), [])
+      const variantStore = parentVariantStore || ownVariantStore
 
       // 设置自定义格式验证器并解析字段
       // 当 asNestedForm 为 true 时，需要为字段名添加 pathPrefix 前缀
@@ -619,46 +618,46 @@ const DynamicFormInner = React.memo(
           stableCustomFormats &&
           Object.keys(stableCustomFormats).length > 0
         ) {
-          SchemaParser.setCustomFormats(stableCustomFormats);
+          SchemaParser.setCustomFormats(stableCustomFormats)
         }
 
         // 从 schema.ui 中读取 prefixLabel（用于 flattenPrefix 场景）
-        const prefixLabel = schema.ui?.prefixLabel || "";
+        const prefixLabel = schema.ui?.prefixLabel || ''
 
         const parsedFields = SchemaParser.parse(schema, {
           prefixLabel,
-        });
+        })
 
         // 如果是嵌套表单模式且有路径前缀，为字段名添加前缀
         if (asNestedForm && pathPrefix) {
           return parsedFields.map((field) => ({
             ...field,
             name: `${pathPrefix}.${field.name}`,
-          }));
+          }))
         }
-        return parsedFields;
-      }, [schema, stableCustomFormats, asNestedForm, pathPrefix]);
+        return parsedFields
+      }, [schema, stableCustomFormats, asNestedForm, pathPrefix])
 
       // 处理 defaultValues：提取 schema 中的 default 值并与用户提供的 defaultValues 合并
       // 优先级：用户提供的 defaultValues > schema 中的 default 值
       // 新方案（v3.0）：数据保持标准嵌套格式，无需路径转换
       const processedDefaultValues = useMemo(() => {
         // 步骤1：从 schema 中提取所有 default 值
-        const schemaDefaults = extractSchemaDefaults(schema);
+        const schemaDefaults = extractSchemaDefaults(schema)
 
         // 步骤2：合并 schema 默认值和用户提供的默认值
         const merged = defaultValues
           ? mergeDefaults(schemaDefaults, defaultValues)
-          : schemaDefaults;
+          : schemaDefaults
 
         // 步骤3：如果没有任何默认值，返回 undefined
         if (Object.keys(merged).length === 0) {
-          return undefined;
+          return undefined
         }
 
         // 步骤4：包装基本类型数组（schema default 本身是展示域，无需反转）
-        return wrapPrimitiveArrays(merged, schema);
-      }, [defaultValues, schema]);
+        return wrapPrimitiveArrays(merged, schema)
+      }, [defaultValues, schema])
 
       // 用于向 resolver 传递最新联动状态（ref 避免重新创建 resolver）
       // resolver 需要读取最新的联动状态（用于跳过隐藏字段的校验），但不能将 linkageStates 作为
@@ -666,11 +665,11 @@ const DynamicFormInner = React.memo(
       // 用 ref 保存最新状态，resolver 通过 ref 读取而不触发 useForm 重建。
       const linkageStatesRef = useRef<
         Record<string, { visible?: boolean; disabled?: boolean }>
-      >({});
+      >({})
 
       // 用于向 resolver 传递最新 helpers
-      const helpersRef = useRef<Record<string, any>>(mergedHelpers);
-      helpersRef.current = mergedHelpers;
+      const helpersRef = useRef<Record<string, any>>(mergedHelpers)
+      helpersRef.current = mergedHelpers
 
       // 只有非嵌套表单模式才创建新的 useForm 实例
       const ownMethods = useForm({
@@ -685,50 +684,48 @@ const DynamicFormInner = React.memo(
           stableCustomFormats,
           variantStore,
         ),
-      });
+      })
 
       // 根据模式选择使用哪个 form methods
       // 嵌套表单模式下复用父表单的 FormContext，否则使用自己的
       const methods =
-        asNestedForm && parentFormContext ? parentFormContext : ownMethods;
-      const watchedValues = methods.watch();
+        asNestedForm && parentFormContext ? parentFormContext : ownMethods
+      const watchedValues = methods.watch()
 
-      const ownOperationControllerRef = useRef(
-        new LinkageOperationController(),
-      );
+      const ownOperationControllerRef = useRef(new LinkageOperationController())
       // 根表单创建控制器，嵌套表单复用 Context 中的控制器。
       // 这样外部 ref.setValues/reset、父级数组联动和子级 DynamicForm 的异步联动
       // 都使用同一套表单版本号；否则不同层级各自判断“最新”，旧结果仍可能跨层覆盖新值。
       const operationController =
         inheritedLinkageStateContext?.operationController ??
-        ownOperationControllerRef.current;
+        ownOperationControllerRef.current
 
       // ✅ 使用 useRef 保持 methods 引用稳定，避免触发不必要的重新计算
-      const methodsRef = React.useRef(methods);
+      const methodsRef = React.useRef(methods)
       React.useEffect(() => {
-        methodsRef.current = methods;
-      }, [methods]);
+        methodsRef.current = methods
+      }, [methods])
 
       const callbacksRef =
-        useRef<{ [key in string]: (...args: any) => any }>(stableCallbacks);
-      callbacksRef.current = stableCallbacks;
+        useRef<{ [key in string]: (...args: any) => any }>(stableCallbacks)
+      callbacksRef.current = stableCallbacks
 
       // 当前写入来源；用户输入为默认值，ref API 操作期间临时切换来源。
-      const changeSourceRef = useRef<FieldChangeSource>("user");
+      const changeSourceRef = useRef<FieldChangeSource>('user')
       // 保存上一次对外快照，用于计算字段 previousValue。
-      const previousChangeDataRef = useRef<Record<string, any> | null>(null);
+      const previousChangeDataRef = useRef<Record<string, any> | null>(null)
       // RHF 未提供路径时，保存 setValue 指定的路径作为兜底。
-      const pendingChangePathRef = useRef<string | null>(null);
+      const pendingChangePathRef = useRef<string | null>(null)
       // 保存兜底路径对应的来源，避免异步 watch 丢失操作语义。
-      const pendingChangeSourceRef = useRef<FieldChangeSource | null>(null);
+      const pendingChangeSourceRef = useRef<FieldChangeSource | null>(null)
       // 保存 setValue 调用前的原值，供 watch 计算差异。
-      const pendingPreviousValueRef = useRef<unknown>(undefined);
+      const pendingPreviousValueRef = useRef<unknown>(undefined)
       // 聚合同一事件循环内的多个字段变化，最终一次性 flush。
-      const pendingChangesRef = useRef<FormChangeMeta["changes"]>([]);
+      const pendingChangesRef = useRef<FormChangeMeta['changes']>([])
       // 保存当前待 flush 的完整表单快照。
-      const pendingDataRef = useRef<Record<string, any> | null>(null);
+      const pendingDataRef = useRef<Record<string, any> | null>(null)
       // 延迟 flush 的定时器句柄，用于合并连续同步写入。
-      const changeFlushTimerRef = useRef<number | null>(null);
+      const changeFlushTimerRef = useRef<number | null>(null)
 
       // ✅ 使用 useRef 保持 refreshLinkage 引用，避免循环依赖
       // const refreshLinkageRef = React.useRef<() => void>(() => {});
@@ -736,7 +733,7 @@ const DynamicFormInner = React.memo(
       // 解析 schema 中的联动配置
       // 分层计算策略：遇到数组字段时停止递归，数组元素内部由 NestedFormWidget 独立处理
       const { linkages: rawLinkages } = useMemo(() => {
-        const parsed = parseSchemaLinkages(schema);
+        const parsed = parseSchemaLinkages(schema)
         // if (process.env.NODE_ENV !== 'production') {
         //   console.log(
         //     '[DynamicForm] 解析 schema 联动配置:',
@@ -748,19 +745,19 @@ const DynamicFormInner = React.memo(
         //     })
         //   );
         // }
-        return parsed;
-      }, [schema, pathPrefix, asNestedForm]);
+        return parsed
+      }, [schema, pathPrefix, asNestedForm])
 
       // 统一处理联动配置：路径转换 -> 过滤父级联动
       const { processedLinkages, formToUse, effectiveLinkageFunctions } =
         useMemo(() => {
           // 步骤1: 路径转换和过滤
-          let linkages = rawLinkages;
+          let linkages = rawLinkages
           if (asNestedForm && pathPrefix) {
             const transformed = transformToAbsolutePaths(
               rawLinkages,
               pathPrefix,
-            );
+            )
 
             // 过滤掉已经由外层 DynamicForm 负责的联动配置。
             // 联动以数组字段为边界分层计算，每层只负责本层数组边界以内、下一层数组边界以外的联动。
@@ -772,13 +769,13 @@ const DynamicFormInner = React.memo(
             // 会因时序问题导致过滤失败，内层错误接管外层的联动，产生空对象覆盖有效状态的问题。
             // parentLinkages 是静态配置，在外层 useMemo 时即可确定，内层初始化时立即可读。
             if (inheritedLinkageStateContext?.parentLinkages) {
-              const filtered: Record<string, LinkageConfig[]> = {};
+              const filtered: Record<string, LinkageConfig[]> = {}
               Object.entries(transformed).forEach(([key, value]) => {
                 if (!(key in inheritedLinkageStateContext.parentLinkages)) {
-                  filtered[key] = value;
+                  filtered[key] = value
                 }
-              });
-              linkages = filtered;
+              })
+              linkages = filtered
             } else {
               // if (process.env.NODE_ENV !== 'production') {
               //   console.log('[DynamicForm] 嵌套表单路径转换:', {
@@ -787,18 +784,17 @@ const DynamicFormInner = React.memo(
               //     transformed,
               //   });
               // }
-              linkages = transformed;
+              linkages = transformed
             }
           }
 
           // 步骤2: 确定使用的表单实例和联动函数
           // 优先使用自己的 linkageFunctions（如果有内容），否则使用 Context 中的
-          const hasOwnFunctions =
-            Object.keys(stableLinkageFunctions).length > 0;
+          const hasOwnFunctions = Object.keys(stableLinkageFunctions).length > 0
           const finalLinkageFunctions = hasOwnFunctions
             ? stableLinkageFunctions
             : inheritedLinkageStateContext?.linkageFunctions ||
-              EMPTY_LINKAGE_FUNCTIONS;
+              EMPTY_LINKAGE_FUNCTIONS
 
           // if (process.env.NODE_ENV !== 'production') {
           //   console.log(
@@ -825,7 +821,7 @@ const DynamicFormInner = React.memo(
             // 这里统一通过 inheritedLinkageStateContext 做分流，避免独立内层表单误继承父级 form。
             formToUse: inheritedLinkageStateContext?.form || methodsRef.current,
             effectiveLinkageFunctions: finalLinkageFunctions,
-          };
+          }
         }, [
           rawLinkages,
           asNestedForm,
@@ -837,7 +833,7 @@ const DynamicFormInner = React.memo(
           stableLinkageFunctions,
           // 移除 methods 依赖，因为它会在每次表单状态变化时触发重新计算
           // methods 只是用来获取表单实例，不应该触发联动配置的重新计算
-        ]);
+        ])
 
       // 步骤3: 计算自己的联动状态
       const {
@@ -852,7 +848,7 @@ const DynamicFormInner = React.memo(
         linkageContext: stableLinkageContext,
         schema,
         operationController,
-      });
+      })
 
       // // 更新 refreshLinkageRef
       // React.useEffect(() => {
@@ -869,28 +865,28 @@ const DynamicFormInner = React.memo(
           const merged = {
             ...ownLinkageStates,
             ...inheritedLinkageStateContext.parentLinkageStates,
-          };
-          return merged;
+          }
+          return merged
         }
-        return { ...ownLinkageStates };
-      }, [inheritedLinkageStateContext, ownLinkageStates, pathPrefix]);
+        return { ...ownLinkageStates }
+      }, [inheritedLinkageStateContext, ownLinkageStates, pathPrefix])
 
       // 同步更新 ref，确保 resolver 始终使用最新联动状态
-      linkageStatesRef.current = linkageStates;
+      linkageStatesRef.current = linkageStates
 
       const {
         handleSubmit,
         watch,
         formState: { errors },
-      } = methods;
+      } = methods
 
       // ========== 暴露外部可访问的 API ==========
       useImperativeHandle(
         ref,
         () => ({
           setValue: (name, value, options) => {
-            operationController.markFormMutation();
-            const fieldSchema = getSchemaAtPath(schema, name);
+            operationController.markFormMutation()
+            const fieldSchema = getSchemaAtPath(schema, name)
             const effectiveSchema = fieldSchema
               ? getEffectiveVariantSchema(
                   fieldSchema,
@@ -898,16 +894,16 @@ const DynamicFormInner = React.memo(
                   callbacksRef.current,
                   mergedHelpers,
                 )
-              : undefined;
+              : undefined
             const reverseFn = resolveTransformFn(
               effectiveSchema?.ui?.transform?.reverseCallback,
               callbacksRef.current,
-            );
-            const previousSource = changeSourceRef.current;
-            changeSourceRef.current = "setValue";
-            pendingChangePathRef.current = name;
-            pendingChangeSourceRef.current = "setValue";
-            pendingPreviousValueRef.current = methods.getValues(name as any);
+            )
+            const previousSource = changeSourceRef.current
+            changeSourceRef.current = 'setValue'
+            pendingChangePathRef.current = name
+            pendingChangeSourceRef.current = 'setValue'
+            pendingPreviousValueRef.current = methods.getValues(name as any)
             try {
               methods.setValue(
                 name,
@@ -915,14 +911,14 @@ const DynamicFormInner = React.memo(
                   ? reverseFn({ value, helpers: mergedHelpers })
                   : value,
                 options,
-              );
+              )
             } finally {
-              changeSourceRef.current = previousSource;
+              changeSourceRef.current = previousSource
             }
           },
           getValue: (name: string) => {
-            const displayValue = methods.getValues(name as any);
-            const fieldSchema = getSchemaAtPath(schema, name);
+            const displayValue = methods.getValues(name as any)
+            const fieldSchema = getSchemaAtPath(schema, name)
             const effectiveSchema = fieldSchema
               ? getEffectiveVariantSchema(
                   fieldSchema,
@@ -930,17 +926,17 @@ const DynamicFormInner = React.memo(
                   callbacksRef.current,
                   mergedHelpers,
                 )
-              : undefined;
+              : undefined
             const fn = resolveTransformFn(
               effectiveSchema?.ui?.transform?.callback,
               callbacksRef.current,
-            );
+            )
             return fn
               ? fn({ value: displayValue, helpers: mergedHelpers })
-              : displayValue;
+              : displayValue
           },
           getValues: () => {
-            const displayValues = methods.getValues();
+            const displayValues = methods.getValues()
             return applyFieldTransforms(
               transformFormData(
                 displayValues,
@@ -955,21 +951,21 @@ const DynamicFormInner = React.memo(
               schema,
               callbacksRef.current,
               mergedHelpers,
-            );
+            )
           },
           setValues: (values, options) => {
             // 外部批量写入代表表单快照整体变化，必须先递增版本，让所有旧异步联动失效。
             // 之后再进入 batch，把递归 setValue 触发的多次 watch 合并为一次最终快照刷新。
-            operationController.markFormMutation();
-            const previousSource = changeSourceRef.current;
-            changeSourceRef.current = "setValues";
+            operationController.markFormMutation()
+            const previousSource = changeSourceRef.current
+            changeSourceRef.current = 'setValues'
             const displayValues = reverseFieldTransforms(
               values,
               schema,
               callbacksRef.current,
               mergedHelpers,
-            );
-            operationController.beginBatch();
+            )
+            operationController.beginBatch()
             try {
               if (options?.silence) {
                 // silence 语义是”不触发新联动”，不是”允许旧联动继续提交”。
@@ -980,30 +976,30 @@ const DynamicFormInner = React.memo(
                     values: displayValues,
                     schema,
                     options,
-                  });
-                });
+                  })
+                })
               } else {
                 setFormValues({
                   methods,
                   values: displayValues,
                   schema,
                   options,
-                });
+                })
               }
             } finally {
-              const shouldRefresh = operationController.endBatch();
+              const shouldRefresh = operationController.endBatch()
               if (shouldRefresh && !options?.silence) {
                 // 批量写入结束后只刷新一次，且刷新读取的是最终表单快照。
                 // 不 await 是为了保持 setValues 现有 void API；refreshLinkage 内部仍有 token 保护。
-                void refreshLinkage();
+                void refreshLinkage()
               }
-              changeSourceRef.current = previousSource;
+              changeSourceRef.current = previousSource
             }
           },
           reset: (values) => {
-            operationController.markFormMutation();
-            const previousSource = changeSourceRef.current;
-            changeSourceRef.current = "reset";
+            operationController.markFormMutation()
+            const previousSource = changeSourceRef.current
+            changeSourceRef.current = 'reset'
             try {
               if (values && Object.keys(values).length > 0) {
                 const reversed = reverseFieldTransforms(
@@ -1011,44 +1007,44 @@ const DynamicFormInner = React.memo(
                   schema,
                   callbacksRef.current,
                   mergedHelpers,
-                );
-                const processed = wrapPrimitiveArrays(reversed, schema);
-                methods.reset(processed);
-                setValuesRecursive(methods, processed);
+                )
+                const processed = wrapPrimitiveArrays(reversed, schema)
+                methods.reset(processed)
+                setValuesRecursive(methods, processed)
               } else {
                 // 清空：构建类型恰当的空值，确保受控组件正确清除
-                const emptyValues = buildEmptyValues(schema);
-                methods.reset(emptyValues);
-                setValuesRecursive(methods, emptyValues);
+                const emptyValues = buildEmptyValues(schema)
+                methods.reset(emptyValues)
+                setValuesRecursive(methods, emptyValues)
               }
             } finally {
-              changeSourceRef.current = previousSource;
+              changeSourceRef.current = previousSource
             }
           },
           validate: async (name) => {
-            methods.clearErrors(name);
-            return methods.trigger(name);
+            methods.clearErrors(name)
+            return methods.trigger(name)
           },
           getErrors: () => {
-            return methods.formState.errors;
+            return methods.formState.errors
           },
           clearErrors: (name) => {
-            methods.clearErrors(name);
+            methods.clearErrors(name)
           },
           setError: (name, error) => {
-            methods.setError(name, error);
+            methods.setError(name, error)
           },
           getFormState: () => {
             const { isDirty, isValid, isSubmitting, isSubmitted, submitCount } =
-              methods.formState;
-            return { isDirty, isValid, isSubmitting, isSubmitted, submitCount };
+              methods.formState
+            return { isDirty, isValid, isSubmitting, isSubmitted, submitCount }
           },
           refreshLinkage: async () => {
-            await refreshLinkage();
+            await refreshLinkage()
           },
         }),
         [methods, schema, refreshLinkage, operationController],
-      );
+      )
 
       React.useEffect(() => {
         if (onChange) {
@@ -1062,32 +1058,32 @@ const DynamicFormInner = React.memo(
                 helpers: mergedHelpers,
                 variantStore,
               }),
-            );
+            )
             const externalData = applyFieldTransforms(
               processedData,
               schema,
               callbacksRef.current,
               mergedHelpers,
-            );
+            )
             // 以上一次对外快照为基线；首次通知没有旧快照时使用空对象。
-            const previousData = previousChangeDataRef.current ?? {};
+            const previousData = previousChangeDataRef.current ?? {}
             // 当前 watch 通知检测出的变化，稍后会合并到批次缓存。
-            const changes: FormChangeMeta["changes"] = [];
+            const changes: FormChangeMeta['changes'] = []
             // RHF 路径优先；缺失时使用 setValue 保存的兜底路径。
-            let changePath = name ?? pendingChangePathRef.current;
+            let changePath = name ?? pendingChangePathRef.current
             if (changePath && name && changePath.match(/\.\d+\.value$/)) {
               // 基本类型数组内部使用 path.value 包装，外部数据则使用数组元素路径。
-              const primitiveArrayPath = changePath.replace(/\.value$/, "");
+              const primitiveArrayPath = changePath.replace(/\.value$/, '')
               // 删除元素后内部路径可能消失，因此额外提取数组根路径。
-              const match = changePath.match(/^(.*)\.\d+\.value$/);
-              const arrayPath = match?.[1];
+              const match = changePath.match(/^(.*)\.\d+\.value$/)
+              const arrayPath = match?.[1]
               // 解包后的数组元素值，用于判断普通编辑还是结构删除。
               const externalValue = PathResolver.getNestedValue(
                 externalData,
                 primitiveArrayPath,
-              );
+              )
               // RHF 内部包装值；删除后通常为 undefined。
-              const rawValue = PathResolver.getNestedValue(data, changePath);
+              const rawValue = PathResolver.getNestedValue(data, changePath)
               if (
                 rawValue === undefined &&
                 arrayPath &&
@@ -1095,12 +1091,12 @@ const DynamicFormInner = React.memo(
                   PathResolver.getNestedValue(externalData, arrayPath),
                 )
               ) {
-                changePath = arrayPath;
+                changePath = arrayPath
               } else if (
                 externalValue !== undefined &&
                 rawValue !== undefined
               ) {
-                changePath = primitiveArrayPath;
+                changePath = primitiveArrayPath
               }
             }
             if (changePath) {
@@ -1108,12 +1104,12 @@ const DynamicFormInner = React.memo(
               const previousValue =
                 !name && pendingChangePathRef.current === changePath
                   ? pendingPreviousValueRef.current
-                  : PathResolver.getNestedValue(previousData, changePath);
+                  : PathResolver.getNestedValue(previousData, changePath)
               // 读取转换后的外部新值，确保与 onChange 第一参数保持同一数据契约。
               const value = PathResolver.getNestedValue(
                 externalData,
                 changePath,
-              );
+              )
               if (!Object.is(previousValue, value)) {
                 changes.push({
                   path: changePath,
@@ -1123,50 +1119,50 @@ const DynamicFormInner = React.memo(
                     ? changeSourceRef.current
                     : (pendingChangeSourceRef.current ??
                       changeSourceRef.current),
-                  action: value === undefined ? "remove" : "update",
+                  action: value === undefined ? 'remove' : 'update',
                   arrayAction: inferArrayAction(
                     schema,
                     changePath,
                     previousValue,
                     value,
                   ),
-                });
+                })
               }
-              pendingChangePathRef.current = null;
-              pendingChangeSourceRef.current = null;
+              pendingChangePathRef.current = null
+              pendingChangeSourceRef.current = null
             } else if (previousChangeDataRef.current) {
               Object.keys(externalData).forEach((path) => {
                 // 无具体 name 时按顶层路径比较快照，用于数组结构等整节点变化。
                 const previousValue = PathResolver.getNestedValue(
                   previousData,
                   path,
-                );
-                const value = PathResolver.getNestedValue(externalData, path);
+                )
+                const value = PathResolver.getNestedValue(externalData, path)
                 if (!Object.is(previousValue, value)) {
                   // 推断数组长度变化或相邻元素交换，供业务区分结构操作。
                   let arrayAction:
-                    | "append"
-                    | "remove"
-                    | "moveUp"
-                    | "moveDown"
-                    | undefined;
+                    | 'append'
+                    | 'remove'
+                    | 'moveUp'
+                    | 'moveDown'
+                    | undefined
                   // 当前路径对应的 schema，用于排除 Select 多选数组。
-                  const fieldSchema = getSchemaAtPath(schema, path);
+                  const fieldSchema = getSchemaAtPath(schema, path)
                   if (
-                    fieldSchema?.type === "array" &&
-                    fieldSchema.ui?.widget !== "select" &&
+                    fieldSchema?.type === 'array' &&
+                    fieldSchema.ui?.widget !== 'select' &&
                     Array.isArray(previousValue) &&
                     Array.isArray(value)
                   ) {
                     if (value.length > previousValue.length) {
-                      arrayAction = "append";
+                      arrayAction = 'append'
                     } else if (value.length < previousValue.length) {
-                      arrayAction = "remove";
+                      arrayAction = 'remove'
                     } else {
                       // 计算数组首个差异索引，识别相邻元素移动方向。
                       const changedIndex = value.findIndex(
                         (item, index) => !Object.is(item, previousValue[index]),
-                      );
+                      )
                       if (
                         changedIndex >= 0 &&
                         changedIndex < value.length - 1 &&
@@ -1179,7 +1175,7 @@ const DynamicFormInner = React.memo(
                           previousValue[changedIndex],
                         )
                       ) {
-                        arrayAction = "moveUp";
+                        arrayAction = 'moveUp'
                       } else if (
                         changedIndex > 0 &&
                         Object.is(
@@ -1191,7 +1187,7 @@ const DynamicFormInner = React.memo(
                           previousValue[changedIndex],
                         )
                       ) {
-                        arrayAction = "moveDown";
+                        arrayAction = 'moveDown'
                       }
                     }
                   }
@@ -1200,47 +1196,47 @@ const DynamicFormInner = React.memo(
                     previousValue,
                     value,
                     source: changeSourceRef.current,
-                    action: value === undefined ? "remove" : "update",
+                    action: value === undefined ? 'remove' : 'update',
                     arrayAction,
-                  });
+                  })
                 }
-              });
+              })
             }
-            previousChangeDataRef.current = externalData;
-            pendingDataRef.current = externalData;
+            previousChangeDataRef.current = externalData
+            pendingDataRef.current = externalData
             changes.forEach((change) => {
               const existing = pendingChangesRef.current.find(
                 (item) => item.path === change.path,
-              );
+              )
               if (existing) {
-                existing.value = change.value;
-                existing.action = change.action;
-                existing.source = change.source;
+                existing.value = change.value
+                existing.action = change.action
+                existing.source = change.source
               } else {
-                pendingChangesRef.current.push(change);
+                pendingChangesRef.current.push(change)
               }
-            });
+            })
             if (changeFlushTimerRef.current === null) {
               changeFlushTimerRef.current = window.setTimeout(() => {
-                changeFlushTimerRef.current = null;
-                const nextData = pendingDataRef.current;
+                changeFlushTimerRef.current = null
+                const nextData = pendingDataRef.current
                 if (nextData) {
-                  onChange(nextData, { changes: pendingChangesRef.current });
+                  onChange(nextData, { changes: pendingChangesRef.current })
                 }
-                pendingDataRef.current = null;
-                pendingChangesRef.current = [];
-              }, 0);
+                pendingDataRef.current = null
+                pendingChangesRef.current = []
+              }, 0)
             }
-          });
+          })
           return () => {
-            subscription.unsubscribe();
+            subscription.unsubscribe()
             if (changeFlushTimerRef.current !== null) {
-              clearTimeout(changeFlushTimerRef.current);
-              changeFlushTimerRef.current = null;
+              clearTimeout(changeFlushTimerRef.current)
+              changeFlushTimerRef.current = null
             }
-          };
+          }
         }
-      }, [watch, onChange, schema, mergedHelpers]);
+      }, [watch, onChange, schema, mergedHelpers])
 
       // ✅ 使用 useCallback 缓存 onSubmitHandler，避免每次渲染创建新函
       const onSubmitHandler = useCallback(
@@ -1258,7 +1254,7 @@ const DynamicFormInner = React.memo(
               }),
               nestedSchemaRegistry || undefined,
               true, // 需要过滤数据
-            );
+            )
 
             await onSubmit(
               applyFieldTransforms(
@@ -1267,7 +1263,7 @@ const DynamicFormInner = React.memo(
                 stableCallbacks,
                 mergedHelpers,
               ),
-            );
+            )
           }
         },
         [
@@ -1277,7 +1273,7 @@ const DynamicFormInner = React.memo(
           stableCallbacks,
           mergedHelpers,
         ],
-      );
+      )
 
       // 使用 useMemo 缓存 LinkageStateContext 的 value 对象
       // 避免每次 linkageStates 变化时都创建新对象，导致所有消费该 Context 的组件重新渲染
@@ -1299,7 +1295,7 @@ const DynamicFormInner = React.memo(
           effectiveLinkageFunctions,
           operationController,
         ], // ✅ 移除 methods 依赖
-      );
+      )
 
       // 使用 useMemo 缓存字段内容，避免每次渲染都创建新的 children
       const fieldsContent = useMemo(
@@ -1310,55 +1306,55 @@ const DynamicFormInner = React.memo(
               ...fieldsWrapperStyle,
               ...(columnsCount > 1
                 ? {
-                    display: "grid",
+                    display: 'grid',
                     gridTemplateColumns: `repeat(${columnsCount}, 1fr)`,
-                    gap: "0 16px",
+                    gap: '0 16px',
                   }
                 : undefined),
             }}
           >
             {fields.map((field) => {
               const currentValue = field.name
-                .split(".")
+                .split('.')
                 .reduce(
                   (current: any, key) => current?.[key],
                   methods.getValues(),
-                );
+                )
               const variant =
-                field.schema?.ui?.widget === "variant"
+                field.schema?.ui?.widget === 'variant'
                   ? null
                   : resolveVariantForValue(
                       field.schema || {},
                       currentValue,
                       callbacksRef.current,
                       mergedHelpers,
-                    );
+                    )
               if (variant) {
                 const variantSchema = buildVariantSchema(
                   field.schema || {},
                   variant,
-                );
+                )
                 field = {
                   ...field,
                   type: variant.type,
                   widget: variant.widget || field.widget,
                   schema: variantSchema,
-                };
+                }
               }
-              const linkageState = linkageStates[field.name];
+              const linkageState = linkageStates[field.name]
 
               // 如果联动状态指定不可见，则不渲染该字段
               if (isFieldHiddenByLinkage(field.name, linkageStates)) {
-                return null;
+                return null
               }
 
               // 如果存在 schema 联动，合并到字段 schema
-              let effectiveField = field;
+              let effectiveField = field
               if (linkageState?.schema) {
                 const mergedSchema = mergeSchemaWithLinkage(
-                  field.schema || { type: "object", properties: {} },
+                  field.schema || { type: 'object', properties: {} },
                   linkageState.schema,
-                );
+                )
                 effectiveField = {
                   ...field,
                   schema: mergedSchema,
@@ -1372,13 +1368,13 @@ const DynamicFormInner = React.memo(
                   hidden: mergedSchema.ui?.hidden ?? field.hidden,
                   // 统一在此处应用 options 联动
                   options: linkageState?.options ?? field.options,
-                };
+                }
               } else if (linkageState?.options) {
                 // 只有 options 联动时，也需要更新 field
                 effectiveField = {
                   ...field,
                   options: linkageState.options,
-                };
+                }
               }
 
               return (
@@ -1405,7 +1401,7 @@ const DynamicFormInner = React.memo(
                   columnsCount={columnsCount}
                   onTextFieldFocus={effectiveTextFieldFocus}
                 />
-              );
+              )
             })}
           </div>
         ),
@@ -1427,7 +1423,7 @@ const DynamicFormInner = React.memo(
           columnsCount,
           effectiveTextFieldFocus,
         ],
-      );
+      )
 
       // 使用 useMemo 缓存带 Provider 的字段内容
       const renderedFields = useMemo(() => {
@@ -1437,37 +1433,37 @@ const DynamicFormInner = React.memo(
             <LinkageStateProvider value={linkageContextValue}>
               {fieldsContent}
             </LinkageStateProvider>
-          );
+          )
         }
-        return fieldsContent;
-      }, [asNestedForm, linkageContextValue, fieldsContent]);
+        return fieldsContent
+      }, [asNestedForm, linkageContextValue, fieldsContent])
 
       // 使用 useMemo 缓存提交按钮
       const submitButton = useMemo(() => {
         if (!showSubmitButton) {
-          return null;
+          return null
         }
 
         return (
-          <div className="dynamic-form__actions" style={{ marginTop: "20px" }}>
+          <div className="dynamic-form__actions" style={{ marginTop: '20px' }}>
             <Button
               type="submit"
               intent="primary"
               loading={loading}
               disabled={loading || disabled}
             >
-              {loading ? "Submitting..." : "Submit"}
+              {loading ? 'Submitting...' : 'Submit'}
             </Button>
           </div>
-        );
-      }, [showSubmitButton, loading, disabled]);
+        )
+      }, [showSubmitButton, loading, disabled])
 
-      const formClassName = `dynamic-form dynamic-form--${layout} ${className || ""}`;
+      const formClassName = `dynamic-form dynamic-form--${layout} ${className || ''}`
 
       // 使用 useMemo 缓存表单内容，避免每次渲染都创建新的 children
       const formContent = useMemo(() => {
         const content = (
-          <PathPrefixProvider prefix={asNestedForm ? "" : pathPrefix}>
+          <PathPrefixProvider prefix={asNestedForm ? '' : pathPrefix}>
             {renderAsForm ? (
               <form
                 onSubmit={handleSubmit(onSubmitHandler)}
@@ -1490,11 +1486,11 @@ const DynamicFormInner = React.memo(
               </div>
             )}
           </PathPrefixProvider>
-        );
+        )
 
         // 只在顶层（非嵌套表单）创建 WidgetsProvider
         if (asNestedForm) {
-          return content;
+          return content
         }
 
         return (
@@ -1509,7 +1505,7 @@ const DynamicFormInner = React.memo(
               </HelpersProvider>
             </TextFieldFocusProvider>
           </FieldVariantProvider>
-        );
+        )
       }, [
         asNestedForm,
         pathPrefix,
@@ -1525,27 +1521,27 @@ const DynamicFormInner = React.memo(
         stableWidgets,
         stableCallbacks,
         effectiveTextFieldFocus,
-      ]);
+      ])
 
       // 嵌套表单模式下不需要再包裹 FormProvider，因为已经复用了父表单的 context
       if (asNestedForm && parentFormContext) {
-        return formContent;
+        return formContent
       }
 
       // 非嵌套表单模式，需要提供 FormProvider
-      return <FormProvider {...methods}>{formContent}</FormProvider>;
+      return <FormProvider {...methods}>{formContent}</FormProvider>
     },
   ),
-);
+)
 
 // 外层组件：提供 NestedSchemaProvider
 export const DynamicForm = forwardRef<DynamicFormRef, DynamicFormProps>(
   (props, ref) => {
     // 如果已经在 NestedSchemaProvider 内部（嵌套表单场景），直接渲染内层组件
-    const existingRegistry = useNestedSchemaRegistryOptional();
+    const existingRegistry = useNestedSchemaRegistryOptional()
 
     if (existingRegistry) {
-      return <DynamicFormInner {...props} ref={ref} />;
+      return <DynamicFormInner {...props} ref={ref} />
     }
 
     // 否则提供新的 NestedSchemaProvider（顶层表单场景）
@@ -1553,6 +1549,6 @@ export const DynamicForm = forwardRef<DynamicFormRef, DynamicFormProps>(
       <NestedSchemaProvider>
         <DynamicFormInner {...props} ref={ref} />
       </NestedSchemaProvider>
-    );
+    )
   },
-);
+)
