@@ -170,7 +170,13 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        calculateTotal: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
+        calculateTotal: ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => {
           return formData.price * formData.quantity;
         },
       };
@@ -207,7 +213,13 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        asyncCalculate: async ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
+        asyncCalculate: async ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => {
           await new Promise((resolve) => setTimeout(resolve, 10));
           return formData.input * 2;
         },
@@ -370,7 +382,13 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        getSchema: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
+        getSchema: ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => {
           if (formData.fieldType === "number") {
             return { type: "number", minimum: 0 };
           }
@@ -517,7 +535,13 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        checkCondition: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => formData.value > 10,
+        checkCondition: ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => formData.value > 10,
       };
 
       const { result } = renderHook(() => {
@@ -580,8 +604,13 @@ describe("useLinkageManager", () => {
 
       let multiplier = 2;
       const linkageFunctions = {
-        calculate: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) =>
-          formData.input * multiplier,
+        calculate: ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => formData.input * multiplier,
       };
 
       const { result } = renderHook(() => {
@@ -624,7 +653,13 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        expensiveCalculation: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
+        expensiveCalculation: ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => {
           callCount++;
           return formData.input * 2;
         },
@@ -680,8 +715,20 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        calcA: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => formData.fieldB + 1,
-        calcB: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => formData.fieldA + 1,
+        calcA: ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => formData.fieldB + 1,
+        calcB: ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => formData.fieldA + 1,
       };
 
       renderHook(() => {
@@ -714,7 +761,14 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        checkType: ({ formData, context }: { formData: Record<string, any>; context: any; helpers: any }) => {
+        checkType: ({
+          formData,
+          context,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => {
           capturedContext = context;
           return formData.contacts?.[0]?.type === "business";
         },
@@ -755,7 +809,13 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        calculate: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => formData.input * 2,
+        calculate: ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => formData.input * 2,
       };
 
       const { result } = renderHook(() => {
@@ -819,7 +879,13 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        getCityOptions: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
+        getCityOptions: ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => {
           if (formData.country === "China") {
             return [
               { label: "Beijing", value: "beijing" },
@@ -905,7 +971,13 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        getCityOptions: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
+        getCityOptions: ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => {
           if (formData.country === "China") {
             return [
               { label: "Beijing", value: "beijing" },
@@ -946,6 +1018,180 @@ describe("useLinkageManager", () => {
       });
     });
 
+    it("options 未就绪时应该保留已有选项和 Schema 默认值", async () => {
+      const linkages: Record<string, LinkageConfig[]> = {
+        city: [
+          {
+            type: "options",
+            dependencies: ["country"],
+            fulfill: { function: "getCityOptions" },
+          },
+        ],
+      };
+
+      const getCityOptions = jest.fn(
+        ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) =>
+          formData.country === "loading"
+            ? undefined
+            : [{ label: "Beijing", value: "beijing" }],
+      );
+      const linkageFunctions = { getCityOptions };
+
+      const { result } = renderHook(() => {
+        const form = useForm({
+          defaultValues: { country: "China", city: "beijing" },
+        });
+        const linkageManager = useLinkageManager({
+          form,
+          linkages,
+          linkageFunctions,
+        });
+        return { form, ...linkageManager };
+      });
+
+      await act(async () => {
+        await result.current.refreshLinkage();
+      });
+
+      expect(result.current.linkageStates.city?.options).toEqual([
+        { label: "Beijing", value: "beijing" },
+      ]);
+
+      await act(async () => {
+        result.current.form.setValue("country", "loading");
+      });
+
+      await waitFor(() => {
+        expect(getCityOptions).toHaveBeenCalledTimes(2);
+        expect(result.current.form.getValues("city")).toBe("beijing");
+        expect(result.current.linkageStates.city?.options).toEqual([
+          { label: "Beijing", value: "beijing" },
+        ]);
+      });
+    });
+
+    it("配置 fallback 时应该以最终选项中的指定值替换失效单选值", async () => {
+      const linkages: Record<string, LinkageConfig[]> = {
+        city: [
+          {
+            type: "options",
+            dependencies: ["country"],
+            invalidValuePolicy: "fallback",
+            fallbackValue: "shanghai",
+            fulfill: {
+              options: [{ label: "Shanghai", value: "shanghai" }],
+            },
+          },
+        ],
+      };
+
+      const { result } = renderHook(() => {
+        const form = useForm({
+          defaultValues: { country: "China", city: "beijing" },
+        });
+        const linkageManager = useLinkageManager({ form, linkages });
+        return { form, ...linkageManager };
+      });
+
+      await act(async () => {
+        await result.current.refreshLinkage();
+      });
+
+      expect(result.current.form.getValues("city")).toBe("shanghai");
+    });
+
+    it("fallback 不在最终选项中时应该清空失效单选值", async () => {
+      const linkages: Record<string, LinkageConfig[]> = {
+        city: [
+          {
+            type: "options",
+            dependencies: ["country"],
+            invalidValuePolicy: "fallback",
+            fallbackValue: "shanghai",
+            fulfill: {
+              options: [{ label: "New York", value: "ny" }],
+            },
+          },
+        ],
+      };
+
+      const { result } = renderHook(() => {
+        const form = useForm({
+          defaultValues: { country: "China", city: "beijing" },
+        });
+        const linkageManager = useLinkageManager({ form, linkages });
+        return { form, ...linkageManager };
+      });
+
+      await act(async () => {
+        await result.current.refreshLinkage();
+      });
+
+      expect(result.current.form.getValues("city")).toBeUndefined();
+    });
+
+    it("配置 retain 时，字段持续 disabled 也应该保留失效的单选历史值", async () => {
+      const linkages: Record<string, LinkageConfig[]> = {
+        city: [
+          {
+            type: "options",
+            dependencies: ["country"],
+            invalidValuePolicy: "retain",
+            fulfill: { function: "getCityOptions" },
+          },
+          {
+            type: "disabled",
+            dependencies: [],
+            fulfill: { state: { disabled: true } },
+          },
+        ],
+      };
+
+      const linkageFunctions = {
+        getCityOptions: ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) =>
+          formData.country === "China"
+            ? [{ label: "Beijing", value: "beijing" }]
+            : [{ label: "New York", value: "ny" }],
+      };
+
+      const { result } = renderHook(() => {
+        const form = useForm({
+          defaultValues: { country: "China", city: "beijing" },
+        });
+        const linkageManager = useLinkageManager({
+          form,
+          linkages,
+          linkageFunctions,
+        });
+        return { form, ...linkageManager };
+      });
+
+      await act(async () => {
+        await result.current.refreshLinkage();
+        result.current.form.setValue("country", "USA");
+      });
+
+      await waitFor(() => {
+        expect(result.current.linkageStates.city?.disabled).toBe(true);
+        expect(result.current.linkageStates.city?.options?.[0].value).toBe(
+          "ny",
+        );
+        expect(result.current.form.getValues("city")).toBe("beijing");
+      });
+    });
+
     it("多选 options 变化后应该移除无效值并保留有效值", async () => {
       const linkages: Record<string, LinkageConfig[]> = {
         tags: [
@@ -980,6 +1226,41 @@ describe("useLinkageManager", () => {
       expect(result.current.form.getValues("tags")).toEqual([
         "react",
         "typescript",
+      ]);
+    });
+
+    it("配置 retain 时，多选 options 变化后应该保留全部历史值", async () => {
+      const linkages: Record<string, LinkageConfig[]> = {
+        tags: [
+          {
+            type: "options",
+            dependencies: ["category"],
+            invalidValuePolicy: "retain",
+            fulfill: {
+              options: [{ label: "React", value: "react" }],
+            },
+          },
+        ],
+      };
+
+      const { result } = renderHook(() => {
+        const form = useForm({
+          defaultValues: {
+            category: "frontend",
+            tags: ["react", "legacy"],
+          },
+        });
+        const linkageManager = useLinkageManager({ form, linkages });
+        return { form, ...linkageManager };
+      });
+
+      await act(async () => {
+        await result.current.refreshLinkage();
+      });
+
+      expect(result.current.form.getValues("tags")).toEqual([
+        "react",
+        "legacy",
       ]);
     });
 
@@ -1029,7 +1310,13 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        checkDisabled: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => !formData.agreed,
+        checkDisabled: ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => !formData.agreed,
       };
 
       const { result } = renderHook(() => {
@@ -1060,8 +1347,13 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        checkReadonly: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) =>
-          formData.verified === true,
+        checkReadonly: ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => formData.verified === true,
       };
 
       const { result } = renderHook(() => {
@@ -1094,8 +1386,13 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        calculateTotal: ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) =>
-          formData.price * formData.quantity,
+        calculateTotal: ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => formData.price * formData.quantity,
       };
 
       let formRef: any;
@@ -1183,10 +1480,12 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        slowCalculate: jest.fn(({ formData }: { formData: Record<string, unknown> }) => {
-          const trigger = Number(formData.trigger ?? 0);
-          return deferred.promise.then(() => trigger * 10);
-        }),
+        slowCalculate: jest.fn(
+          ({ formData }: { formData: Record<string, unknown> }) => {
+            const trigger = Number(formData.trigger ?? 0);
+            return deferred.promise.then(() => trigger * 10);
+          },
+        ),
       };
 
       let formRef: any;
@@ -1232,7 +1531,13 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        asyncCalculate: async ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
+        asyncCalculate: async ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => {
           callCount++;
           const currentCall = callCount;
           // 模拟不同的延迟
@@ -1294,7 +1599,13 @@ describe("useLinkageManager", () => {
 
       const callOrder: number[] = [];
       const linkageFunctions = {
-        slowAsync: async ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
+        slowAsync: async ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => {
           const value = formData.trigger;
           callOrder.push(value);
           // 第一次调用延迟更长
@@ -1386,7 +1697,13 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        controlledAsync: async ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
+        controlledAsync: async ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => {
           callCount++;
           const value = formData.trigger;
           const currentCall = callCount;
@@ -1463,7 +1780,13 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        delayedAsync: async ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
+        delayedAsync: async ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => {
           callCount++;
           const currentCall = callCount;
           const value = formData.trigger;
@@ -1526,7 +1849,13 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        racingAsync: async ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
+        racingAsync: async ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => {
           callCount++;
           const currentCall = callCount;
           // 第一次调用延迟更长
@@ -1588,7 +1917,13 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        slowAsync: async ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
+        slowAsync: async ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => {
           await new Promise<void>((resolve) => {
             asyncResolvers.push(resolve);
             // 自动在短时间后解决
@@ -1660,7 +1995,13 @@ describe("useLinkageManager", () => {
       };
 
       const linkageFunctions = {
-        calculate: async ({ formData }: { formData: Record<string, any>; context: any; helpers: any }) => {
+        calculate: async ({
+          formData,
+        }: {
+          formData: Record<string, any>;
+          context: any;
+          helpers: any;
+        }) => {
           await new Promise((resolve) => setTimeout(resolve, 10));
           return formData.input * 2;
         },
