@@ -580,16 +580,23 @@ export type FieldChangeAction = "update" | "remove" | "reset";
 
 /** 字段级变更记录 */
 export interface FieldChange {
+  /** 完整绝对字段路径；数组项索引也编码在路径中。 */
   path: string;
+  /** 本次逻辑操作开始前的外部存储域值。 */
   previousValue: unknown;
+  /** 本次逻辑操作稳定后的外部存储域值。 */
   value: unknown;
+  /** 触发变化的来源，用于区分用户输入、API、重置和联动。 */
   source: FieldChangeSource;
+  /** 值变化的业务动作，例如更新、移除或重置。 */
   action: FieldChangeAction;
+  /** 数组结构变化的方向或类型；普通数组项编辑不设置此字段。 */
   arrayAction?: "append" | "remove" | "moveUp" | "moveDown";
 }
 
 /** 表单变更元数据 */
 export interface FormChangeMeta {
+  /** 当前稳定回调中发生的一个或多个字段变化。 */
   changes: FieldChange[];
 }
 

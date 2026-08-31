@@ -2,12 +2,14 @@
 
 set -eu
 
+# 获取暂存区中待提交的新增、复制或修改文件，避免格式化未参与本次提交的文件。
 staged_files=$(git diff --cached --name-only --diff-filter=ACMR)
 
 if [ -z "$staged_files" ]; then
   exit 0
 fi
 
+# 从暂存文件中筛选 Prettier 支持的代码和文档扩展名。
 prettier_files=$(printf '%s\n' "$staged_files" | awk '
   /\.(css|js|jsx|json|md|scss|ts|tsx)$/ { print }
 ')
