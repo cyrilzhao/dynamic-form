@@ -2,6 +2,10 @@ export { DynamicForm } from "./DynamicForm";
 export type {
   DynamicFormProps,
   DynamicFormRef,
+  FieldChange,
+  FieldChangeAction,
+  FieldChangeSource,
+  FormChangeMeta,
   FieldWidgetProps,
   NestedFormWidgetProps,
   TextFieldFocusPayload,

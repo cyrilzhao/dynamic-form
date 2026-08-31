@@ -679,6 +679,7 @@ describe("DynamicForm", () => {
           percent: 0.2,
           note: "Ready",
         }),
+        expect.objectContaining({ changes: expect.any(Array) }),
       );
     });
 
@@ -689,6 +690,78 @@ describe("DynamicForm", () => {
         percent: 0.2,
         note: "Ready",
       });
+    });
+  });
+
+  it("onChange 应该提供字段级变更元数据", async () => {
+    const handleChange = jest.fn();
+    const schema: ExtendedJSONSchema = {
+      type: "object",
+      properties: {
+        name: { type: "string", title: "Name" },
+      },
+    };
+
+    const { formRef } = renderDynamicForm({
+      props: { schema, onChange: handleChange },
+    });
+    await waitForFormReady({ formRef });
+
+    handleChange.mockClear();
+    await act(async () => {
+      formRef.current!.setValue("name", "Ada");
+    });
+
+    await waitFor(() => {
+      expect(handleChange).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Ada" }),
+        expect.objectContaining({
+          changes: [
+            expect.objectContaining({
+              path: "name",
+              previousValue: undefined,
+              value: "Ada",
+              source: "setValue",
+              action: "update",
+            }),
+          ],
+        }),
+      );
+    });
+  });
+
+  it("primitive array item 变更应映射为数组元素路径", async () => {
+    const handleChange = jest.fn();
+    const schema: ExtendedJSONSchema = {
+      type: "object",
+      properties: {
+        users: {
+          type: "array",
+          title: "Users",
+          items: { type: "string" },
+          default: ["Alan"],
+        },
+      },
+    };
+    const { container, formRef } = renderDynamicForm({
+      props: { schema, onChange: handleChange },
+    });
+    await waitForFormReady({ formRef });
+    handleChange.mockClear();
+
+    fireEvent.change(getInputByName({ container, name: "users.0.value" }), {
+      target: { value: "Ada" },
+    });
+
+    await waitFor(() => {
+      expect(handleChange).toHaveBeenCalledWith(
+        expect.objectContaining({ users: ["Ada"] }),
+        expect.objectContaining({
+          changes: [
+            expect.objectContaining({ path: "users.0", value: "Ada" }),
+          ],
+        }),
+      );
     });
   });
 

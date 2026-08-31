@@ -460,7 +460,7 @@ export interface DynamicFormProps {
   // 可选属性
   defaultValues?: Record<string, any>;
   onSubmit?: (data: Record<string, any>) => void | Promise<void>;
-  onChange?: (data: Record<string, any>) => void;
+  onChange?: (data: Record<string, any>, meta?: FormChangeMeta) => void;
   /**
    * 文本字段获得焦点时触发。
    * 仅 `text` Widget 会调用该回调，其他 Widget 不受影响。
@@ -565,6 +565,32 @@ export interface DynamicFormProps {
    * - false: 创建独立的 useForm 实例（默认）
    */
   asNestedForm?: boolean;
+}
+
+/** 字段变更来源 */
+export type FieldChangeSource =
+  | "user"
+  | "setValue"
+  | "setValues"
+  | "reset"
+  | "linkage";
+
+/** 字段变更动作 */
+export type FieldChangeAction = "update" | "remove" | "reset";
+
+/** 字段级变更记录 */
+export interface FieldChange {
+  path: string;
+  previousValue: unknown;
+  value: unknown;
+  source: FieldChangeSource;
+  action: FieldChangeAction;
+  arrayAction?: "append" | "remove" | "moveUp" | "moveDown";
+}
+
+/** 表单变更元数据 */
+export interface FormChangeMeta {
+  changes: FieldChange[];
 }
 
 /**
