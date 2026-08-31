@@ -49,6 +49,9 @@ DynamicForm is a powerful, configuration-driven form component built on top of `
 - **UI Linkage**: Dynamic field visibility, disabled states, and computed values
 - **Nested Forms**: Support for nested objects and arrays
 - **Field Path Flattening**: Simplify deeply nested parameter display
+- **Polymorphic Fields**: Switch a field between independently validated variants
+- **Value Transforms**: Keep display-domain input separate from stored-domain output
+- **Widget Callbacks**: Inject registered or trusted inline callbacks through `ui.callbackProps`
 
 ---
 
@@ -232,6 +235,12 @@ DynamicForm supports three layout modes:
 
 ### Readonly and Disabled States
 
+`readonly` and `disabled` control whether users can edit fields. They do not
+change the submission data contract: submitted values are filtered by the
+active schema (unknown fields are removed), not by the field's disabled state.
+If disabled values must be omitted, remove them in your `onSubmit` handler or
+use a schema/linkage design that excludes the field from the active schema.
+
 ```typescript
 // Readonly form (data included in submission)
 <DynamicForm
@@ -240,7 +249,7 @@ DynamicForm supports three layout modes:
   onSubmit={handleSubmit}
 />
 
-// Disabled form (data excluded from submission)
+// Disabled form (fields are not editable; submission filtering is schema-based)
 <DynamicForm
   schema={schema}
   disabled={true}
@@ -790,10 +799,15 @@ The `ui` field provides extensive customization options:
 | `checkboxes`    | array               | Multiple checkboxes               |
 | `checkbox`      | boolean             | Single checkbox                   |
 | `switch`        | boolean             | Toggle switch                     |
-| `date`          | string              | Date picker                       |
-| `nested-form`   | object/array        | Nested form                       |
+| `url`           | string              | URL input                         |
+| `checkbox-group`| array/non-boolean   | Multiple checkbox group           |
+| `nested-form`   | object              | Nested form                       |
 | `code-editor`   | string              | Code editor with syntax highlight |
 | `object-editor` | object              | JSON object editor                |
+| `key-value-array` | array              | Key-value pair table              |
+| `table-array`   | array of objects    | Object table with optional virtual scroll |
+| `variant`       | any                 | Polymorphic field editor          |
+| `schema-builder`| object              | Schema builder editor             |
 
 ### 2. Field Validation
 
@@ -848,6 +862,12 @@ You can customize error messages for each validation rule using `ui.errorMessage
 {
   type: 'string',
   title: 'Username',
+  minLength: 3,
+  ui: {
+    errorMessages: {
+      minLength: 'Username must be at least 3 characters',
+    },
+  },
 }
 ```
 
@@ -1475,6 +1495,12 @@ const linkageFunctions = {
 
 When options change, DynamicForm automatically clears the field value if it's no longer valid in the new options list. This ensures data integrity:
 
+Use `invalidValuePolicy` to change this behavior:
+
+- `clear` (default): clear values that are not in the new options
+- `retain`: keep the current value even when it is not listed
+- `fallback`: replace it with `fallbackValue` (which must exist in the new options)
+
 ```typescript
 // Example: User selects category='electronics' and subcategory='laptop'
 // Then changes category to 'books'
@@ -1494,7 +1520,7 @@ useEffect(() => {
 
 // ✅ Linkage function receives external data via context.externalData
 const linkageFunctions = {
-  loadCityOptions: (formData, context) => {
+  loadCityOptions: ({ formData, context }) => {
     const { apiData } = context.externalData;
     const country = formData.country;
 
@@ -1700,8 +1726,8 @@ const schema = {
 };
 
 const linkageFunctions = {
-  getDocumentValidation: (context: any) => {
-    const { documentType } = context.formData;
+  getDocumentValidation: ({ formData }: { formData: Record<string, any> }) => {
+    const { documentType } = formData;
 
     // Return different validation rules based on document type
     if (documentType === "passport") {
@@ -1766,8 +1792,8 @@ const schema = {
 };
 
 const linkageFunctions = {
-  getContentWidget: (context: any) => {
-    const { inputType } = context.formData;
+  getContentWidget: ({ formData }: { formData: Record<string, any> }) => {
+    const { inputType } = formData;
 
     if (inputType === "short") {
       return {
@@ -2153,11 +2179,16 @@ DynamicForm automatically selects appropriate widgets based on field type, but y
 | `checkboxes`    | array               | Multiple checkboxes               |
 | `checkbox`      | boolean             | Single checkbox                   |
 | `switch`        | boolean             | Toggle switch                     |
-| `date`          | string              | Date picker                       |
+| `url`           | string              | URL input                         |
+| `checkbox-group`| array/non-boolean   | Multiple checkbox group           |
 | `nested-form`   | object              | Nested form (auto for objects)    |
 | `array`         | array               | Array widget (auto for arrays)    |
 | `code-editor`   | string              | Code editor with syntax highlight |
 | `object-editor` | object              | JSON object editor                |
+| `key-value-array` | array              | Key-value pair table              |
+| `table-array`   | array of objects    | Object table with optional virtual scroll |
+| `variant`       | any                 | Polymorphic field editor          |
+| `schema-builder`| object              | Schema builder editor             |
 
 **Example:**
 
@@ -2424,6 +2455,12 @@ Additional UI customization options:
 | `widgetProps`   | `object`  | Props passed to widget component                                                                           |
 | `callbackProps` | `object`  | Callback function refs (key=prop name, value=function name from `callbacks` or `{ type: 'script', code }`) |
 | `transform`     | `object`  | Value transform config (see below)                                                                         |
+| `arrayMode`     | `'dynamic' \| 'static'` | Array editing mode                                                                     |
+| `showAddButton` / `showRemoveButton` / `showMoveButtons` | `boolean` | Array action visibility                         |
+| `enableDragSort`| `boolean` | Enable drag sorting for arrays                                                                       |
+| `addButtonText` / `removeButtonText` / `emptyText` | `string` | Array action and empty-state text                         |
+| `itemLayout`    | `string`  | Layout for array items                                                                              |
+| `autogenerate`  | `'uuid'`   | Auto-generate array item IDs                                                                         |
 
 **Note:** Help text should be set using the top-level `description` field (JSON Schema standard), not `ui.help`.
 
@@ -2915,15 +2952,8 @@ const schema = {
 };
 ```
 
-**Automatic Value Cleanup:**
-
-When options change, the form automatically clears the field value if it's no longer in the new options list. This ensures data validity:
-
-```typescript
-// If user selects category='electronics' and subcategory='laptop',
-// then changes category to 'books', the subcategory field will be
-// automatically cleared since 'laptop' is not in the books options.
-```
+The options-linkage cleanup behavior and `invalidValuePolicy` are documented in
+[Field Linkage](#3-field-linkage); the same rules apply to this advanced example.
 
 #### Nested Forms
 
@@ -2976,7 +3006,7 @@ const userSchemas = {
 
 // Define linkage function to load schema
 const linkageFunctions = {
-  loadUserSchema: (formData: Record<string, any>) => {
+  loadUserSchema: ({ formData }: { formData: Record<string, any> }) => {
     const userType = formData?.userType;
     return userSchemas[userType] || { type: 'object', properties: {} };
   },
@@ -3312,6 +3342,7 @@ Helpers are dependency injection, not a sandbox. Inline scripts still use dynami
 | `defaultValues`    | `Record<string, any>`                           | No       | `{}`             | Initial form values                                                                   |
 | `onSubmit`         | `(data: any) => void \| Promise<void>`          | No       | -                | Submit handler                                                                        |
 | `onChange`         | `(data: any) => void`                           | No       | -                | Change handler                                                                        |
+| `onTextFieldFocus` | `(payload: TextFieldFocusPayload) => void`      | No       | -                | Focus callback for `text` widgets                                                      |
 | `widgets`          | `Record<string, ComponentType>`                 | No       | `{}`             | Custom widgets                                                                        |
 | `helpers`          | `Record<string, any>`                           | No       | built-in helpers | Helper utilities available in inline scripts and callbacks                            |
 | `linkageFunctions` | `Record<string, Function>`                      | No       | `{}`             | Helper-aware linkage functions                                                        |
@@ -3319,14 +3350,22 @@ Helpers are dependency injection, not a sandbox. Inline scripts still use dynami
 | `customFormats`    | `Record<string, Function>`                      | No       | `{}`             | Custom format validators                                                              |
 | `layout`           | `'vertical' \| 'horizontal' \| 'inline'`        | No       | `'vertical'`     | Form layout                                                                           |
 | `labelWidth`       | `number \| string`                              | No       | -                | Label width (horizontal layout)                                                       |
+| `columnsCount`     | `number`                                        | No       | `1`              | Number of columns for object layouts                                                  |
+| `showErrorList`    | `boolean`                                       | No       | `false`          | Show aggregated error list                                                            |
 | `showSubmitButton` | `boolean`                                       | No       | `true`           | Show submit button                                                                    |
 | `renderAsForm`     | `boolean`                                       | No       | `true`           | Render as `<form>` tag                                                                |
 | `validateMode`     | `'onSubmit' \| 'onBlur' \| 'onChange' \| 'all'` | No       | `'onSubmit'`     | Validation mode                                                                       |
+| `reValidateMode`   | `'onSubmit' \| 'onBlur' \| 'onChange'`        | No       | `'onChange'`     | Re-validation mode                                                                   |
 | `loading`          | `boolean`                                       | No       | `false`          | Loading state                                                                         |
 | `disabled`         | `boolean`                                       | No       | `false`          | Disable all fields                                                                    |
 | `readonly`         | `boolean`                                       | No       | `false`          | Make all fields readonly                                                              |
+| `enableVirtualScroll` | `boolean`                                    | No       | `false`          | Enable virtual scrolling for array fields                                             |
+| `virtualScrollHeight` | `number`                                    | No       | `600`            | Virtual-scroll viewport height                                                       |
 | `className`        | `string`                                        | No       | -                | CSS class name                                                                        |
 | `style`            | `React.CSSProperties`                           | No       | -                | Inline styles                                                                         |
+| `fieldsWrapperStyle` / `fieldRowStyle` / `fieldLabelStyle` / `fieldControlStyle` | `React.CSSProperties` | No | - | Form layout styles |
+| `pathPrefix`        | `string`                                       | No       | `''`             | Path prefix for nested forms                                                          |
+| `asNestedForm`      | `boolean`                                      | No       | `false`          | Reuse the parent form context                                                         |
 
 ### DynamicFormRef Methods
 
