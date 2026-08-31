@@ -136,12 +136,6 @@ export function createSchemaResolver(
     const variants = fieldSchema.ui?.variants;
     if (!variants?.length) return null;
     const activeName = variantStore?.getActive(path);
-    console.info("[VariantDebug] resolver", {
-      path,
-      value: JSON.stringify(value),
-      activeName,
-      variants: variants.map((variant) => variant.name),
-    });
     return (
       variants.find((variant) => variant.name === activeName) ||
       detectVariantSync({
@@ -245,12 +239,6 @@ export function createSchemaResolver(
     );
     // 标准 Schema 规则与 ui.validators 业务规则互补，合并后统一映射给 RHF。
     const errors = { ...schemaErrors, ...fieldValidatorErrors };
-    console.info("[VariantDebug] resolver-errors", {
-      values: JSON.stringify(values),
-      schemaErrors: JSON.stringify(schemaErrors),
-      fieldValidatorErrors: JSON.stringify(fieldValidatorErrors),
-      errors: JSON.stringify(errors),
-    });
 
     if (Object.keys(errors).length === 0) {
       return { values, errors: {} };

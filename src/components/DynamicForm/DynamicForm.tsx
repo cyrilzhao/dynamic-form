@@ -302,10 +302,6 @@ function applyFieldTransforms(
   callbacks: Record<string, (...args: any[]) => any>,
   helpers: Record<string, any>
 ): any {
-  console.info('[VariantDebug] applyFieldTransforms-input', {
-    valueType: Array.isArray(data) ? 'array' : typeof data,
-    value: JSON.stringify(data),
-  })
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return data
   }
@@ -325,16 +321,7 @@ function applyFieldTransforms(
     const fn = resolveTransformFn(cb, callbacks)
     if (fn) {
       try {
-        console.info('[VariantDebug] applyFieldTransforms-field', {
-          key,
-          before: JSON.stringify(result[key]),
-          callback: typeof cb === 'string' ? cb : 'inline',
-        })
         result[key] = fn({ value: result[key], helpers })
-        console.info('[VariantDebug] applyFieldTransforms-field-output', {
-          key,
-          after: JSON.stringify(result[key]),
-        })
       } catch {
         /* keep */
       }
@@ -978,10 +965,6 @@ const DynamicFormInner = React.memo(
       React.useEffect(() => {
         if (onChange) {
           const subscription = watch((data) => {
-            console.info('[VariantDebug] watch-data', {
-              valueType: Array.isArray(data) ? 'array' : typeof data,
-              value: JSON.stringify(data),
-            })
             const processedData = transformFormData(
               data,
               buildEffectiveSchemaTree({

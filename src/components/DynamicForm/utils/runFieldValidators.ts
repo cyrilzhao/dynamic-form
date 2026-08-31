@@ -109,12 +109,6 @@ export async function runAllFieldValidators(
     const variants = schema.ui?.variants;
     if (!variants?.length) return schema;
     const activeName = variantStore?.getActive(path);
-    console.info("[VariantDebug] validators", {
-      path,
-      value: JSON.stringify(value),
-      activeName,
-      variants: variants.map((variant) => variant.name),
-    });
     const variant =
       variants.find((item) => item.name === activeName) ||
       (await detectVariant({

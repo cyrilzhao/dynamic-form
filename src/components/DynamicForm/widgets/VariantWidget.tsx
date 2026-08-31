@@ -64,14 +64,6 @@ export const VariantWidget: React.FC<FieldWidgetProps> = ({
     setCache((previous) => ({ ...previous, [active.name]: value }))
     variantStore.setActive(name, next.name)
     variantStore.setCachedValue(name, active.name, value)
-    console.info('[VariantDebug] switch', {
-      path: name,
-      from: active.name,
-      to: next.name,
-      currentValue: JSON.stringify(value),
-      nextValue: JSON.stringify(nextValue),
-      activeBefore: variantStore.getActive(name),
-    })
     setActiveName(next.name)
     onChange?.(nextValue)
   }
