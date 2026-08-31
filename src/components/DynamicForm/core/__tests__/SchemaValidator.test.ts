@@ -844,6 +844,36 @@ describe("SchemaValidator", () => {
 
       expect(Object.keys(errors).length).toBe(0);
     });
+
+    it("integer 类型应拒绝小数", () => {
+      const schema: ExtendedJSONSchema = {
+        type: "object",
+        properties: {
+          quantity: { type: "integer", title: "Quantity", minimum: 1 },
+        },
+      };
+
+      const validator = new SchemaValidator(schema);
+      const errors = validator.validate({ quantity: 1.5 });
+
+      expect(errors.quantity).toBe("Quantity must be an integer");
+    });
+
+    it("integer 类型应遵循 minimum 约束", () => {
+      const schema: ExtendedJSONSchema = {
+        type: "object",
+        properties: {
+          quantity: { type: "integer", title: "Quantity", minimum: 1 },
+        },
+      };
+
+      const validator = new SchemaValidator(schema);
+
+      expect(validator.validate({ quantity: 0 }).quantity).toBe(
+        "Quantity minimum value is 1",
+      );
+      expect(validator.validate({ quantity: 1 })).toEqual({});
+    });
   });
 
   describe("数组类型验证", () => {

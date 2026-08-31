@@ -118,6 +118,7 @@ export function createSchemaResolver(
     >
   >,
   helpersRef?: RefObject<Record<string, any>>,
+  customFormats: Record<string, (value: string) => boolean> = {},
 ): Resolver {
   return async (values) => {
     const linkageStates = linkageStatesRef?.current ?? {};
@@ -154,7 +155,7 @@ export function createSchemaResolver(
     }
 
     // 使用合并后的 schema 进行验证
-    const validator = new SchemaValidator(effectiveSchema);
+    const validator = new SchemaValidator(effectiveSchema, undefined, customFormats);
     const schemaErrors = validator.validate(values);
     const fieldValidatorErrors = await runAllFieldValidators(
       values,

@@ -77,36 +77,53 @@ export async function runAllFieldValidators(
   helpers: Record<string, any> = {},
 ): Promise<Record<string, string>> {
   const errors: Record<string, string> = {};
-  const properties = schema.properties;
-  if (!properties) {
-    return errors;
-  }
 
-  await Promise.all(
-    Object.entries(properties).map(async ([fieldName, fieldSchema]) => {
-      if (typeof fieldSchema === "boolean") {
-        return;
-      }
-      const validators = fieldSchema.ui?.validators;
-      if (!validators?.length) {
-        return;
-      }
+  const getValue = (path: string): any =>
+    path.replace(/\[(\d+)\]/g, ".$1").split(".").reduce(
+      (current: any, key: string) => current?.[key],
+      values,
+    );
 
+  const visit = async (
+    currentSchema: ExtendedJSONSchema,
+    path: string,
+  ): Promise<void> => {
+    const validators = currentSchema.ui?.validators;
+    if (validators?.length) {
       for (const rule of validators) {
         const error = await runValidator(
           rule,
-          values[fieldName],
+          getValue(path),
           values,
           callbacks,
           helpers,
         );
         if (error) {
-          errors[fieldName] = error;
-          break; // 第一个报错的 validator 优先
+          errors[path] = error;
+          break;
         }
       }
-    }),
-  );
+    }
+
+    if (currentSchema.properties) {
+      await Promise.all(
+        Object.entries(currentSchema.properties).map(async ([name, child]) => {
+          if (typeof child !== "boolean") {
+            await visit(child, path ? `${path}.${name}` : name);
+          }
+        }),
+      );
+    }
+
+    if (currentSchema.items && !Array.isArray(currentSchema.items) && typeof currentSchema.items !== "boolean") {
+      const arrayValue = getValue(path);
+      if (Array.isArray(arrayValue)) {
+        await Promise.all(arrayValue.map((_, index) => visit(currentSchema.items as ExtendedJSONSchema, `${path}[${index}]`)));
+      }
+    }
+  };
+
+  await visit(schema, "");
 
   return errors;
 }

@@ -37,6 +37,9 @@ export interface ErrorMessages {
   maxLength?: string;
   min?: string;
   max?: string;
+  exclusiveMinimum?: string;
+  exclusiveMaximum?: string;
+  multipleOf?: string;
   pattern?: string;
   [key: string]: string | undefined;
 }

@@ -1,5 +1,7 @@
 import type { ExtendedJSONSchema } from '../types/schema'
 
+type CustomFormats = Record<string, (value: string) => boolean>
+
 /**
  * Schema 级别验证器
  * 负责处理 JSON Schema 中的条件验证机制
@@ -7,10 +9,16 @@ import type { ExtendedJSONSchema } from '../types/schema'
 export class SchemaValidator {
   private schema: ExtendedJSONSchema
   private rootSchema: ExtendedJSONSchema
+  private customFormats: CustomFormats
 
-  constructor(schema: ExtendedJSONSchema, rootSchema?: ExtendedJSONSchema) {
+  constructor(
+    schema: ExtendedJSONSchema,
+    rootSchema?: ExtendedJSONSchema,
+    customFormats: CustomFormats = {},
+  ) {
     this.schema = schema
     this.rootSchema = rootSchema || schema
+    this.customFormats = customFormats
   }
 
   /**
@@ -48,6 +56,35 @@ export class SchemaValidator {
       return false
     }
     return true
+  }
+
+  private isTypeValid(value: unknown, type: string | string[]): boolean {
+    if (Array.isArray(type)) return type.some((item) => this.isTypeValid(value, item))
+    switch (type) {
+      case 'string': return typeof value === 'string'
+      case 'number': return typeof value === 'number' && Number.isFinite(value)
+      case 'integer': return typeof value === 'number' && Number.isInteger(value)
+      case 'boolean': return typeof value === 'boolean'
+      case 'array': return Array.isArray(value)
+      case 'object': return typeof value === 'object' && value !== null && !Array.isArray(value)
+      case 'null': return value === null
+      default: return true
+    }
+  }
+
+  private stableValue(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map((item) => this.stableValue(item))
+    if (value && typeof value === 'object') {
+      return Object.keys(value as Record<string, unknown>).sort().reduce<Record<string, unknown>>(
+        (result, key) => ({ ...result, [key]: this.stableValue((value as Record<string, unknown>)[key]) }),
+        {},
+      )
+    }
+    return value
+  }
+
+  private deepEqual(left: unknown, right: unknown): boolean {
+    return JSON.stringify(this.stableValue(left)) === JSON.stringify(this.stableValue(right))
   }
 
   /**
@@ -402,7 +439,11 @@ export class SchemaValidator {
     // 修复前：dependencies 被包裹在 if (schema.oneOf || ...) 大块中，
     // 导致只有 schema 同时包含条件关键字时 dependencies 才会被验证。
     // 修复后：每个条件独立检查，dependencies 始终生效。
-    const nestedValidator = new SchemaValidator(schema, this.rootSchema)
+    const nestedValidator = new SchemaValidator(
+      schema,
+      this.rootSchema,
+      this.customFormats,
+    )
     if (schema.dependencies) {
       nestedValidator.validateDependencies(formData, errors)
     }
@@ -459,14 +500,21 @@ export class SchemaValidator {
     }
 
     // 验证 const（常量值）
-    if (schema.const !== undefined && value !== schema.const) {
+    if (schema.type && !this.isTypeValid(value, schema.type)) {
+      errors[fieldName] = schema.type === 'integer'
+        ? `${this.getFieldTitle(fieldName, parentSchema)} must be an integer`
+        : `${this.getFieldTitle(fieldName, parentSchema)} must be of type ${schema.type}`
+      return errors
+    }
+
+    if (schema.const !== undefined && !this.deepEqual(value, schema.const)) {
       errors[fieldName] =
         `${this.getFieldTitle(fieldName, parentSchema)} must be ${schema.const}`
       return errors
     }
 
     // 验证 enum（枚举值）
-    if (schema.enum && !schema.enum.includes(value)) {
+    if (schema.enum && !schema.enum.some((item) => this.deepEqual(item, value))) {
       errors[fieldName] =
         `${this.getFieldTitle(fieldName, parentSchema)} must be one of: ${schema.enum.join(', ')}`
       return errors
@@ -555,15 +603,18 @@ export class SchemaValidator {
     errors: Record<string, string>
     parentSchema?: ExtendedJSONSchema
   }): void {
+    const messages = schema.ui?.errorMessages || {}
     // 验证最小长度
     if (schema.minLength !== undefined && value.length < schema.minLength) {
       errors[fieldName] =
+        messages.minLength ||
         `${this.getFieldTitle(fieldName, parentSchema)} minimum length is ${schema.minLength} characters`
     }
 
     // 验证最大长度
     if (schema.maxLength !== undefined && value.length > schema.maxLength) {
       errors[fieldName] =
+        messages.maxLength ||
         `${this.getFieldTitle(fieldName, parentSchema)} maximum length is ${schema.maxLength} characters`
     }
 
@@ -571,8 +622,7 @@ export class SchemaValidator {
     if (schema.pattern) {
       const regex = new RegExp(schema.pattern)
       if (!regex.test(value)) {
-        errors[fieldName] =
-          `${this.getFieldTitle(fieldName, parentSchema)} invalid format`
+        errors[fieldName] = messages.pattern || `${this.getFieldTitle(fieldName, parentSchema)} invalid format`
       }
     }
 
@@ -583,6 +633,7 @@ export class SchemaValidator {
         format: schema.format,
         fieldName,
         parentSchema,
+        errorMessage: schema.ui?.errorMessages?.format,
       })
       if (formatError) {
         errors[fieldName] = formatError
@@ -611,15 +662,25 @@ export class SchemaValidator {
     errors: Record<string, string>
     parentSchema?: ExtendedJSONSchema
   }): void {
+    const messages = schema.ui?.errorMessages || {}
+    // integer 类型不允许小数
+    if (schema.type === 'integer' && !Number.isInteger(value)) {
+      errors[fieldName] =
+        `${this.getFieldTitle(fieldName, parentSchema)} must be an integer`
+      return
+    }
+
     // 验证最小值
     if (schema.minimum !== undefined && value < schema.minimum) {
       errors[fieldName] =
+        messages.min ||
         `${this.getFieldTitle(fieldName, parentSchema)} minimum value is ${schema.minimum}`
     }
 
     // 验证最大值
     if (schema.maximum !== undefined && value > schema.maximum) {
       errors[fieldName] =
+        messages.max ||
         `${this.getFieldTitle(fieldName, parentSchema)} maximum value is ${schema.maximum}`
     }
 
@@ -629,6 +690,7 @@ export class SchemaValidator {
       value <= schema.exclusiveMinimum
     ) {
       errors[fieldName] =
+        messages.exclusiveMinimum ||
         `${this.getFieldTitle(fieldName, parentSchema)} must be greater than ${schema.exclusiveMinimum}`
     }
 
@@ -638,12 +700,17 @@ export class SchemaValidator {
       value >= schema.exclusiveMaximum
     ) {
       errors[fieldName] =
+        messages.exclusiveMaximum ||
         `${this.getFieldTitle(fieldName, parentSchema)} must be less than ${schema.exclusiveMaximum}`
     }
 
     // 验证倍数
-    if (schema.multipleOf !== undefined && value % schema.multipleOf !== 0) {
+    if (
+      schema.multipleOf !== undefined &&
+      Math.abs(value / schema.multipleOf - Math.round(value / schema.multipleOf)) > 1e-10
+    ) {
       errors[fieldName] =
+        messages.multipleOf ||
         `${this.getFieldTitle(fieldName, parentSchema)} must be a multiple of ${schema.multipleOf}`
     }
   }
@@ -683,7 +750,7 @@ export class SchemaValidator {
 
     // 验证唯一性
     if (schema.uniqueItems) {
-      const uniqueValues = new Set(value.map((v) => JSON.stringify(v)))
+      const uniqueValues = new Set(value.map((v) => JSON.stringify(this.stableValue(v))))
       if (uniqueValues.size !== value.length) {
         errors[fieldName] =
           `${this.getFieldTitle(fieldName, parentSchema)} must not contain duplicate items`
@@ -842,12 +909,22 @@ export class SchemaValidator {
     format,
     fieldName,
     parentSchema,
+    errorMessage,
   }: {
     value: string
     format: string
     fieldName: string
     parentSchema?: ExtendedJSONSchema
+    errorMessage?: string
   }): string | null {
+    const customValidator = this.customFormats[format]
+    if (customValidator && !customValidator(value)) {
+      return (
+        errorMessage ||
+        `${this.getFieldTitle(fieldName, parentSchema)} invalid format`
+      )
+    }
+
     const formatValidators: Record<string, RegExp> = {
       email: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
       uri: /^https?:\/\/.+/,
@@ -859,7 +936,10 @@ export class SchemaValidator {
 
     const validator = formatValidators[format]
     if (validator && !validator.test(value)) {
-      return `${this.getFieldTitle(fieldName, parentSchema)} invalid format (expected: ${format})`
+      return (
+        errorMessage ||
+        `${this.getFieldTitle(fieldName, parentSchema)} invalid format (expected: ${format})`
+      )
     }
 
     return null

@@ -1050,6 +1050,26 @@ export const PropertyEditor: React.FC = () => {
                           )}
                         />
                       </FormGroup>
+                      <FormGroup label="Multiple Of Error Message">
+                        <Controller
+                          name="ui.errorMessages.multipleOf"
+                          control={control}
+                          render={({ field }) => (
+                            <InputGroup
+                              {...field}
+                              value={field.value ?? ''}
+                              placeholder="Custom error message for multipleOf"
+                              onChange={(e) => {
+                                field.onChange(e)
+                                handleUIChange('errorMessages', {
+                                  ...currentNode.ui?.errorMessages,
+                                  multipleOf: e.target.value,
+                                })
+                              }}
+                            />
+                          )}
+                        />
+                      </FormGroup>
                     </ConfigSection>
                   )}
 
