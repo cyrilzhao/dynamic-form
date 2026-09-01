@@ -31,7 +31,9 @@ import type { ExtendedJSONSchema } from '@/components/DynamicForm'
 
 // Helper to get node from path
 const getNode = (schema: any, path: string[]) => {
-  if (path.length === 0) return schema
+  if (path.length === 0) {
+    return schema
+  }
   return get(schema, path)
 }
 
@@ -178,12 +180,24 @@ const ConfigSection = ({
 
 const getDefaultWidget = (schema: any): string => {
   if (schema?.type === 'string') {
-    if (schema.format === 'email') return 'email'
-    if (schema.format === 'date') return 'date'
-    if (schema.format === 'date-time') return 'datetime'
-    if (schema.format === 'time') return 'time'
-    if (schema.enum) return 'select'
-    if (schema.maxLength && schema.maxLength > 100) return 'textarea'
+    if (schema.format === 'email') {
+      return 'email'
+    }
+    if (schema.format === 'date') {
+      return 'date'
+    }
+    if (schema.format === 'date-time') {
+      return 'datetime'
+    }
+    if (schema.format === 'time') {
+      return 'time'
+    }
+    if (schema.enum) {
+      return 'select'
+    }
+    if (schema.maxLength && schema.maxLength > 100) {
+      return 'textarea'
+    }
     return 'text'
   }
 
@@ -242,7 +256,7 @@ export const PropertyEditor: React.FC = () => {
   const isSchemaLevelNode = isRoot && !options?.rootType
 
   const [selectedTabId, setSelectedTabId] = useState(
-    isSchemaLevelNode ? 'validation' : 'basic'
+    isSchemaLevelNode ? 'validation' : 'basic',
   )
   const [keyInput, setKeyInput] = useState(currentKey || '')
   const [keyError, setKeyError] = useState('')
@@ -438,14 +452,21 @@ export const PropertyEditor: React.FC = () => {
       label:
         widget.charAt(0).toUpperCase() + widget.slice(1).replace(/-/g, ' '),
       value: widget,
-    })
+    }),
   )
   const showWidgetConfig = currentWidgetOptions.length > 0
   const defaultWidget = getDefaultWidget(currentNode)
-  const editorReadonly = options?.readonly?.all || options?.readonly?.schema || options?.readonly?.propertyEditor
+  const editorReadonly =
+    options?.readonly?.all ||
+    options?.readonly?.schema ||
+    options?.readonly?.propertyEditor
 
   if (editorReadonly) {
-    return <div className="property-editor"><JsonView title="Schema (Read Only)" data={currentNode} /></div>
+    return (
+      <div className="property-editor">
+        <JsonView title="Schema (Read Only)" data={currentNode} />
+      </div>
+    )
   }
 
   return (
@@ -453,102 +474,104 @@ export const PropertyEditor: React.FC = () => {
       {isSchemaLevelNode ? (
         // Schema 层级节点:只显示条件验证配置
         <div className="editor-panel">
-          {options?.hidden?.rootValidation ? null : <>
-          <Callout
-            intent="primary"
-            icon="info-sign"
-            style={{ marginBottom: 16 }}
-          >
-            <strong>Schema-Level Configuration</strong>
-            <p style={{ marginTop: 8, marginBottom: 0, fontSize: 13 }}>
-              Configure conditional validation rules for this schema level.
-              These rules apply to the fields within this object.
-            </p>
-          </Callout>
+          {options?.hidden?.rootValidation ? null : (
+            <>
+              <Callout
+                intent="primary"
+                icon="info-sign"
+                style={{ marginBottom: 16 }}
+              >
+                <strong>Schema-Level Configuration</strong>
+                <p style={{ marginTop: 8, marginBottom: 0, fontSize: 13 }}>
+                  Configure conditional validation rules for this schema level.
+                  These rules apply to the fields within this object.
+                </p>
+              </Callout>
 
-          <FormGroup
-            label={renderLabelWithTooltip({
-              label: 'Columns Count',
-              title: 'Form layout column count',
-              description:
-                'Controls how many columns this schema level uses when laying out child fields.',
-              reasons: [
-                'Use it to make long forms easier to scan by grouping fields across columns.',
-                'It defines the grid that field-level Column Span values can use.',
-              ],
-            })}
-            helperText="Number of columns for the form layout (default: 1)"
-            style={{ marginBottom: 16 }}
-          >
-            <Controller
-              name="ui.columnsCount"
-              control={control}
-              render={({ field }) => (
-                <NumericInput
-                  {...field}
-                  value={field.value ?? 1}
-                  onValueChange={(value) =>
-                    handleUIChange('columnsCount', value)
-                  }
-                  min={1}
-                  max={12}
-                  fill
+              <FormGroup
+                label={renderLabelWithTooltip({
+                  label: 'Columns Count',
+                  title: 'Form layout column count',
+                  description:
+                    'Controls how many columns this schema level uses when laying out child fields.',
+                  reasons: [
+                    'Use it to make long forms easier to scan by grouping fields across columns.',
+                    'It defines the grid that field-level Column Span values can use.',
+                  ],
+                })}
+                helperText="Number of columns for the form layout (default: 1)"
+                style={{ marginBottom: 16 }}
+              >
+                <Controller
+                  name="ui.columnsCount"
+                  control={control}
+                  render={({ field }) => (
+                    <NumericInput
+                      {...field}
+                      value={field.value ?? 1}
+                      onValueChange={(value) =>
+                        handleUIChange('columnsCount', value)
+                      }
+                      min={1}
+                      max={12}
+                      fill
+                    />
+                  )}
                 />
-              )}
-            />
-          </FormGroup>
+              </FormGroup>
 
-          <Divider style={{ marginBottom: 16 }} />
+              <Divider style={{ marginBottom: 16 }} />
 
-          <SchemaValidationEditor
-            schema={schema}
-            currentFieldPath={currentFieldPath}
-            parentSchema={schema}
-            value={{
-              dependencies: currentNode.dependencies,
-              if: currentNode.if,
-              then: currentNode.then,
-              else: currentNode.else,
-              allOf: currentNode.allOf,
-              anyOf: currentNode.anyOf,
-              oneOf: currentNode.oneOf,
-            }}
-            onChange={(validationConfig) => {
-              // 更新条件验证配置
-              const updates: any = {}
+              <SchemaValidationEditor
+                schema={schema}
+                currentFieldPath={currentFieldPath}
+                parentSchema={schema}
+                value={{
+                  dependencies: currentNode.dependencies,
+                  if: currentNode.if,
+                  then: currentNode.then,
+                  else: currentNode.else,
+                  allOf: currentNode.allOf,
+                  anyOf: currentNode.anyOf,
+                  oneOf: currentNode.oneOf,
+                }}
+                onChange={(validationConfig) => {
+                  // 更新条件验证配置
+                  const updates: any = {}
 
-              // dependencies - 使用 'in' 操作符检查键是否存在
-              if ('dependencies' in validationConfig) {
-                updates.dependencies = validationConfig.dependencies
-              }
+                  // dependencies - 使用 'in' 操作符检查键是否存在
+                  if ('dependencies' in validationConfig) {
+                    updates.dependencies = validationConfig.dependencies
+                  }
 
-              // if/then/else - 需要检查是否存在于 validationConfig 中
-              if ('if' in validationConfig) {
-                updates.if = validationConfig.if
-                updates.then = validationConfig.then
-                updates.else = validationConfig.else
-              }
+                  // if/then/else - 需要检查是否存在于 validationConfig 中
+                  if ('if' in validationConfig) {
+                    updates.if = validationConfig.if
+                    updates.then = validationConfig.then
+                    updates.else = validationConfig.else
+                  }
 
-              // allOf
-              if ('allOf' in validationConfig) {
-                updates.allOf = validationConfig.allOf
-              }
+                  // allOf
+                  if ('allOf' in validationConfig) {
+                    updates.allOf = validationConfig.allOf
+                  }
 
-              // anyOf
-              if ('anyOf' in validationConfig) {
-                updates.anyOf = validationConfig.anyOf
-              }
+                  // anyOf
+                  if ('anyOf' in validationConfig) {
+                    updates.anyOf = validationConfig.anyOf
+                  }
 
-              // oneOf
-              if ('oneOf' in validationConfig) {
-                updates.oneOf = validationConfig.oneOf
-              }
+                  // oneOf
+                  if ('oneOf' in validationConfig) {
+                    updates.oneOf = validationConfig.oneOf
+                  }
 
-              onUpdate(selectedPath, updates)
-            }}
-            disabled={false}
-          />
-          </>}
+                  onUpdate(selectedPath, updates)
+                }}
+                disabled={false}
+              />
+            </>
+          )}
         </div>
       ) : (
         // 字段级别节点:显示完整的配置标签页
@@ -620,8 +643,8 @@ export const PropertyEditor: React.FC = () => {
                     name="type"
                     control={control}
                     render={({ field }) => (
-                        <Select
-                          value={field.value ?? ''}
+                      <Select
+                        value={field.value ?? ''}
                         onChange={(value) => {
                           field.onChange(value)
                           handleFieldChange('type', value)
@@ -629,7 +652,7 @@ export const PropertyEditor: React.FC = () => {
                           handleFieldChange('default', undefined)
                         }}
                         options={typeOptions}
-                          disabled={isRoot || options?.readonly?.editFieldType}
+                        disabled={isRoot || options?.readonly?.editFieldType}
                       />
                     )}
                   />
@@ -701,10 +724,10 @@ export const PropertyEditor: React.FC = () => {
 
                         const handleRemoveOption = (index: number) => {
                           const newEnum = enumValues.filter(
-                            (_: any, i: number) => i !== index
+                            (_: any, i: number) => i !== index,
                           )
                           const newEnumNames = enumNames.filter(
-                            (_: any, i: number) => i !== index
+                            (_: any, i: number) => i !== index,
                           )
                           onUpdate(selectedPath, {
                             enum: newEnum.length > 0 ? newEnum : undefined,
@@ -717,7 +740,7 @@ export const PropertyEditor: React.FC = () => {
 
                         const handleUpdateValue = (
                           index: number,
-                          value: string
+                          value: string,
                         ) => {
                           const newEnum = [...enumValues]
                           newEnum[index] = value
@@ -726,7 +749,7 @@ export const PropertyEditor: React.FC = () => {
 
                         const handleUpdateLabel = (
                           index: number,
-                          label: string
+                          label: string,
                         ) => {
                           const newEnumNames = [...enumNames]
                           newEnumNames[index] = label
@@ -1139,7 +1162,7 @@ export const PropertyEditor: React.FC = () => {
                             onChange={(e) =>
                               handleFieldChange(
                                 'uniqueItems',
-                                e.currentTarget.checked
+                                e.currentTarget.checked,
                               )
                             }
                           />
@@ -1397,7 +1420,7 @@ export const PropertyEditor: React.FC = () => {
 
                             const handleUpdateLabel = (
                               index: number,
-                              label: string
+                              label: string,
                             ) => {
                               const newEnumNames = [...enumNames]
                               newEnumNames[index] = label
@@ -1478,14 +1501,14 @@ export const PropertyEditor: React.FC = () => {
                                           onChange={(e) =>
                                             handleUpdateLabel(
                                               index,
-                                              e.target.value
+                                              e.target.value,
                                             )
                                           }
                                           style={{ flex: 1 }}
                                         />
                                       </div>
                                     </div>
-                                  )
+                                  ),
                                 )}
                               </div>
                             )
@@ -1699,7 +1722,7 @@ export const PropertyEditor: React.FC = () => {
                             onChange={(e) =>
                               handleUIChange(
                                 'flattenPath',
-                                e.currentTarget.checked
+                                e.currentTarget.checked,
                               )
                             }
                             disabled={isArrayItems}
@@ -1727,7 +1750,7 @@ export const PropertyEditor: React.FC = () => {
                             onChange={(e) =>
                               handleUIChange(
                                 'flattenPrefix',
-                                e.currentTarget.checked
+                                e.currentTarget.checked,
                               )
                             }
                             disabled={isArrayItems}
@@ -1807,10 +1830,10 @@ export const PropertyEditor: React.FC = () => {
 
                             const handleRemoveOption = (index: number) => {
                               const newEnum = enumValues.filter(
-                                (_: any, i: number) => i !== index
+                                (_: any, i: number) => i !== index,
                               )
                               const newEnumNames = enumNames.filter(
-                                (_: any, i: number) => i !== index
+                                (_: any, i: number) => i !== index,
                               )
                               onUpdate(selectedPath, {
                                 items: {
@@ -1827,7 +1850,7 @@ export const PropertyEditor: React.FC = () => {
 
                             const handleUpdateValue = (
                               index: number,
-                              value: string
+                              value: string,
                             ) => {
                               const newEnum = [...enumValues]
                               newEnum[index] = value
@@ -1838,7 +1861,7 @@ export const PropertyEditor: React.FC = () => {
 
                             const handleUpdateLabel = (
                               index: number,
-                              label: string
+                              label: string,
                             ) => {
                               const newEnumNames = [...enumNames]
                               newEnumNames[index] = label
@@ -1892,7 +1915,7 @@ export const PropertyEditor: React.FC = () => {
                                             onChange={(e) =>
                                               handleUpdateValue(
                                                 index,
-                                                e.target.value
+                                                e.target.value,
                                               )
                                             }
                                             style={{ flex: 1 }}
@@ -1929,14 +1952,14 @@ export const PropertyEditor: React.FC = () => {
                                             onChange={(e) =>
                                               handleUpdateLabel(
                                                 index,
-                                                e.target.value
+                                                e.target.value,
                                               )
                                             }
                                             style={{ flex: 1 }}
                                           />
                                         </div>
                                       </div>
-                                    )
+                                    ),
                                   )
                                 ) : (
                                   <Callout intent="warning" icon="info-sign">
@@ -2040,33 +2063,43 @@ export const PropertyEditor: React.FC = () => {
             }
           />
 
-          {!options?.hidden?.variantsTab && !isArrayItems && <Tab
-            id="variants"
-            title="Variants"
-            panel={
-              <div className="editor-panel">
-                <ConfigSection
-                  title="Field Variants"
-                  description="Configure independent data types and widgets for this field."
-                >
-                  <VariantsEditor
-                    value={currentNode.ui?.variants}
-                    defaultVariant={currentNode.ui?.defaultVariant}
-                    onChange={(variants, nextDefaultVariant) => {
-                      onUpdate(selectedPath, {
-                        ui: {
-                          ...currentNode.ui,
-                          variants,
-                          defaultVariant: nextDefaultVariant,
-                        },
-                      })
-                    }}
-                    disabled={isArrayItems}
-                  />
-                </ConfigSection>
-              </div>
-            }
-          />}
+          {!options?.hidden?.variantsTab && !isArrayItems && (
+            <Tab
+              id="variants"
+              title="Variants"
+              panel={
+                <div className="editor-panel">
+                  <ConfigSection
+                    title="Field Variants"
+                    description="Configure independent data types and widgets for this field."
+                  >
+                    <VariantsEditor
+                      value={currentNode.ui?.variants}
+                      defaultVariant={currentNode.ui?.defaultVariant}
+                      onChange={(variants, nextDefaultVariant) => {
+                        const hadVariants =
+                          (currentNode.ui?.variants?.length ?? 0) > 0
+                        const hasVariants = (variants?.length ?? 0) > 0
+                        onUpdate(selectedPath, {
+                          ui: {
+                            ...currentNode.ui,
+                            variants,
+                            defaultVariant: nextDefaultVariant,
+                            widget: hasVariants
+                              ? 'variant'
+                              : hadVariants
+                                ? getDefaultWidget(currentNode)
+                                : currentNode.ui?.widget,
+                          },
+                        })
+                      }}
+                      disabled={isArrayItems}
+                    />
+                  </ConfigSection>
+                </div>
+              }
+            />
+          )}
         </Tabs>
       )}
     </div>
