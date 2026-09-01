@@ -27,8 +27,13 @@ export default defineConfig([
     },
     rules: {
       'prettier/prettier': 'error',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-      'curly': ['error', 'all'],
+      // Hooks 依赖数组必须与闭包实际使用的值保持同步。
+      'react-hooks/exhaustive-deps': 'error',
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_' },
+      ],
+      curly: ['error', 'all'],
     },
   },
 ])
