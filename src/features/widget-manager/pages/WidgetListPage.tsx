@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Card,
   HTMLTable,
@@ -39,7 +39,7 @@ export const WidgetListPage: React.FC = () => {
   const [selectedWidget, setSelectedWidget] = useState<CustomWidget | null>(null);
   const [newName, setNewName] = useState('');
 
-  const loadWidgets = async () => {
+  const loadWidgets = useCallback(async () => {
     setLoading(true);
     try {
       const result = await fetchWidgets({
@@ -53,11 +53,11 @@ export const WidgetListPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, statusFilter, createdByFilter]);
 
   useEffect(() => {
     loadWidgets();
-  }, [search, statusFilter, createdByFilter]);
+  }, [loadWidgets]);
 
   const handleCreate = () => {
     navigate('/widget-manager/editor');

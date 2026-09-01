@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { WidgetLoader } from '../utils/widgetLoader';
 
 export interface UseCustomWidgetsResult {
@@ -17,9 +17,9 @@ export function useCustomWidgets(): UseCustomWidgetsResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const loader = new WidgetLoader();
+  const loader = useMemo(() => new WidgetLoader(), []);
 
-  const loadWidgets = async () => {
+  const loadWidgets = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -30,11 +30,11 @@ export function useCustomWidgets(): UseCustomWidgetsResult {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loader]);
 
   useEffect(() => {
     loadWidgets();
-  }, []);
+  }, [loadWidgets]);
 
   return {
     widgets,

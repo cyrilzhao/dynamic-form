@@ -49,6 +49,13 @@ export const CodeMirrorView: React.FC<CodeMirrorViewProps> = ({
 }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const valueRef = useRef(value);
+  const onChangeRef = useRef(onChange);
+
+  useEffect(() => {
+    valueRef.current = value;
+    onChangeRef.current = onChange;
+  }, [value, onChange]);
 
   useEffect(() => {
     if (!editorRef.current) return;
@@ -93,11 +100,11 @@ export const CodeMirrorView: React.FC<CodeMirrorViewProps> = ({
     }
 
     // 添加值变化监听
-    if (onChange) {
+    if (onChangeRef.current) {
       extensions.push(
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
-            onChange(update.state.doc.toString());
+            onChangeRef.current?.(update.state.doc.toString());
           }
         })
       );
@@ -105,7 +112,7 @@ export const CodeMirrorView: React.FC<CodeMirrorViewProps> = ({
 
     // 创建编辑器实例
     const view = new EditorView({
-      state: EditorState.create({ doc: value, extensions }),
+      state: EditorState.create({ doc: valueRef.current, extensions }),
       parent: editorRef.current,
     });
 

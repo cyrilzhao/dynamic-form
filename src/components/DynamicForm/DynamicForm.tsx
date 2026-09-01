@@ -794,7 +794,7 @@ const DynamicFormInner = React.memo(
         //   );
         // }
         return parsed
-      }, [schema, pathPrefix, asNestedForm])
+      }, [schema])
 
       // 统一处理联动配置：路径转换 -> 过滤父级联动
       const { processedLinkages, formToUse, effectiveLinkageFunctions } =
@@ -874,7 +874,6 @@ const DynamicFormInner = React.memo(
           rawLinkages,
           asNestedForm,
           pathPrefix,
-          inheritedLinkageStateContext?.parentLinkageStates,
           inheritedLinkageStateContext?.parentLinkages,
           inheritedLinkageStateContext?.form,
           inheritedLinkageStateContext?.linkageFunctions,
@@ -917,7 +916,7 @@ const DynamicFormInner = React.memo(
           return merged
         }
         return { ...ownLinkageStates }
-      }, [inheritedLinkageStateContext, ownLinkageStates, pathPrefix])
+      }, [inheritedLinkageStateContext?.parentLinkageStates, ownLinkageStates])
 
       // 同步更新 ref，确保 resolver 始终使用最新联动状态
       linkageStatesRef.current = linkageStates
@@ -1108,7 +1107,7 @@ const DynamicFormInner = React.memo(
             await refreshLinkage()
           },
         }),
-        [methods, schema, refreshLinkage, operationController],
+        [methods, schema, refreshLinkage, operationController, mergedHelpers, setValueWithoutLinkage, variantStore],
       )
 
       React.useEffect(() => {
@@ -1300,7 +1299,7 @@ const DynamicFormInner = React.memo(
             }
           }
         }
-      }, [watch, onChange, schema, mergedHelpers])
+      }, [watch, onChange, schema, mergedHelpers, variantStore])
 
       // ✅ 使用 useCallback 缓存 onSubmitHandler，避免每次渲染创建新函
       const onSubmitHandler = useCallback(
@@ -1338,6 +1337,7 @@ const DynamicFormInner = React.memo(
           nestedSchemaRegistry,
           stableCallbacks,
           mergedHelpers,
+          variantStore,
         ],
       )
 
@@ -1475,7 +1475,6 @@ const DynamicFormInner = React.memo(
           disabled,
           enableVirtualScroll,
           fields,
-          watchedValues,
           fieldControlStyle,
           fieldLabelStyle,
           fieldRowStyle,
@@ -1488,6 +1487,8 @@ const DynamicFormInner = React.memo(
           fieldsWrapperStyle,
           columnsCount,
           effectiveTextFieldFocus,
+          mergedHelpers,
+          methods,
         ],
       )
 
@@ -1587,6 +1588,8 @@ const DynamicFormInner = React.memo(
         stableWidgets,
         stableCallbacks,
         effectiveTextFieldFocus,
+        mergedHelpers,
+        variantStore,
       ])
 
       // 嵌套表单模式下不需要再包裹 FormProvider，因为已经复用了父表单的 context

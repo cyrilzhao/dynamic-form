@@ -99,7 +99,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
     }
 
     // 获取初始选中路径
-    const getInitialSelectedPath = (schema: ExtendedJSONSchema): string[] => {
+    const getInitialSelectedPath = useCallback((schema: ExtendedJSONSchema): string[] => {
       if (!initialSelectedPath) {
         return getFirstLevelNodePath(schema)
       }
@@ -118,7 +118,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
       // 如果路径无效，回退到第一个一级节点
       console.warn('Invalid initialSelectedPath, falling back to first node')
       return getFirstLevelNodePath(schema)
-    }
+    }, [initialSelectedPath])
 
     const initialSchema = getInitialSchema()
     const initialSchemaRef = useRef(initialSchema)
@@ -172,7 +172,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           setPreviewData({})
         },
       }),
-      [schema, selectedPath],
+      [schema, selectedPath, getInitialSelectedPath, options?.rootType],
     )
 
     // Resize handler
