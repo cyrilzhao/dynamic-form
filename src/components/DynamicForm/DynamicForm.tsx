@@ -95,13 +95,19 @@ function inferArrayAction(
   ) {
     return undefined
   }
-  if (value.length > previousValue.length) return 'append'
-  if (value.length < previousValue.length) return 'remove'
+  if (value.length > previousValue.length) {
+    return 'append'
+  }
+  if (value.length < previousValue.length) {
+    return 'remove'
+  }
   // 首个差异位置用于判断相邻元素发生了上移还是下移。
   const changedIndex = value.findIndex(
     (item, index) => !Object.is(item, previousValue[index]),
   )
-  if (changedIndex < 0) return undefined
+  if (changedIndex < 0) {
+    return undefined
+  }
   if (
     changedIndex < value.length - 1 &&
     Object.is(value[changedIndex], previousValue[changedIndex + 1]) &&
@@ -260,10 +266,14 @@ function resolveVariantForValue(
   variantStore?: ReturnType<typeof createFieldVariantStore>,
 ) {
   const variants = fieldSchema.ui?.variants
-  if (!variants?.length) return null
+  if (!variants?.length) {
+    return null
+  }
   const activeName = variantStore?.getActive(path)
   const activeVariant = variants.find((variant) => variant.name === activeName)
-  if (activeVariant) return activeVariant
+  if (activeVariant) {
+    return activeVariant
+  }
   const detected = detectVariantSync({
     variants,
     value,
@@ -291,7 +301,9 @@ function getEffectiveVariantSchema(
     path,
     variantStore,
   )
-  if (!variant) return fieldSchema
+  if (!variant) {
+    return fieldSchema
+  }
   return buildVariantSchema(fieldSchema, variant)
 }
 

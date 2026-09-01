@@ -23,7 +23,7 @@ export const VariantWidget: React.FC<FieldWidgetProps> = ({
   const defaultName =
     (schema as ExtendedJSONSchema)?.ui?.defaultVariant || variants[0]?.name
   const [activeName, setActiveName] = useState(
-    variantStore.getActive(name) || defaultName
+    variantStore.getActive(name) || defaultName,
   )
   const [cache, setCache] = useState<Record<string, unknown>>({})
   const active =
@@ -41,10 +41,12 @@ export const VariantWidget: React.FC<FieldWidgetProps> = ({
         widget: widgetName,
       },
     }),
-    [active, schema, widgetName]
+    [active, schema, widgetName],
   )
 
-  if (!active || !Widget) return null
+  if (!active || !Widget) {
+    return null
+  }
   const activeValue = Object.prototype.hasOwnProperty.call(cache, active.name)
     ? cache[active.name]
     : value
@@ -102,7 +104,9 @@ export const VariantWidget: React.FC<FieldWidgetProps> = ({
         }))}
         onChange={(nextName) => {
           const next = variants.find((variant) => variant.name === nextName)
-          if (next) switchVariant(next)
+          if (next) {
+            switchVariant(next)
+          }
         }}
         className="variant-widget__select"
         style={{ flex: '0 0 32px' }}

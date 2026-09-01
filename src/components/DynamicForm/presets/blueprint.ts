@@ -17,8 +17,8 @@ import {
   VariantWidget,
   CodeEditorWidget,
   ObjectEditorWidget,
-} from "../widgets";
-import type { WidgetPreset } from "../types/widgets";
+} from '../widgets'
+import type { WidgetPreset } from '../types/widgets'
 
 /**
  * Blueprint 组件库预设
@@ -34,14 +34,14 @@ export const blueprintPreset: WidgetPreset = {
   select: SelectWidget,
   radio: RadioWidget,
   checkbox: CheckboxWidget,
-  "checkbox-group": CheckboxGroupWidget,
-  "schema-builder": SchemaBuilderWidget,
+  'checkbox-group': CheckboxGroupWidget,
+  'schema-builder': SchemaBuilderWidget,
   switch: SwitchWidget,
-  "nested-form": NestedFormWidget,
+  'nested-form': NestedFormWidget,
   array: ArrayFieldWidget,
-  "key-value-array": KeyValueArrayWidget,
-  "table-array": TableArrayWidget,
+  'key-value-array': KeyValueArrayWidget,
+  'table-array': TableArrayWidget,
   variant: VariantWidget,
-  "code-editor": CodeEditorWidget,
-  "object-editor": ObjectEditorWidget,
-};
+  'code-editor': CodeEditorWidget,
+  'object-editor': ObjectEditorWidget,
+}

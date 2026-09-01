@@ -33,6 +33,8 @@ export default defineConfig([
         'warn',
         { argsIgnorePattern: '^_' },
       ],
+      // 当前项目中存在较多历史 any 用法，暂时放开该限制，后续再逐步收敛类型。
+      '@typescript-eslint/no-explicit-any': 'off',
       curly: ['error', 'all'],
     },
   },

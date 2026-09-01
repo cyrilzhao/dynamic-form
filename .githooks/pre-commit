@@ -2,23 +2,5 @@
 
 set -eu
 
-# 获取暂存区中待提交的新增、复制或修改文件，避免格式化未参与本次提交的文件。
-staged_files=$(git diff --cached --name-only --diff-filter=ACMR)
-
-if [ -z "$staged_files" ]; then
-  exit 0
-fi
-
-# 从暂存文件中筛选 Prettier 支持的代码和文档扩展名。
-prettier_files=$(printf '%s\n' "$staged_files" | awk '
-  /\.(css|js|jsx|json|md|scss|ts|tsx)$/ { print }
-')
-
-if [ -z "$prettier_files" ]; then
-  exit 0
-fi
-
-echo "Running Prettier on staged files..."
-# 显式读取仓库配置，确保命令行规则与 VS Code 保存时的 Prettier 规则一致。
-printf '%s\n' "$prettier_files" | xargs ./node_modules/.bin/prettier --config .prettierrc --write
-printf '%s\n' "$prettier_files" | xargs git add --
+# 仅处理暂存文件：代码先由 Prettier 格式化，再由 ESLint 自动修复。
+./node_modules/.bin/lint-staged
