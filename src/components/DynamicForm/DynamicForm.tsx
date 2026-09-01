@@ -333,6 +333,20 @@ function buildEffectiveSchemaTree({
       ]),
     )
   }
+  if (
+    effective.type === 'array' &&
+    !Array.isArray(effective.items) &&
+    effective.items
+  ) {
+    effective.items = buildEffectiveSchemaTree({
+      schema: effective.items as ExtendedJSONSchema,
+      value: Array.isArray(value) ? value[0] : undefined,
+      callbacks,
+      helpers,
+      variantStore,
+      path: path ? `${path}.items` : 'items',
+    })
+  }
   return effective
 }
 
@@ -348,6 +362,8 @@ function applyFieldTransforms(
   schema: ExtendedJSONSchema,
   callbacks: Record<string, (...args: any[]) => any>,
   helpers: Record<string, any>,
+  variantStore?: ReturnType<typeof createFieldVariantStore>,
+  path = '',
 ): any {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return data
@@ -357,13 +373,7 @@ function applyFieldTransforms(
     if (!(key in result)) {
       continue
     }
-    const fieldSchema = rawSchema as ExtendedJSONSchema
-    const effectiveSchema = getEffectiveVariantSchema(
-      fieldSchema,
-      result[key],
-      callbacks,
-      helpers,
-    )
+    const effectiveSchema = rawSchema as ExtendedJSONSchema
     const cb = effectiveSchema.ui?.transform?.callback
     const fn = resolveTransformFn(cb, callbacks)
     if (fn) {
@@ -380,22 +390,37 @@ function applyFieldTransforms(
         effectiveSchema,
         callbacks,
         helpers,
+        variantStore,
+        path ? `${path}.${key}` : key,
       )
     }
     if (
-      fieldSchema.type === 'array' &&
-      !Array.isArray(fieldSchema.items) &&
-      fieldSchema.items &&
+      effectiveSchema.type === 'array' &&
+      !Array.isArray(effectiveSchema.items) &&
+      effectiveSchema.items &&
       Array.isArray(result[key])
     ) {
-      result[key] = (result[key] as any[]).map((item) =>
-        applyFieldTransforms(
+      result[key] = (result[key] as any[]).map((item, index) => {
+        const itemPath = path ? `${path}.${key}.${index}` : `${key}.${index}`
+        const effectiveItemSchema = variantStore
+          ? buildEffectiveSchemaTree({
+              schema: effectiveSchema.items as ExtendedJSONSchema,
+              value: item,
+              callbacks,
+              helpers,
+              variantStore,
+              path: itemPath,
+            })
+          : (effectiveSchema.items as ExtendedJSONSchema)
+        return applyFieldTransforms(
           item,
-          fieldSchema.items as ExtendedJSONSchema,
+          effectiveItemSchema,
           callbacks,
           helpers,
-        ),
-      )
+          variantStore,
+          itemPath,
+        )
+      })
     }
   }
   return result
@@ -439,6 +464,8 @@ function reverseFieldTransforms(
   schema: ExtendedJSONSchema,
   callbacks: Record<string, (...args: any[]) => any>,
   helpers: Record<string, any>,
+  variantStore?: ReturnType<typeof createFieldVariantStore>,
+  path = '',
 ): any {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return data
@@ -448,13 +475,7 @@ function reverseFieldTransforms(
     if (!(key in result)) {
       continue
     }
-    const fieldSchema = rawSchema as ExtendedJSONSchema
-    const effectiveSchema = getEffectiveVariantSchema(
-      fieldSchema,
-      result[key],
-      callbacks,
-      helpers,
-    )
+    const effectiveSchema = rawSchema as ExtendedJSONSchema
     const cb = effectiveSchema.ui?.transform?.reverseCallback
     const fn = resolveTransformFn(cb, callbacks)
     if (fn) {
@@ -471,6 +492,8 @@ function reverseFieldTransforms(
         effectiveSchema,
         callbacks,
         helpers,
+        variantStore,
+        path ? `${path}.${key}` : key,
       )
     }
     if (
@@ -479,14 +502,27 @@ function reverseFieldTransforms(
       effectiveSchema.items &&
       Array.isArray(result[key])
     ) {
-      result[key] = (result[key] as any[]).map((item) =>
-        reverseFieldTransforms(
+      result[key] = (result[key] as any[]).map((item, index) => {
+        const itemPath = path ? `${path}.${key}.${index}` : `${key}.${index}`
+        const effectiveItemSchema = variantStore
+          ? buildEffectiveSchemaTree({
+              schema: effectiveSchema.items as ExtendedJSONSchema,
+              value: item,
+              callbacks,
+              helpers,
+              variantStore,
+              path: itemPath,
+            })
+          : (effectiveSchema.items as ExtendedJSONSchema)
+        return reverseFieldTransforms(
           item,
-          effectiveSchema.items as ExtendedJSONSchema,
+          effectiveItemSchema,
           callbacks,
           helpers,
-        ),
-      )
+          variantStore,
+          itemPath,
+        )
+      })
     }
   }
   return result
@@ -893,6 +929,8 @@ const DynamicFormInner = React.memo(
                   value,
                   callbacksRef.current,
                   mergedHelpers,
+                  name,
+                  variantStore,
                 )
               : undefined
             const reverseFn = resolveTransformFn(
@@ -925,6 +963,8 @@ const DynamicFormInner = React.memo(
                   displayValue,
                   callbacksRef.current,
                   mergedHelpers,
+                  name,
+                  variantStore,
                 )
               : undefined
             const fn = resolveTransformFn(
@@ -937,20 +977,19 @@ const DynamicFormInner = React.memo(
           },
           getValues: () => {
             const displayValues = methods.getValues()
-            return applyFieldTransforms(
-              transformFormData(
-                displayValues,
-                buildEffectiveSchemaTree({
-                  schema,
-                  value: displayValues,
-                  callbacks: callbacksRef.current,
-                  helpers: mergedHelpers,
-                  variantStore,
-                }),
-              ),
+            const effectiveSchema = buildEffectiveSchemaTree({
               schema,
+              value: displayValues,
+              callbacks: callbacksRef.current,
+              helpers: mergedHelpers,
+              variantStore,
+            })
+            return applyFieldTransforms(
+              transformFormData(displayValues, effectiveSchema),
+              effectiveSchema,
               callbacksRef.current,
               mergedHelpers,
+              variantStore,
             )
           },
           setValues: (values, options) => {
@@ -961,9 +1000,16 @@ const DynamicFormInner = React.memo(
             changeSourceRef.current = 'setValues'
             const displayValues = reverseFieldTransforms(
               values,
-              schema,
+              buildEffectiveSchemaTree({
+                schema,
+                value: values,
+                callbacks: callbacksRef.current,
+                helpers: mergedHelpers,
+                variantStore,
+              }),
               callbacksRef.current,
               mergedHelpers,
+              variantStore,
             )
             operationController.beginBatch()
             try {
@@ -1004,9 +1050,16 @@ const DynamicFormInner = React.memo(
               if (values && Object.keys(values).length > 0) {
                 const reversed = reverseFieldTransforms(
                   values,
-                  schema,
+                  buildEffectiveSchemaTree({
+                    schema,
+                    value: values,
+                    callbacks: callbacksRef.current,
+                    helpers: mergedHelpers,
+                    variantStore,
+                  }),
                   callbacksRef.current,
                   mergedHelpers,
+                  variantStore,
                 )
                 const processed = wrapPrimitiveArrays(reversed, schema)
                 methods.reset(processed)
@@ -1049,21 +1102,20 @@ const DynamicFormInner = React.memo(
       React.useEffect(() => {
         if (onChange) {
           const subscription = watch((data, { name }) => {
-            const processedData = transformFormData(
-              data,
-              buildEffectiveSchemaTree({
-                schema,
-                value: data,
-                callbacks: callbacksRef.current,
-                helpers: mergedHelpers,
-                variantStore,
-              }),
-            )
+            const effectiveSchema = buildEffectiveSchemaTree({
+              schema,
+              value: data,
+              callbacks: callbacksRef.current,
+              helpers: mergedHelpers,
+              variantStore,
+            })
+            const processedData = transformFormData(data, effectiveSchema)
             const externalData = applyFieldTransforms(
               processedData,
-              schema,
+              effectiveSchema,
               callbacksRef.current,
               mergedHelpers,
+              variantStore,
             )
             // 以上一次对外快照为基线；首次通知没有旧快照时使用空对象。
             const previousData = previousChangeDataRef.current ?? {}
@@ -1243,15 +1295,16 @@ const DynamicFormInner = React.memo(
         async (data: Record<string, any>) => {
           if (onSubmit) {
             // 使用公共函数进行数据转换，包含过滤步骤
+            const effectiveSchema = buildEffectiveSchemaTree({
+              schema,
+              value: data,
+              callbacks: stableCallbacks,
+              helpers: mergedHelpers,
+              variantStore,
+            })
             const filteredData = transformFormData(
               data,
-              buildEffectiveSchemaTree({
-                schema,
-                value: data,
-                callbacks: stableCallbacks,
-                helpers: mergedHelpers,
-                variantStore,
-              }),
+              effectiveSchema,
               nestedSchemaRegistry || undefined,
               true, // 需要过滤数据
             )
@@ -1259,9 +1312,10 @@ const DynamicFormInner = React.memo(
             await onSubmit(
               applyFieldTransforms(
                 filteredData,
-                schema,
+                effectiveSchema,
                 stableCallbacks,
                 mergedHelpers,
+                variantStore,
               ),
             )
           }

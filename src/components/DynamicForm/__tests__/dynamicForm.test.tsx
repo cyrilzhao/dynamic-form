@@ -693,6 +693,308 @@ describe('DynamicForm', () => {
     })
   })
 
+  it('手动激活的 Variant 应在 getValues、onChange 和 onSubmit 中使用同一 transform', async () => {
+    const handleChange = jest.fn()
+    const handleSubmit = jest.fn()
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        value: {
+          type: 'string',
+          title: 'Value',
+          ui: {
+            widget: 'variant',
+            defaultVariant: 'alpha',
+            variants: [
+              {
+                name: 'alpha',
+                type: 'string',
+                widget: 'text',
+                schema: {
+                  ui: {
+                    transform: { callback: 'alphaToStorage' },
+                  },
+                },
+              },
+              {
+                name: 'beta',
+                type: 'string',
+                widget: 'text',
+                schema: {
+                  ui: {
+                    transform: { callback: 'betaToStorage' },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    }
+    const callbacks = {
+      alphaToStorage: ({ value }: { value: string }) => `alpha:${value}`,
+      betaToStorage: ({ value }: { value: string }) => `beta:${value}`,
+    }
+
+    const { formRef, container } = renderDynamicForm({
+      props: {
+        schema,
+        callbacks,
+        onChange: handleChange,
+        onSubmit: handleSubmit,
+      },
+    })
+    await waitForFormReady({ formRef })
+
+    fireEvent.click(screen.getByRole('button', { name: '选择 Variant' }))
+    fireEvent.click(screen.getByText('beta'))
+    await setFieldValue({ formRef, name: 'value', value: 'current' })
+
+    expect(formRef.current!.getValues()).toEqual({ value: 'beta:current' })
+    await waitFor(() => {
+      expect(handleChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ value: 'beta:current' }),
+        expect.objectContaining({ changes: expect.any(Array) }),
+      )
+    })
+
+    fireEvent.submit(container.querySelector('form')!)
+    await waitFor(() => {
+      expect(handleSubmit).toHaveBeenCalledWith({ value: 'beta:current' })
+    })
+  })
+
+  it('Variant 替换为数组后应递归应用 effective items 中字段的 transform', async () => {
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        entries: {
+          type: 'array',
+          title: 'Entries',
+          ui: {
+            widget: 'variant',
+            defaultVariant: 'list',
+            variants: [
+              {
+                name: 'list',
+                type: 'array',
+                widget: 'table-array',
+                schema: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      amount: {
+                        type: 'number',
+                        title: 'Amount',
+                        ui: { transform: { callback: 'amountToStorage' } },
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    }
+    const callbacks = {
+      amountToStorage: ({ value }: { value: number }) => value / 10,
+    }
+    const { formRef } = renderDynamicForm({ props: { schema, callbacks } })
+    await waitForFormReady({ formRef })
+
+    await act(async () => {
+      formRef.current!.setValues({ entries: [{ amount: 30 }] })
+    })
+
+    expect(formRef.current!.getValues()).toEqual({
+      entries: [{ amount: 3 }],
+    })
+  })
+
+  it('嵌套 object Variant 的子字段应使用当前激活 Variant 的 transform', async () => {
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        profile: {
+          type: 'object',
+          title: 'Profile',
+          ui: {
+            widget: 'variant',
+            defaultVariant: 'public',
+            variants: [
+              {
+                name: 'public',
+                type: 'object',
+                widget: 'object-editor',
+                schema: {
+                  type: 'object',
+                  properties: {
+                    name: {
+                      type: 'string',
+                      ui: { transform: { callback: 'publicToStorage' } },
+                    },
+                  },
+                },
+              },
+              {
+                name: 'private',
+                type: 'object',
+                widget: 'object-editor',
+                schema: {
+                  type: 'object',
+                  properties: {
+                    name: {
+                      type: 'string',
+                      ui: { transform: { callback: 'privateToStorage' } },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    }
+    const callbacks = {
+      publicToStorage: ({ value }: { value: string }) => `public:${value}`,
+      privateToStorage: ({ value }: { value: string }) => `private:${value}`,
+    }
+    const { formRef } = renderDynamicForm({ props: { schema, callbacks } })
+    await waitForFormReady({ formRef })
+
+    fireEvent.click(screen.getByRole('button', { name: '选择 Variant' }))
+    fireEvent.click(screen.getByText('private'))
+    await act(async () => {
+      formRef.current!.setValues({ profile: { name: 'current' } })
+    })
+
+    expect(formRef.current!.getValues()).toEqual({
+      profile: { name: 'private:current' },
+    })
+  })
+
+  it('普通数组 items 中的 Variant 应在导出时保留数组元素的 active transform', async () => {
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        entries: {
+          type: 'array',
+          title: 'Entries',
+          items: {
+            type: 'object',
+            properties: {
+              value: {
+                type: 'string',
+                title: 'Value',
+                ui: {
+                  widget: 'variant',
+                  defaultVariant: 'raw',
+                  variants: [
+                    {
+                      name: 'raw',
+                      type: 'string',
+                      widget: 'text',
+                      schema: {
+                        ui: { transform: { callback: 'rawToStorage' } },
+                      },
+                    },
+                    {
+                      name: 'encoded',
+                      type: 'string',
+                      widget: 'text',
+                      schema: {
+                        ui: { transform: { callback: 'encodedToStorage' } },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+    }
+    const callbacks = {
+      rawToStorage: ({ value }: { value: string }) => `raw:${value}`,
+      encodedToStorage: ({ value }: { value: string }) => `encoded:${value}`,
+    }
+    const { formRef } = renderDynamicForm({ props: { schema, callbacks } })
+    await waitForFormReady({ formRef })
+
+    await act(async () => {
+      formRef.current!.setValues({ entries: [{ value: 'current' }] })
+    })
+
+    expect(formRef.current!.getValues()).toEqual({
+      entries: [{ value: 'raw:current' }],
+    })
+  })
+
+  it('当前激活 Variant 的 reverseCallback 应用于 setValue 和 setValues', async () => {
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        value: {
+          type: 'string',
+          title: 'Value',
+          ui: {
+            widget: 'variant',
+            defaultVariant: 'alpha',
+            variants: [
+              {
+                name: 'alpha',
+                type: 'string',
+                widget: 'text',
+                schema: {
+                  ui: {
+                    transform: {
+                      callback: 'identity',
+                      reverseCallback: 'alphaToDisplay',
+                    },
+                  },
+                },
+              },
+              {
+                name: 'beta',
+                type: 'string',
+                widget: 'text',
+                schema: {
+                  ui: {
+                    transform: {
+                      callback: 'identity',
+                      reverseCallback: 'betaToDisplay',
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    }
+    const callbacks = {
+      identity: ({ value }: { value: string }) => value,
+      alphaToDisplay: ({ value }: { value: string }) => `alpha:${value}`,
+      betaToDisplay: ({ value }: { value: string }) => `beta:${value}`,
+    }
+    const { formRef, container } = renderDynamicForm({
+      props: { schema, callbacks },
+    })
+    await waitForFormReady({ formRef })
+
+    fireEvent.click(screen.getByRole('button', { name: '选择 Variant' }))
+    fireEvent.click(screen.getByText('beta'))
+    await act(async () => {
+      formRef.current!.setValues({ value: 'stored' })
+    })
+
+    expect(getInputByName({ container, name: 'value' })).toHaveValue(
+      'beta:stored',
+    )
+  })
+
   it('onChange 应该提供字段级变更元数据', async () => {
     const handleChange = jest.fn()
     const schema: ExtendedJSONSchema = {
