@@ -1024,7 +1024,6 @@ describe('DynamicForm', () => {
               previousValue: undefined,
               value: 'Ada',
               source: 'setValue',
-              action: 'update',
             }),
           ],
         }),

@@ -16,7 +16,7 @@ import { SchemaParser } from './core/SchemaParser'
 import { FormField } from './layout/FormField'
 import { ErrorList } from './components/ErrorList'
 import type { DynamicFormProps, DynamicFormRef } from './types'
-import type { FieldChangeSource, FormChangeMeta } from './types'
+import type { ArrayAction, FieldChangeSource, FormChangeMeta } from './types'
 import {
   parseSchemaLinkages,
   transformToAbsolutePaths,
@@ -56,6 +56,11 @@ import { mergeSchemaWithLinkage } from './utils/mergeSchemaWithLinkage'
 import { LinkageOperationController } from './utils/linkageOperationController'
 import { builtInHelpers } from './utils/builtInHelpers'
 import {
+  registerArrayActionStore,
+  consumeLatestArrayAction,
+  peekArrayAction,
+} from './utils/arrayActionRegistry'
+import {
   createFieldVariantStore,
   FieldVariantProvider,
   useFieldVariantStoreOptional,
@@ -79,12 +84,48 @@ const EMPTY_HELPERS = {}
  * 该函数独立于 watch 订阅，便于同时服务带路径和无路径的 RHF 通知；
  * Select 多选不属于结构操作，因此显式排除。
  */
+function isDeepEqual(previousValue: unknown, value: unknown): boolean {
+  if (Object.is(previousValue, value)) return true
+  if (Array.isArray(previousValue) && Array.isArray(value)) {
+    return (
+      previousValue.length === value.length &&
+      previousValue.every((item, index) => isDeepEqual(item, value[index]))
+    )
+  }
+  if (
+    previousValue &&
+    value &&
+    typeof previousValue === 'object' &&
+    typeof value === 'object'
+  ) {
+    const previousKeys = Object.keys(previousValue as Record<string, unknown>)
+    const valueRecord = value as Record<string, unknown>
+    return (
+      previousKeys.length === Object.keys(valueRecord).length &&
+      previousKeys.every(
+        (key) =>
+          key in valueRecord &&
+          isDeepEqual(
+            (previousValue as Record<string, unknown>)[key],
+            valueRecord[key],
+          ),
+      )
+    )
+  }
+  return false
+}
+
 function inferArrayAction(
   schema: ExtendedJSONSchema,
   path: string,
   previousValue: unknown,
   value: unknown,
-): 'append' | 'remove' | 'moveUp' | 'moveDown' | undefined {
+): ArrayAction | undefined {
+  if (previousValue === undefined && Array.isArray(value)) {
+    return value.length > 0
+      ? { action: 'insert', index: 0, value: value[0] }
+      : undefined
+  }
   // 仅对动态数组结构推断动作；Select 多选数组属于值更新，不应标记数组结构操作。
   const fieldSchema = getSchemaAtPath(schema, path)
   if (
@@ -96,10 +137,38 @@ function inferArrayAction(
     return undefined
   }
   if (value.length > previousValue.length) {
-    return 'append'
+    if (value.length !== previousValue.length + 1) return undefined
+    const candidates = value
+      .map((_, index) => index)
+      .filter((insertIndex) =>
+        previousValue.every((item, i) =>
+          i < insertIndex
+            ? isDeepEqual(item, value[i])
+            : isDeepEqual(item, value[i + 1]),
+        ),
+      )
+    return candidates.length === 1
+      ? { action: 'insert', index: candidates[0], value: value[candidates[0]] }
+      : undefined
   }
   if (value.length < previousValue.length) {
-    return 'remove'
+    if (previousValue.length !== value.length + 1) return undefined
+    const candidates = previousValue
+      .map((_, index) => index)
+      .filter((removeIndex) =>
+        value.every((item, i) =>
+          i < removeIndex
+            ? isDeepEqual(item, previousValue[i])
+            : isDeepEqual(item, previousValue[i + 1]),
+        ),
+      )
+    return candidates.length === 1
+      ? {
+          action: 'remove',
+          index: candidates[0],
+          value: previousValue[candidates[0]],
+        }
+      : undefined
   }
   // 首个差异位置用于判断相邻元素发生了上移还是下移。
   const changedIndex = value.findIndex(
@@ -110,17 +179,27 @@ function inferArrayAction(
   }
   if (
     changedIndex < value.length - 1 &&
-    Object.is(value[changedIndex], previousValue[changedIndex + 1]) &&
-    Object.is(value[changedIndex + 1], previousValue[changedIndex])
+    isDeepEqual(value[changedIndex], previousValue[changedIndex + 1]) &&
+    isDeepEqual(value[changedIndex + 1], previousValue[changedIndex])
   ) {
-    return 'moveUp'
+    return {
+      action: 'move',
+      fromIndex: changedIndex + 1,
+      toIndex: changedIndex,
+      value: value[changedIndex],
+    }
   }
   if (
     changedIndex > 0 &&
-    Object.is(value[changedIndex], previousValue[changedIndex - 1]) &&
-    Object.is(value[changedIndex - 1], previousValue[changedIndex])
+    isDeepEqual(value[changedIndex], previousValue[changedIndex - 1]) &&
+    isDeepEqual(value[changedIndex - 1], previousValue[changedIndex])
   ) {
-    return 'moveDown'
+    return {
+      action: 'move',
+      fromIndex: changedIndex - 1,
+      toIndex: changedIndex,
+      value: value[changedIndex],
+    }
   }
   return undefined
 }
@@ -774,6 +853,13 @@ const DynamicFormInner = React.memo(
       const pendingDataRef = useRef<Record<string, any> | null>(null)
       // 延迟 flush 的定时器句柄，用于合并连续同步写入。
       const changeFlushTimerRef = useRef<number | null>(null)
+      const arrayActionStore = useRef<{
+        path: string
+        action: ArrayAction
+      } | null>(null)
+      registerArrayActionStore(methods.control, arrayActionStore)
+      const latestOnChangeRef = useRef(onChange)
+      latestOnChangeRef.current = onChange
 
       // ✅ 使用 useRef 保持 refreshLinkage 引用，避免循环依赖
       // const refreshLinkageRef = React.useRef<() => void>(() => {});
@@ -1056,6 +1142,8 @@ const DynamicFormInner = React.memo(
           reset: (values) => {
             operationController.markFormMutation()
             const previousSource = changeSourceRef.current
+            const previousMutationSource =
+              operationController.setMutationSource('reset')
             changeSourceRef.current = 'reset'
             try {
               if (values && Object.keys(values).length > 0) {
@@ -1083,6 +1171,12 @@ const DynamicFormInner = React.memo(
               }
             } finally {
               changeSourceRef.current = previousSource
+              // RHF 的 reset/setValue 通知可能在当前调用栈结束后才派发，保持来源到下一轮事件循环。
+              window.setTimeout(
+                () =>
+                  operationController.setMutationSource(previousMutationSource),
+                0,
+              )
             }
           },
           validate: async (name) => {
@@ -1107,7 +1201,15 @@ const DynamicFormInner = React.memo(
             await refreshLinkage()
           },
         }),
-        [methods, schema, refreshLinkage, operationController, mergedHelpers, setValueWithoutLinkage, variantStore],
+        [
+          methods,
+          schema,
+          refreshLinkage,
+          operationController,
+          mergedHelpers,
+          setValueWithoutLinkage,
+          variantStore,
+        ],
       )
 
       React.useEffect(() => {
@@ -1134,6 +1236,24 @@ const DynamicFormInner = React.memo(
             const changes: FormChangeMeta['changes'] = []
             // RHF 路径优先；缺失时使用 setValue 保存的兜底路径。
             let changePath = name ?? pendingChangePathRef.current
+            const pendingArrayRecord = peekArrayAction(methods.control)
+            const explicitRecord =
+              pendingArrayRecord &&
+              (changePath === pendingArrayRecord.path ||
+                pendingArrayRecord.action.action === 'move')
+                ? consumeLatestArrayAction(methods.control)
+                : undefined
+            if (explicitRecord && explicitRecord.action.action === 'move') {
+              changePath = explicitRecord.path
+            }
+            const explicitArrayAction =
+              explicitRecord &&
+              changePath &&
+              (changePath === explicitRecord.path ||
+                changePath.startsWith(`${explicitRecord.path}.`))
+                ? explicitRecord.action
+                : undefined
+            if (!changePath && explicitRecord) changePath = explicitRecord.path
             if (changePath && name && changePath.match(/\.\d+\.value$/)) {
               // 基本类型数组内部使用 path.value 包装，外部数据则使用数组元素路径。
               const primitiveArrayPath = changePath.replace(/\.value$/, '')
@@ -1173,22 +1293,21 @@ const DynamicFormInner = React.memo(
                 externalData,
                 changePath,
               )
-              if (!Object.is(previousValue, value)) {
+              if (!isDeepEqual(previousValue, value)) {
+                const arrayAction =
+                  explicitArrayAction ??
+                  inferArrayAction(schema, changePath, previousValue, value)
                 changes.push({
                   path: changePath,
                   previousValue,
                   value,
                   source: name
-                    ? changeSourceRef.current
+                    ? operationController.getMutationSource() === 'linkage'
+                      ? 'linkage'
+                      : changeSourceRef.current
                     : (pendingChangeSourceRef.current ??
                       changeSourceRef.current),
-                  action: value === undefined ? 'remove' : 'update',
-                  arrayAction: inferArrayAction(
-                    schema,
-                    changePath,
-                    previousValue,
-                    value,
-                  ),
+                  ...(arrayAction ? { arrayAction } : {}),
                 })
               }
               pendingChangePathRef.current = null
@@ -1201,14 +1320,9 @@ const DynamicFormInner = React.memo(
                   path,
                 )
                 const value = PathResolver.getNestedValue(externalData, path)
-                if (!Object.is(previousValue, value)) {
+                if (!isDeepEqual(previousValue, value)) {
                   // 推断数组长度变化或相邻元素交换，供业务区分结构操作。
-                  let arrayAction:
-                    | 'append'
-                    | 'remove'
-                    | 'moveUp'
-                    | 'moveDown'
-                    | undefined
+                  let arrayAction: ArrayAction | undefined
                   // 当前路径对应的 schema，用于排除 Select 多选数组。
                   const fieldSchema = getSchemaAtPath(schema, path)
                   if (
@@ -1218,9 +1332,25 @@ const DynamicFormInner = React.memo(
                     Array.isArray(value)
                   ) {
                     if (value.length > previousValue.length) {
-                      arrayAction = 'append'
+                      const index = previousValue.findIndex(
+                        (item, i) => !isDeepEqual(item, value[i]),
+                      )
+                      const insertIndex = index < 0 ? value.length - 1 : index
+                      arrayAction = {
+                        action: 'insert',
+                        index: insertIndex,
+                        value: value[insertIndex],
+                      }
                     } else if (value.length < previousValue.length) {
-                      arrayAction = 'remove'
+                      const index = value.findIndex(
+                        (item, i) => !isDeepEqual(item, previousValue[i]),
+                      )
+                      const removeIndex = index < 0 ? value.length : index
+                      arrayAction = {
+                        action: 'remove',
+                        index: removeIndex,
+                        value: previousValue[removeIndex],
+                      }
                     } else {
                       // 计算数组首个差异索引，识别相邻元素移动方向。
                       const changedIndex = value.findIndex(
@@ -1229,28 +1359,38 @@ const DynamicFormInner = React.memo(
                       if (
                         changedIndex >= 0 &&
                         changedIndex < value.length - 1 &&
-                        Object.is(
+                        isDeepEqual(
                           value[changedIndex],
                           previousValue[changedIndex + 1],
                         ) &&
-                        Object.is(
+                        isDeepEqual(
                           value[changedIndex + 1],
                           previousValue[changedIndex],
                         )
                       ) {
-                        arrayAction = 'moveUp'
+                        arrayAction = {
+                          action: 'move',
+                          fromIndex: changedIndex + 1,
+                          toIndex: changedIndex,
+                          value: value[changedIndex],
+                        }
                       } else if (
                         changedIndex > 0 &&
-                        Object.is(
+                        isDeepEqual(
                           value[changedIndex],
                           previousValue[changedIndex - 1],
                         ) &&
-                        Object.is(
+                        isDeepEqual(
                           value[changedIndex - 1],
                           previousValue[changedIndex],
                         )
                       ) {
-                        arrayAction = 'moveDown'
+                        arrayAction = {
+                          action: 'move',
+                          fromIndex: changedIndex - 1,
+                          toIndex: changedIndex,
+                          value: value[changedIndex],
+                        }
                       }
                     }
                   }
@@ -1258,9 +1398,8 @@ const DynamicFormInner = React.memo(
                     path,
                     previousValue,
                     value,
-                    source: changeSourceRef.current,
-                    action: value === undefined ? 'remove' : 'update',
-                    arrayAction,
+                    source: operationController.getMutationSource(),
+                    ...(arrayAction ? { arrayAction } : {}),
                   })
                 }
               })
@@ -1273,21 +1412,27 @@ const DynamicFormInner = React.memo(
               )
               if (existing) {
                 existing.value = change.value
-                existing.action = change.action
                 existing.source = change.source
+                existing.arrayAction = change.arrayAction
               } else {
                 pendingChangesRef.current.push(change)
               }
             })
-            if (changeFlushTimerRef.current === null) {
+            if (
+              pendingChangesRef.current.length > 0 &&
+              changeFlushTimerRef.current === null
+            ) {
               changeFlushTimerRef.current = window.setTimeout(() => {
                 changeFlushTimerRef.current = null
                 const nextData = pendingDataRef.current
                 if (nextData) {
-                  onChange(nextData, { changes: pendingChangesRef.current })
+                  const changesSnapshot = pendingChangesRef.current
+                  pendingChangesRef.current = []
+                  pendingDataRef.current = null
+                  latestOnChangeRef.current?.(nextData, {
+                    changes: changesSnapshot,
+                  })
                 }
-                pendingDataRef.current = null
-                pendingChangesRef.current = []
               }, 0)
             }
           })
@@ -1297,9 +1442,11 @@ const DynamicFormInner = React.memo(
               clearTimeout(changeFlushTimerRef.current)
               changeFlushTimerRef.current = null
             }
+            pendingChangesRef.current = []
+            pendingDataRef.current = null
           }
         }
-      }, [watch, onChange, schema, mergedHelpers, variantStore])
+      }, [watch])
 
       // ✅ 使用 useCallback 缓存 onSubmitHandler，避免每次渲染创建新函
       const onSubmitHandler = useCallback(
