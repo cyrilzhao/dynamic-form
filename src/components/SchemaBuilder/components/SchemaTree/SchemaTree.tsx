@@ -127,7 +127,17 @@ export const SchemaTree: React.FC = () => {
         </Menu>
       )
     },
-    [schema, onAddChild, onAddSibling, onMoveUp, onMoveDown, onDelete]
+    [
+      schema,
+      onAddChild,
+      onAddSibling,
+      onMoveUp,
+      onMoveDown,
+      onDelete,
+      hideAdd,
+      hideDelete,
+      hideReorder,
+    ]
   )
 
   const buildTreeNodes = useCallback(

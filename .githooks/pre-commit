@@ -1,0 +1,6 @@
+#!/bin/sh
+
+set -eu
+
+# 仅处理暂存文件：代码先由 Prettier 格式化，再由 ESLint 自动修复。
+./node_modules/.bin/lint-staged

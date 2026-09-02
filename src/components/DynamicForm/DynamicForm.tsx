@@ -16,6 +16,7 @@ import { SchemaParser } from './core/SchemaParser'
 import { FormField } from './layout/FormField'
 import { ErrorList } from './components/ErrorList'
 import type { DynamicFormProps, DynamicFormRef } from './types'
+import type { FieldChangeSource, FormChangeMeta } from './types'
 import {
   parseSchemaLinkages,
   transformToAbsolutePaths,
@@ -50,6 +51,7 @@ import {
 } from './utils/extractSchemaDefaults'
 import { createSchemaResolver } from './utils/createSchemaResolver'
 import { resolveTransformFn } from './utils/resolveTransformFn'
+import { PathResolver } from './utils/pathResolver'
 import { mergeSchemaWithLinkage } from './utils/mergeSchemaWithLinkage'
 import { LinkageOperationController } from './utils/linkageOperationController'
 import { builtInHelpers } from './utils/builtInHelpers'
@@ -73,6 +75,57 @@ const EMPTY_CALLBACKS = {}
 const EMPTY_HELPERS = {}
 
 /**
+ * 根据数组前后快照推断结构动作。
+ * 该函数独立于 watch 订阅，便于同时服务带路径和无路径的 RHF 通知；
+ * Select 多选不属于结构操作，因此显式排除。
+ */
+function inferArrayAction(
+  schema: ExtendedJSONSchema,
+  path: string,
+  previousValue: unknown,
+  value: unknown,
+): 'append' | 'remove' | 'moveUp' | 'moveDown' | undefined {
+  // 仅对动态数组结构推断动作；Select 多选数组属于值更新，不应标记数组结构操作。
+  const fieldSchema = getSchemaAtPath(schema, path)
+  if (
+    fieldSchema?.type !== 'array' ||
+    fieldSchema.ui?.widget === 'select' ||
+    !Array.isArray(previousValue) ||
+    !Array.isArray(value)
+  ) {
+    return undefined
+  }
+  if (value.length > previousValue.length) {
+    return 'append'
+  }
+  if (value.length < previousValue.length) {
+    return 'remove'
+  }
+  // 首个差异位置用于判断相邻元素发生了上移还是下移。
+  const changedIndex = value.findIndex(
+    (item, index) => !Object.is(item, previousValue[index]),
+  )
+  if (changedIndex < 0) {
+    return undefined
+  }
+  if (
+    changedIndex < value.length - 1 &&
+    Object.is(value[changedIndex], previousValue[changedIndex + 1]) &&
+    Object.is(value[changedIndex + 1], previousValue[changedIndex])
+  ) {
+    return 'moveUp'
+  }
+  if (
+    changedIndex > 0 &&
+    Object.is(value[changedIndex], previousValue[changedIndex - 1]) &&
+    Object.is(value[changedIndex - 1], previousValue[changedIndex])
+  ) {
+    return 'moveDown'
+  }
+  return undefined
+}
+
+/**
  * 递归展开嵌套对象，对每层路径都调用 setValue
  *
  * NestedFormWidget 的对象路径是结构节点，实际值由 address.street 等叶子 Controller 管理。
@@ -88,7 +141,7 @@ function setValuesRecursive(
     shouldDirty?: boolean
     shouldTouch?: boolean
   },
-  prefix = ''
+  prefix = '',
 ) {
   Object.entries(obj || {}).forEach(([key, value]) => {
     const path = prefix ? `${prefix}.${key}` : key
@@ -185,7 +238,7 @@ function transformFormData(
   nestedSchemaRegistry?: {
     getAllSchemas: () => Map<string, ExtendedJSONSchema>
   },
-  shouldFilter: boolean = false
+  shouldFilter: boolean = false,
 ): Record<string, any> {
   // 第一步：解包基本类型数组。Variant 解析由调用方提前完成，保持本函数纯粹。
   let processedData = unwrapPrimitiveArrays(data, schema)
@@ -196,7 +249,7 @@ function transformFormData(
       ? filterValueWithNestedSchemas(
           processedData,
           schema,
-          nestedSchemaRegistry.getAllSchemas()
+          nestedSchemaRegistry.getAllSchemas(),
         )
       : filterValueWithNestedSchemas(processedData, schema, new Map())
   }
@@ -210,13 +263,17 @@ function resolveVariantForValue(
   callbacks: Record<string, (...args: any[]) => any> = {},
   helpers: Record<string, any> = {},
   path = '',
-  variantStore?: ReturnType<typeof createFieldVariantStore>
+  variantStore?: ReturnType<typeof createFieldVariantStore>,
 ) {
   const variants = fieldSchema.ui?.variants
-  if (!variants?.length) return null
+  if (!variants?.length) {
+    return null
+  }
   const activeName = variantStore?.getActive(path)
   const activeVariant = variants.find((variant) => variant.name === activeName)
-  if (activeVariant) return activeVariant
+  if (activeVariant) {
+    return activeVariant
+  }
   const detected = detectVariantSync({
     variants,
     value,
@@ -234,7 +291,7 @@ function getEffectiveVariantSchema(
   callbacks: Record<string, (...args: any[]) => any> = {},
   helpers: Record<string, any> = {},
   path = '',
-  variantStore?: ReturnType<typeof createFieldVariantStore>
+  variantStore?: ReturnType<typeof createFieldVariantStore>,
 ): ExtendedJSONSchema {
   const variant = resolveVariantForValue(
     fieldSchema,
@@ -242,9 +299,11 @@ function getEffectiveVariantSchema(
     callbacks,
     helpers,
     path,
-    variantStore
+    variantStore,
   )
-  if (!variant) return fieldSchema
+  if (!variant) {
+    return fieldSchema
+  }
   return buildVariantSchema(fieldSchema, variant)
 }
 
@@ -269,7 +328,7 @@ function buildEffectiveSchemaTree({
     callbacks,
     helpers,
     path,
-    variantStore
+    variantStore,
   )
   if (effective.properties && value && typeof value === 'object') {
     effective.properties = Object.fromEntries(
@@ -283,8 +342,22 @@ function buildEffectiveSchemaTree({
           variantStore,
           path: path ? `${path}.${key}` : key,
         }),
-      ])
+      ]),
     )
+  }
+  if (
+    effective.type === 'array' &&
+    !Array.isArray(effective.items) &&
+    effective.items
+  ) {
+    effective.items = buildEffectiveSchemaTree({
+      schema: effective.items as ExtendedJSONSchema,
+      value: Array.isArray(value) ? value[0] : undefined,
+      callbacks,
+      helpers,
+      variantStore,
+      path: path ? `${path}.items` : 'items',
+    })
   }
   return effective
 }
@@ -300,7 +373,9 @@ function applyFieldTransforms(
   data: any,
   schema: ExtendedJSONSchema,
   callbacks: Record<string, (...args: any[]) => any>,
-  helpers: Record<string, any>
+  helpers: Record<string, any>,
+  variantStore?: ReturnType<typeof createFieldVariantStore>,
+  path = '',
 ): any {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return data
@@ -310,13 +385,7 @@ function applyFieldTransforms(
     if (!(key in result)) {
       continue
     }
-    const fieldSchema = rawSchema as ExtendedJSONSchema
-    const effectiveSchema = getEffectiveVariantSchema(
-      fieldSchema,
-      result[key],
-      callbacks,
-      helpers
-    )
+    const effectiveSchema = rawSchema as ExtendedJSONSchema
     const cb = effectiveSchema.ui?.transform?.callback
     const fn = resolveTransformFn(cb, callbacks)
     if (fn) {
@@ -332,23 +401,38 @@ function applyFieldTransforms(
         result[key],
         effectiveSchema,
         callbacks,
-        helpers
+        helpers,
+        variantStore,
+        path ? `${path}.${key}` : key,
       )
     }
     if (
-      fieldSchema.type === 'array' &&
-      !Array.isArray(fieldSchema.items) &&
-      fieldSchema.items &&
+      effectiveSchema.type === 'array' &&
+      !Array.isArray(effectiveSchema.items) &&
+      effectiveSchema.items &&
       Array.isArray(result[key])
     ) {
-      result[key] = (result[key] as any[]).map((item) =>
-        applyFieldTransforms(
+      result[key] = (result[key] as any[]).map((item, index) => {
+        const itemPath = path ? `${path}.${key}.${index}` : `${key}.${index}`
+        const effectiveItemSchema = variantStore
+          ? buildEffectiveSchemaTree({
+              schema: effectiveSchema.items as ExtendedJSONSchema,
+              value: item,
+              callbacks,
+              helpers,
+              variantStore,
+              path: itemPath,
+            })
+          : (effectiveSchema.items as ExtendedJSONSchema)
+        return applyFieldTransforms(
           item,
-          fieldSchema.items as ExtendedJSONSchema,
+          effectiveItemSchema,
           callbacks,
-          helpers
+          helpers,
+          variantStore,
+          itemPath,
         )
-      )
+      })
     }
   }
   return result
@@ -362,7 +446,7 @@ function applyFieldTransforms(
  */
 function getSchemaAtPath(
   schema: ExtendedJSONSchema,
-  path: string
+  path: string,
 ): ExtendedJSONSchema | undefined {
   const parts = path.split('.')
   let current: ExtendedJSONSchema = schema
@@ -391,7 +475,9 @@ function reverseFieldTransforms(
   data: any,
   schema: ExtendedJSONSchema,
   callbacks: Record<string, (...args: any[]) => any>,
-  helpers: Record<string, any>
+  helpers: Record<string, any>,
+  variantStore?: ReturnType<typeof createFieldVariantStore>,
+  path = '',
 ): any {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return data
@@ -401,13 +487,7 @@ function reverseFieldTransforms(
     if (!(key in result)) {
       continue
     }
-    const fieldSchema = rawSchema as ExtendedJSONSchema
-    const effectiveSchema = getEffectiveVariantSchema(
-      fieldSchema,
-      result[key],
-      callbacks,
-      helpers
-    )
+    const effectiveSchema = rawSchema as ExtendedJSONSchema
     const cb = effectiveSchema.ui?.transform?.reverseCallback
     const fn = resolveTransformFn(cb, callbacks)
     if (fn) {
@@ -423,7 +503,9 @@ function reverseFieldTransforms(
         result[key],
         effectiveSchema,
         callbacks,
-        helpers
+        helpers,
+        variantStore,
+        path ? `${path}.${key}` : key,
       )
     }
     if (
@@ -432,14 +514,27 @@ function reverseFieldTransforms(
       effectiveSchema.items &&
       Array.isArray(result[key])
     ) {
-      result[key] = (result[key] as any[]).map((item) =>
-        reverseFieldTransforms(
+      result[key] = (result[key] as any[]).map((item, index) => {
+        const itemPath = path ? `${path}.${key}.${index}` : `${key}.${index}`
+        const effectiveItemSchema = variantStore
+          ? buildEffectiveSchemaTree({
+              schema: effectiveSchema.items as ExtendedJSONSchema,
+              value: item,
+              callbacks,
+              helpers,
+              variantStore,
+              path: itemPath,
+            })
+          : (effectiveSchema.items as ExtendedJSONSchema)
+        return reverseFieldTransforms(
           item,
-          effectiveSchema.items as ExtendedJSONSchema,
+          effectiveItemSchema,
           callbacks,
-          helpers
+          helpers,
+          variantStore,
+          itemPath,
         )
-      )
+      })
     }
   }
   return result
@@ -458,7 +553,7 @@ function reverseFieldTransforms(
  */
 function isFieldHiddenByLinkage(
   fieldPath: string,
-  linkageStates: Record<string, { visible?: boolean }>
+  linkageStates: Record<string, { visible?: boolean }>,
 ): boolean {
   // 检查字段自身的联动状态
   if (linkageStates[fieldPath]?.visible === false) {
@@ -518,7 +613,7 @@ const DynamicFormInner = React.memo(
         enableVirtualScroll = false,
         virtualScrollHeight = 600,
       },
-      ref
+      ref,
     ) => {
       // ========== Context 获取（集中管理） ==========
       const parentFormContext = useFormContext()
@@ -558,7 +653,7 @@ const DynamicFormInner = React.memo(
           ...builtInHelpers,
           ...stableHelpers,
         }),
-        [stableHelpers]
+        [stableHelpers],
       )
       const parentVariantStore = useFieldVariantStoreOptional()
       const ownVariantStore = useMemo(() => createFieldVariantStore(), [])
@@ -635,7 +730,7 @@ const DynamicFormInner = React.memo(
           linkageStatesRef,
           helpersRef,
           stableCustomFormats,
-          variantStore
+          variantStore,
         ),
       })
 
@@ -663,6 +758,23 @@ const DynamicFormInner = React.memo(
         useRef<{ [key in string]: (...args: any) => any }>(stableCallbacks)
       callbacksRef.current = stableCallbacks
 
+      // 当前写入来源；用户输入为默认值，ref API 操作期间临时切换来源。
+      const changeSourceRef = useRef<FieldChangeSource>('user')
+      // 保存上一次对外快照，用于计算字段 previousValue。
+      const previousChangeDataRef = useRef<Record<string, any> | null>(null)
+      // RHF 未提供路径时，保存 setValue 指定的路径作为兜底。
+      const pendingChangePathRef = useRef<string | null>(null)
+      // 保存兜底路径对应的来源，避免异步 watch 丢失操作语义。
+      const pendingChangeSourceRef = useRef<FieldChangeSource | null>(null)
+      // 保存 setValue 调用前的原值，供 watch 计算差异。
+      const pendingPreviousValueRef = useRef<unknown>(undefined)
+      // 聚合同一事件循环内的多个字段变化，最终一次性 flush。
+      const pendingChangesRef = useRef<FormChangeMeta['changes']>([])
+      // 保存当前待 flush 的完整表单快照。
+      const pendingDataRef = useRef<Record<string, any> | null>(null)
+      // 延迟 flush 的定时器句柄，用于合并连续同步写入。
+      const changeFlushTimerRef = useRef<number | null>(null)
+
       // ✅ 使用 useRef 保持 refreshLinkage 引用，避免循环依赖
       // const refreshLinkageRef = React.useRef<() => void>(() => {});
 
@@ -682,7 +794,7 @@ const DynamicFormInner = React.memo(
         //   );
         // }
         return parsed
-      }, [schema, pathPrefix, asNestedForm])
+      }, [schema])
 
       // 统一处理联动配置：路径转换 -> 过滤父级联动
       const { processedLinkages, formToUse, effectiveLinkageFunctions } =
@@ -692,7 +804,7 @@ const DynamicFormInner = React.memo(
           if (asNestedForm && pathPrefix) {
             const transformed = transformToAbsolutePaths(
               rawLinkages,
-              pathPrefix
+              pathPrefix,
             )
 
             // 过滤掉已经由外层 DynamicForm 负责的联动配置。
@@ -762,7 +874,6 @@ const DynamicFormInner = React.memo(
           rawLinkages,
           asNestedForm,
           pathPrefix,
-          inheritedLinkageStateContext?.parentLinkageStates,
           inheritedLinkageStateContext?.parentLinkages,
           inheritedLinkageStateContext?.form,
           inheritedLinkageStateContext?.linkageFunctions,
@@ -805,7 +916,7 @@ const DynamicFormInner = React.memo(
           return merged
         }
         return { ...ownLinkageStates }
-      }, [inheritedLinkageStateContext, ownLinkageStates, pathPrefix])
+      }, [inheritedLinkageStateContext?.parentLinkageStates, ownLinkageStates])
 
       // 同步更新 ref，确保 resolver 始终使用最新联动状态
       linkageStatesRef.current = linkageStates
@@ -828,18 +939,31 @@ const DynamicFormInner = React.memo(
                   fieldSchema,
                   value,
                   callbacksRef.current,
-                  mergedHelpers
+                  mergedHelpers,
+                  name,
+                  variantStore,
                 )
               : undefined
             const reverseFn = resolveTransformFn(
               effectiveSchema?.ui?.transform?.reverseCallback,
-              callbacksRef.current
+              callbacksRef.current,
             )
-            methods.setValue(
-              name,
-              reverseFn ? reverseFn({ value, helpers: mergedHelpers }) : value,
-              options
-            )
+            const previousSource = changeSourceRef.current
+            changeSourceRef.current = 'setValue'
+            pendingChangePathRef.current = name
+            pendingChangeSourceRef.current = 'setValue'
+            pendingPreviousValueRef.current = methods.getValues(name as any)
+            try {
+              methods.setValue(
+                name,
+                reverseFn
+                  ? reverseFn({ value, helpers: mergedHelpers })
+                  : value,
+                options,
+              )
+            } finally {
+              changeSourceRef.current = previousSource
+            }
           },
           getValue: (name: string) => {
             const displayValue = methods.getValues(name as any)
@@ -849,12 +973,14 @@ const DynamicFormInner = React.memo(
                   fieldSchema,
                   displayValue,
                   callbacksRef.current,
-                  mergedHelpers
+                  mergedHelpers,
+                  name,
+                  variantStore,
                 )
               : undefined
             const fn = resolveTransformFn(
               effectiveSchema?.ui?.transform?.callback,
-              callbacksRef.current
+              callbacksRef.current,
             )
             return fn
               ? fn({ value: displayValue, helpers: mergedHelpers })
@@ -862,31 +988,39 @@ const DynamicFormInner = React.memo(
           },
           getValues: () => {
             const displayValues = methods.getValues()
-            return applyFieldTransforms(
-              transformFormData(
-                displayValues,
-                buildEffectiveSchemaTree({
-                  schema,
-                  value: displayValues,
-                  callbacks: callbacksRef.current,
-                  helpers: mergedHelpers,
-                  variantStore,
-                })
-              ),
+            const effectiveSchema = buildEffectiveSchemaTree({
               schema,
+              value: displayValues,
+              callbacks: callbacksRef.current,
+              helpers: mergedHelpers,
+              variantStore,
+            })
+            return applyFieldTransforms(
+              transformFormData(displayValues, effectiveSchema),
+              effectiveSchema,
               callbacksRef.current,
-              mergedHelpers
+              mergedHelpers,
+              variantStore,
             )
           },
           setValues: (values, options) => {
             // 外部批量写入代表表单快照整体变化，必须先递增版本，让所有旧异步联动失效。
             // 之后再进入 batch，把递归 setValue 触发的多次 watch 合并为一次最终快照刷新。
             operationController.markFormMutation()
+            const previousSource = changeSourceRef.current
+            changeSourceRef.current = 'setValues'
             const displayValues = reverseFieldTransforms(
               values,
-              schema,
+              buildEffectiveSchemaTree({
+                schema,
+                value: values,
+                callbacks: callbacksRef.current,
+                helpers: mergedHelpers,
+                variantStore,
+              }),
               callbacksRef.current,
-              mergedHelpers
+              mergedHelpers,
+              variantStore,
             )
             operationController.beginBatch()
             try {
@@ -916,25 +1050,39 @@ const DynamicFormInner = React.memo(
                 // 不 await 是为了保持 setValues 现有 void API；refreshLinkage 内部仍有 token 保护。
                 void refreshLinkage()
               }
+              changeSourceRef.current = previousSource
             }
           },
           reset: (values) => {
             operationController.markFormMutation()
-            if (values && Object.keys(values).length > 0) {
-              const reversed = reverseFieldTransforms(
-                values,
-                schema,
-                callbacksRef.current,
-                mergedHelpers
-              )
-              const processed = wrapPrimitiveArrays(reversed, schema)
-              methods.reset(processed)
-              setValuesRecursive(methods, processed)
-            } else {
-              // 清空：构建类型恰当的空值，确保受控组件正确清除
-              const emptyValues = buildEmptyValues(schema)
-              methods.reset(emptyValues)
-              setValuesRecursive(methods, emptyValues)
+            const previousSource = changeSourceRef.current
+            changeSourceRef.current = 'reset'
+            try {
+              if (values && Object.keys(values).length > 0) {
+                const reversed = reverseFieldTransforms(
+                  values,
+                  buildEffectiveSchemaTree({
+                    schema,
+                    value: values,
+                    callbacks: callbacksRef.current,
+                    helpers: mergedHelpers,
+                    variantStore,
+                  }),
+                  callbacksRef.current,
+                  mergedHelpers,
+                  variantStore,
+                )
+                const processed = wrapPrimitiveArrays(reversed, schema)
+                methods.reset(processed)
+                setValuesRecursive(methods, processed)
+              } else {
+                // 清空：构建类型恰当的空值，确保受控组件正确清除
+                const emptyValues = buildEmptyValues(schema)
+                methods.reset(emptyValues)
+                setValuesRecursive(methods, emptyValues)
+              }
+            } finally {
+              changeSourceRef.current = previousSource
             }
           },
           validate: async (name) => {
@@ -959,64 +1107,238 @@ const DynamicFormInner = React.memo(
             await refreshLinkage()
           },
         }),
-        [methods, schema, refreshLinkage, operationController]
+        [methods, schema, refreshLinkage, operationController, mergedHelpers, setValueWithoutLinkage, variantStore],
       )
 
       React.useEffect(() => {
         if (onChange) {
-          const subscription = watch((data) => {
-            const processedData = transformFormData(
-              data,
-              buildEffectiveSchemaTree({
-                schema,
-                value: data,
-                callbacks: callbacksRef.current,
-                helpers: mergedHelpers,
-                variantStore,
-              })
+          const subscription = watch((data, { name }) => {
+            const effectiveSchema = buildEffectiveSchemaTree({
+              schema,
+              value: data,
+              callbacks: callbacksRef.current,
+              helpers: mergedHelpers,
+              variantStore,
+            })
+            const processedData = transformFormData(data, effectiveSchema)
+            const externalData = applyFieldTransforms(
+              processedData,
+              effectiveSchema,
+              callbacksRef.current,
+              mergedHelpers,
+              variantStore,
             )
-            onChange(
-              applyFieldTransforms(
-                processedData,
-                schema,
-                callbacksRef.current,
-                mergedHelpers
+            // 以上一次对外快照为基线；首次通知没有旧快照时使用空对象。
+            const previousData = previousChangeDataRef.current ?? {}
+            // 当前 watch 通知检测出的变化，稍后会合并到批次缓存。
+            const changes: FormChangeMeta['changes'] = []
+            // RHF 路径优先；缺失时使用 setValue 保存的兜底路径。
+            let changePath = name ?? pendingChangePathRef.current
+            if (changePath && name && changePath.match(/\.\d+\.value$/)) {
+              // 基本类型数组内部使用 path.value 包装，外部数据则使用数组元素路径。
+              const primitiveArrayPath = changePath.replace(/\.value$/, '')
+              // 删除元素后内部路径可能消失，因此额外提取数组根路径。
+              const match = changePath.match(/^(.*)\.\d+\.value$/)
+              const arrayPath = match?.[1]
+              // 解包后的数组元素值，用于判断普通编辑还是结构删除。
+              const externalValue = PathResolver.getNestedValue(
+                externalData,
+                primitiveArrayPath,
               )
-            )
+              // RHF 内部包装值；删除后通常为 undefined。
+              const rawValue = PathResolver.getNestedValue(data, changePath)
+              if (
+                rawValue === undefined &&
+                arrayPath &&
+                Array.isArray(
+                  PathResolver.getNestedValue(externalData, arrayPath),
+                )
+              ) {
+                changePath = arrayPath
+              } else if (
+                externalValue !== undefined &&
+                rawValue !== undefined
+              ) {
+                changePath = primitiveArrayPath
+              }
+            }
+            if (changePath) {
+              // 读取外部值域的旧值；setValue 无路径通知时使用调用前保存的原值。
+              const previousValue =
+                !name && pendingChangePathRef.current === changePath
+                  ? pendingPreviousValueRef.current
+                  : PathResolver.getNestedValue(previousData, changePath)
+              // 读取转换后的外部新值，确保与 onChange 第一参数保持同一数据契约。
+              const value = PathResolver.getNestedValue(
+                externalData,
+                changePath,
+              )
+              if (!Object.is(previousValue, value)) {
+                changes.push({
+                  path: changePath,
+                  previousValue,
+                  value,
+                  source: name
+                    ? changeSourceRef.current
+                    : (pendingChangeSourceRef.current ??
+                      changeSourceRef.current),
+                  action: value === undefined ? 'remove' : 'update',
+                  arrayAction: inferArrayAction(
+                    schema,
+                    changePath,
+                    previousValue,
+                    value,
+                  ),
+                })
+              }
+              pendingChangePathRef.current = null
+              pendingChangeSourceRef.current = null
+            } else if (previousChangeDataRef.current) {
+              Object.keys(externalData).forEach((path) => {
+                // 无具体 name 时按顶层路径比较快照，用于数组结构等整节点变化。
+                const previousValue = PathResolver.getNestedValue(
+                  previousData,
+                  path,
+                )
+                const value = PathResolver.getNestedValue(externalData, path)
+                if (!Object.is(previousValue, value)) {
+                  // 推断数组长度变化或相邻元素交换，供业务区分结构操作。
+                  let arrayAction:
+                    | 'append'
+                    | 'remove'
+                    | 'moveUp'
+                    | 'moveDown'
+                    | undefined
+                  // 当前路径对应的 schema，用于排除 Select 多选数组。
+                  const fieldSchema = getSchemaAtPath(schema, path)
+                  if (
+                    fieldSchema?.type === 'array' &&
+                    fieldSchema.ui?.widget !== 'select' &&
+                    Array.isArray(previousValue) &&
+                    Array.isArray(value)
+                  ) {
+                    if (value.length > previousValue.length) {
+                      arrayAction = 'append'
+                    } else if (value.length < previousValue.length) {
+                      arrayAction = 'remove'
+                    } else {
+                      // 计算数组首个差异索引，识别相邻元素移动方向。
+                      const changedIndex = value.findIndex(
+                        (item, index) => !Object.is(item, previousValue[index]),
+                      )
+                      if (
+                        changedIndex >= 0 &&
+                        changedIndex < value.length - 1 &&
+                        Object.is(
+                          value[changedIndex],
+                          previousValue[changedIndex + 1],
+                        ) &&
+                        Object.is(
+                          value[changedIndex + 1],
+                          previousValue[changedIndex],
+                        )
+                      ) {
+                        arrayAction = 'moveUp'
+                      } else if (
+                        changedIndex > 0 &&
+                        Object.is(
+                          value[changedIndex],
+                          previousValue[changedIndex - 1],
+                        ) &&
+                        Object.is(
+                          value[changedIndex - 1],
+                          previousValue[changedIndex],
+                        )
+                      ) {
+                        arrayAction = 'moveDown'
+                      }
+                    }
+                  }
+                  changes.push({
+                    path,
+                    previousValue,
+                    value,
+                    source: changeSourceRef.current,
+                    action: value === undefined ? 'remove' : 'update',
+                    arrayAction,
+                  })
+                }
+              })
+            }
+            previousChangeDataRef.current = externalData
+            pendingDataRef.current = externalData
+            changes.forEach((change) => {
+              const existing = pendingChangesRef.current.find(
+                (item) => item.path === change.path,
+              )
+              if (existing) {
+                existing.value = change.value
+                existing.action = change.action
+                existing.source = change.source
+              } else {
+                pendingChangesRef.current.push(change)
+              }
+            })
+            if (changeFlushTimerRef.current === null) {
+              changeFlushTimerRef.current = window.setTimeout(() => {
+                changeFlushTimerRef.current = null
+                const nextData = pendingDataRef.current
+                if (nextData) {
+                  onChange(nextData, { changes: pendingChangesRef.current })
+                }
+                pendingDataRef.current = null
+                pendingChangesRef.current = []
+              }, 0)
+            }
           })
-          return () => subscription.unsubscribe()
+          return () => {
+            subscription.unsubscribe()
+            if (changeFlushTimerRef.current !== null) {
+              clearTimeout(changeFlushTimerRef.current)
+              changeFlushTimerRef.current = null
+            }
+          }
         }
-      }, [watch, onChange, schema, mergedHelpers])
+      }, [watch, onChange, schema, mergedHelpers, variantStore])
 
       // ✅ 使用 useCallback 缓存 onSubmitHandler，避免每次渲染创建新函
       const onSubmitHandler = useCallback(
         async (data: Record<string, any>) => {
           if (onSubmit) {
             // 使用公共函数进行数据转换，包含过滤步骤
+            const effectiveSchema = buildEffectiveSchemaTree({
+              schema,
+              value: data,
+              callbacks: stableCallbacks,
+              helpers: mergedHelpers,
+              variantStore,
+            })
             const filteredData = transformFormData(
               data,
-              buildEffectiveSchemaTree({
-                schema,
-                value: data,
-                callbacks: stableCallbacks,
-                helpers: mergedHelpers,
-                variantStore,
-              }),
+              effectiveSchema,
               nestedSchemaRegistry || undefined,
-              true // 需要过滤数据
+              true, // 需要过滤数据
             )
 
             await onSubmit(
               applyFieldTransforms(
                 filteredData,
-                schema,
+                effectiveSchema,
                 stableCallbacks,
-                mergedHelpers
-              )
+                mergedHelpers,
+                variantStore,
+              ),
             )
           }
         },
-        [onSubmit, schema, nestedSchemaRegistry, stableCallbacks, mergedHelpers]
+        [
+          onSubmit,
+          schema,
+          nestedSchemaRegistry,
+          stableCallbacks,
+          mergedHelpers,
+          variantStore,
+        ],
       )
 
       // 使用 useMemo 缓存 LinkageStateContext 的 value 对象
@@ -1038,7 +1360,7 @@ const DynamicFormInner = React.memo(
           pathPrefix,
           effectiveLinkageFunctions,
           operationController,
-        ] // ✅ 移除 methods 依赖
+        ], // ✅ 移除 methods 依赖
       )
 
       // 使用 useMemo 缓存字段内容，避免每次渲染都创建新的 children
@@ -1062,7 +1384,7 @@ const DynamicFormInner = React.memo(
                 .split('.')
                 .reduce(
                   (current: any, key) => current?.[key],
-                  methods.getValues()
+                  methods.getValues(),
                 )
               const variant =
                 field.schema?.ui?.widget === 'variant'
@@ -1071,12 +1393,12 @@ const DynamicFormInner = React.memo(
                       field.schema || {},
                       currentValue,
                       callbacksRef.current,
-                      mergedHelpers
+                      mergedHelpers,
                     )
               if (variant) {
                 const variantSchema = buildVariantSchema(
                   field.schema || {},
-                  variant
+                  variant,
                 )
                 field = {
                   ...field,
@@ -1097,7 +1419,7 @@ const DynamicFormInner = React.memo(
               if (linkageState?.schema) {
                 const mergedSchema = mergeSchemaWithLinkage(
                   field.schema || { type: 'object', properties: {} },
-                  linkageState.schema
+                  linkageState.schema,
                 )
                 effectiveField = {
                   ...field,
@@ -1153,7 +1475,6 @@ const DynamicFormInner = React.memo(
           disabled,
           enableVirtualScroll,
           fields,
-          watchedValues,
           fieldControlStyle,
           fieldLabelStyle,
           fieldRowStyle,
@@ -1166,7 +1487,9 @@ const DynamicFormInner = React.memo(
           fieldsWrapperStyle,
           columnsCount,
           effectiveTextFieldFocus,
-        ]
+          mergedHelpers,
+          methods,
+        ],
       )
 
       // 使用 useMemo 缓存带 Provider 的字段内容
@@ -1265,6 +1588,8 @@ const DynamicFormInner = React.memo(
         stableWidgets,
         stableCallbacks,
         effectiveTextFieldFocus,
+        mergedHelpers,
+        variantStore,
       ])
 
       // 嵌套表单模式下不需要再包裹 FormProvider，因为已经复用了父表单的 context
@@ -1274,8 +1599,8 @@ const DynamicFormInner = React.memo(
 
       // 非嵌套表单模式，需要提供 FormProvider
       return <FormProvider {...methods}>{formContent}</FormProvider>
-    }
-  )
+    },
+  ),
 )
 
 // 外层组件：提供 NestedSchemaProvider
@@ -1294,5 +1619,5 @@ export const DynamicForm = forwardRef<DynamicFormRef, DynamicFormProps>(
         <DynamicFormInner {...props} ref={ref} />
       </NestedSchemaProvider>
     )
-  }
+  },
 )

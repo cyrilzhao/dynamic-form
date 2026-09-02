@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   Switch,
   Card,
@@ -122,20 +122,20 @@ export const EffectEditor: React.FC<EffectEditorProps> = ({
   isFulfill = true,
 }) => {
   // 确定当前的配置模式
-  const getCurrentMode = (): ConfigMode => {
+  const getCurrentMode = useCallback((): ConfigMode => {
     if (!value) return 'static'
     // 如果有 function 字段（即使是空字符串），则为 dynamic 模式
     if ('function' in value) return 'dynamic'
     // 否则为 static 模式
     return 'static'
-  }
+  }, [value])
 
   const [configMode, setConfigMode] = useState<ConfigMode>(getCurrentMode)
 
   // 当 value 变化时同步状态
   useEffect(() => {
     setConfigMode(getCurrentMode())
-  }, [value])
+  }, [value, getCurrentMode])
 
   const handleClear = () => {
     onChange(undefined)

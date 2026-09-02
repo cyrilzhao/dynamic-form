@@ -1,101 +1,215 @@
-# SchemaBuilder: User Guide
+# SchemaBuilder 使用指南
 
-SchemaBuilder is a visual workspace for building a form. You work with a field tree and property panels; the tool updates the form definition for you, so you do not need to write JSON.
+SchemaBuilder 是一个可视化的 `ExtendedJSONSchema` 编辑器。你可以通过字段树和属性面板创建表单结构、配置校验和 UI 行为，并在不直接编写 JSON 的情况下实时预览结果。
 
-## The screen at a glance
+本文面向两类用户：
 
-When SchemaBuilder opens, the screen is divided into these areas:
+- **终端操作用户**：在页面中创建、调整和检查 Schema。
+- **集成开发者**：在 React 页面中嵌入 SchemaBuilder，并读取或保存生成的 Schema。
 
-1. **Schema Tree (left)** – Shows the form hierarchy. The root is at the top, object fields appear beneath `properties`, and array fields contain an item definition.
-2. **Property Editor (center)** – Shows settings for the selected field. Select a different tree node to edit another field.
-3. **Toolbar (top)** – Contains **Import JSON** (when enabled) and the **Edit / Preview** switch.
-4. **Preview (right or main area)** – In Preview mode, **Live Preview** renders the form and shows the entered data; **JSON Schema** displays the generated definition.
+## 在页面中打开 SchemaBuilder
 
-The divider between the tree and editor can be dragged to make the tree wider or narrower. If the tree or preview is not visible, it may have been hidden by the page configuration.
+在示例应用中，打开左侧的 **Schema 构建器** 页面即可使用。页面通常包含以下区域：
 
-## Build a form
+1. **Schema Tree**（左侧）：显示 Root、对象属性和数组 `items` 的层级结构。
+2. **Property Editor**（中间）：编辑当前选中节点的属性。
+3. **Toolbar**（顶部）：切换 **Edit** / **Preview**，以及打开 **Import JSON**。
+4. **Preview**（右侧或主区域）：查看 **Live Preview**、表单数据和 **JSON Schema**。
 
-### 1. Start with the root
+拖动树和编辑器之间的分隔线可以调整左侧宽度。某些页面会按权限或用途隐藏树、预览或部分编辑能力，这属于正常配置。
 
-If no schema is provided, SchemaBuilder starts with an object and a starter field. The root itself cannot be deleted. Select the root when you need to work with the form's top-level structure.
+## 从零创建一个 Schema
 
-### 2. Add fields
+### 1. 选择根节点
 
-1. Select an **object** node in the tree.
-2. Choose **Add child** and select a field type (string, number, integer, boolean, object, or array).
-3. Select the new field and edit its **Name**, **Label**, and other settings in the Property Editor.
+没有传入初始 Schema 时，编辑器会创建一个 `object` 根节点，并自动生成一个初始字段。根节点不能删除；选中根节点可以配置整个表单级别的设置。
 
-For an array node, use its item controls to define the type and structure of each item. Object and array nodes are expanded automatically when a child is added.
+如果页面已有 Schema，树中会显示它的现有结构。节点名称优先显示 `Label`，括号内显示字段名，例如 `Email (email)`。
 
-### 3. Organize fields
+### 2. 添加字段
 
-Use the actions on a selected tree node to:
+1. 在树中选中一个 **object** 节点。
+2. 点击节点右侧的 **…**，选择 **Add Child Node**。
+3. 新字段默认类型为 `string`，选中新节点后在 **Basic** 标签页中修改名称、标签和类型。
 
-- **Add sibling** – Insert another field at the same level.
-- **Move up / Move down** – Change the order of object properties.
-- **Delete** – Remove the selected field. Deleting a parent also removes its nested fields.
+对象节点可以继续添加子字段。数组节点不能添加多个并列字段，它只有一个 `items` 定义，用来描述数组中每一项的类型和结构；选中数组的 `items` 节点可编辑该项定义，但不能直接删除或重命名 `items`。
 
-Field names must be unique within the same object. Renaming a field updates its path and keeps its nested content.
+### 3. 添加同级字段、排序和删除
 
-## Configure a selected field
+在对象属性节点的 **…** 菜单中可以使用：
 
-The Property Editor is organized into tabs. Available tabs can vary by field type and page configuration.
+- **Add Sibling Node**：在当前字段后插入一个同级字段。
+- **Move Up / Move Down**：调整同一对象下的字段顺序。
+- **Delete Node**：删除当前字段及其嵌套内容。
+
+同一对象下的字段名必须唯一且不能为空。重命名会同步更新字段路径和其子节点路径。根节点不能删除；为避免表单没有字段，一级对象的最后一个字段也不能删除。
+
+## 配置字段属性
+
+选中对象属性或数组项后，Property Editor 会显示以下标签页。可见标签会因字段类型和页面配置而变化。
 
 ### Basic
 
-Set the field's name, label, description, type, default value, and whether it is required. For enum fields, enter the selectable values and their display labels.
+- **Name**：对象属性的字段名。数组 `items` 和根节点没有此输入框。
+- **Label**：表单中显示的标签，也会用于验证错误提示。
+- **Description**：字段说明。
+- **Type**：`String`、`Number`、`Integer`、`Boolean`、`Object` 或 `Array`。
+- **Default Value**：按字段类型输入默认值；数组 `items` 节点不能设置默认值。
+- **Required**：将字段加入父对象的 `required` 列表。
+- **Options (enum)**（字符串字段）：维护可选值及其显示标签，供 `select`、`radio` 等组件使用。
 
-Changing **Type** changes which settings are valid. For example, switching a field from object to string removes its object children; switching to object or array creates an initial child structure when needed.
+切换字段类型会清理不再适用的 `properties`、`items` 和 `required` 配置，并为 `object` 或 `array` 创建可继续编辑的初始子结构。因此，切换类型前请先确认原有子字段是否还需要。
 
 ### Validation
 
-Add rules appropriate to the field type:
+按类型配置标准 JSON Schema 校验：
 
-- Strings: minimum/maximum length, regular expression, and format.
-- Numbers: minimum, maximum, and step multiples.
-- Arrays: minimum/maximum items and unique items.
-- Objects: minimum/maximum properties.
+- **字符串**：`Min Length`、`Max Length`、`Pattern (Regex)`、`Format`（如 email、date、uri）及对应错误消息。
+- **数字/整数**：`Minimum`、`Maximum`、`Multiple Of` 及对应错误消息。
+- **数组**：`Min Items`、`Max Items`、`Unique Items`。
+- **对象**：`Min Properties`、`Max Properties`。
 
-You can also customize validation messages and add custom validators where those controls are enabled.
+根节点的 Validation 标签页用于 Schema 级别规则，包括 `dependencies`、`if/then/else`、`allOf`、`anyOf` 和 `oneOf`。这些规则负责数据合法性，不负责字段显示或隐藏；显示联动请使用 **Linkage**。
 
 ### UI Config
 
-Choose how the field appears in the generated form: widget, placeholder, help text, hidden/disabled/read-only state, layout, column span, and object/array behavior. This is also where you configure transforms and other advanced display or data-handling options.
+用于控制生成表单的展示和数据处理方式，常用设置包括：
+
+- **Widget**：按字段类型选择控件，例如字符串的 `textarea`、`select`、`radio`，数字的 `range`，布尔值的 `checkbox`，数组的 `select`、`table-array`，对象的 `object-editor`。
+- 输入提示：`Placeholder`、帮助文本和自定义控件属性。
+- 状态：`Hidden`、`Disabled`、`Readonly`。
+- 布局：`Layout`、`Label Width`、`Column Span`；根节点还可设置 `Columns Count`（1–12）。
+- 对象扁平化：`Flatten Path`、`Flatten Prefix`。
+- 数组行为：数组模式、添加按钮文本等。
+- 高级数据处理：Transform、Validators、Callback Props（页面启用时显示）。
 
 ### Linkage
 
-Create rules that react to other fields. A rule can show or hide a field, disable or make it read-only, set its value, change its options, or apply a schema change. Select the dependent field path, define a condition, then configure what happens when the condition is true or false. Multiple rules run in the order shown.
+用于根据其他字段的值动态改变当前字段。创建规则时依次选择依赖字段、条件和效果；同一字段的多条规则按列表顺序执行，后面的规则可能覆盖前面的结果。
+
+常见效果类型：
+
+| 类型         | 用途                |
+| ------------ | ------------------- |
+| `visibility` | 显示或隐藏字段      |
+| `disabled`   | 动态禁用字段        |
+| `readonly`   | 动态设为只读        |
+| `value`      | 设置固定值或计算值  |
+| `options`    | 动态生成选项        |
+| `schema`     | 动态修改字段 Schema |
+
+条件支持等于、不等于、大小比较、`in`/`notIn`、`includes`/`notIncludes`、`isEmpty` 和 `isNotEmpty`，也可以组合 `AND` / `OR`。字段路径可使用字段选择器提供的 JSON Pointer（如 `#/properties/status`）；数组项内部的同级依赖可使用相对路径（如 `./type`）。
+
+联动脚本应返回与效果类型匹配的数据。例如 `options` 需要返回 `{ label, value }` 数组。配置后务必在 Live Preview 中分别测试条件满足和不满足的情况。
 
 ### Variants
 
-Variants let one field offer several mutually exclusive editing modes (for example, a text mode and an object mode). Add a variant, give it a unique name and label, choose its type and widget, then edit its schema. Select a default variant and, when needed, configure automatic detection.
+Variants 让一个字段拥有多个互斥的编辑模式，例如“文本模式”和“对象模式”。操作步骤：
 
-## Check the result
+1. 在 **Variants** 中点击添加，填写唯一的名称和标签。
+2. 选择 Variant 类型和 Widget，点击 **Edit Schema** 编辑该模式的子 Schema。
+3. 选择默认 Variant；需要时配置自动检测函数。
+4. 保存当前 Variant 后，再保存字段配置。
 
-1. Click **Preview** in the toolbar.
-2. In **Live Preview**, fill in the generated form as a user would. The **Data** area below it shows the current values.
-3. Select **JSON Schema** to inspect the complete definition.
-4. Click **Edit** to return to the tree and Property Editor.
+删除默认 Variant 前应先选择新的默认项，避免留下无效引用。嵌套 SchemaBuilder 弹窗中的 **Apply** 只更新当前 Variant 草稿，外层保存后才会写回主 Schema。
 
-Preview reflects the current edits. It is useful for checking labels, required fields, widget choices, layout, and linkage behavior before saving or publishing the schema.
+## 预览和检查结果
 
-## Import an existing schema
+1. 点击顶部 **Preview**。
+2. 在 **Live Preview** 中像终端用户一样填写表单。
+3. 在 **Data** 区域查看当前输入值（这是预览数据，不是 Schema）。
+4. 切换到 **JSON Schema** 检查最终生成的完整 JSON。
+5. 点击 **Edit** 返回树和属性编辑器。
 
-1. Click **Import JSON**.
-2. Paste or edit an `ExtendedJSONSchema` document in the dialog.
-3. Click **Apply**. If the document is invalid, an error message appears and the current schema is kept.
-4. Click **Cancel** to close the dialog without applying changes.
+预览可用于检查必填校验、控件选择、标签、布局、默认值和联动效果。修改后无需手动刷新，预览会跟随当前 Schema 更新。
 
-Import replaces the schema currently open in the builder. Review it in the tree and Preview after applying.
+## 导入已有 Schema
 
-## Working with a restricted or read-only screen
+1. 点击 **Import JSON**。
+2. 在编辑器中粘贴或修改 `ExtendedJSONSchema` JSON。
+3. 点击 **Apply**。
+4. 如果 JSON 格式或 Schema 结构无效，会显示 `Invalid ExtendedJSONSchema`，当前 Schema 保持不变。
+5. 不想应用时点击 **Cancel**。
 
-Some deployments intentionally hide parts of the interface or disable actions. For example, the tree, preview, import control, Property Editor, Variants tab, or root validation may not be shown. A read-only screen can still let you browse fields and inspect their settings, but add, delete, reorder, rename, or type-changing actions may be unavailable. This is expected behavior for review workflows.
+导入会替换当前编辑内容。应用前请确认 JSON 已包含正确的 `type`、`properties` / `items` 和字段 `title`，应用后再通过树和 JSON Schema 复核。
 
-## Practical tips
+## 集成到 React 页面
 
-- Build the hierarchy first, then configure each field's details.
-- Use clear labels because they are shown to form users and in validation messages.
-- Test conditional rules in Live Preview with both matching and non-matching values.
-- After importing or making major changes, inspect both Live Preview and JSON Schema.
-- If a field seems missing, expand its parent object or array in the tree and verify that the relevant panel has not been hidden.
+```tsx
+import { useState } from 'react'
+import { SchemaBuilder } from '@/components/SchemaBuilder'
+import type { ExtendedJSONSchema } from '@/components/DynamicForm'
+
+export function SchemaEditorPage() {
+  const [schema, setSchema] = useState<ExtendedJSONSchema>()
+
+  return (
+    <SchemaBuilder
+      defaultValue={schema}
+      onChange={setSchema}
+      previewMode="both"
+    />
+  )
+}
+```
+
+常用属性：
+
+| 属性                  | 说明                                                                                                        |
+| --------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `defaultValue`        | 非受控初始 Schema，只在组件初始化时读取。挂载后要整体重置，可改变 React 的 `key`。                          |
+| `onChange`            | 每次编辑或导入成功后回调最新 Schema，可在此保存到状态或后端。                                               |
+| `initialSelectedPath` | 初始选中字段，支持路径数组或 JSON Pointer，例如 `#/properties/user/properties/name`。不能直接选中 `items`。 |
+| `previewMode`         | `both`（默认）、`form`、`json` 或 `none`。                                                                  |
+| `hideTree`            | 隐藏左侧树面板。                                                                                            |
+| `options`             | 控制隐藏项、只读范围和嵌套编辑器的根类型。                                                                  |
+| `className` / `style` | 自定义容器样式。                                                                                            |
+
+### 受限和只读配置
+
+`options.hidden` 可隐藏 `tree`、`preview`、`importExport`、`propertyEditor`、`rootValidation` 或 `variantsTab`。`options.readonly` 可整体只读，也可分别限制树、Schema、字段增删、排序、字段名和字段类型编辑。例如：
+
+```tsx
+<SchemaBuilder
+  defaultValue={schema}
+  options={{
+    hidden: { importExport: true },
+    readonly: { editFieldKey: true },
+  }}
+  previewMode="json"
+/>
+```
+
+只读属性面板会显示 **Schema (Read Only)**。隐藏或只读配置只影响界面操作，不会阻止外部程序通过代码传入新的 Schema。
+
+### 使用 Ref 读取和重置
+
+需要从按钮或父组件主动读取、替换或重置时，可使用 `SchemaBuilderRef`：
+
+```tsx
+import { useRef } from 'react'
+import type { SchemaBuilderRef } from '@/components/SchemaBuilder'
+
+const builderRef = useRef<SchemaBuilderRef>(null)
+
+<SchemaBuilder ref={builderRef} defaultValue={schema} />
+
+builderRef.current?.getSchema()       // 获取当前 Schema
+builderRef.current?.setSchema(schema) // 替换当前 Schema
+builderRef.current?.reset()            // 恢复初始 Schema 并清除界面状态
+```
+
+`setSchema` 会尽量保留当前选中路径；如果路径已不存在，则自动选中第一个一级字段。
+
+## 常见问题
+
+- **看不到字段**：展开父级 object/array 节点，并确认页面没有隐藏 Schema Tree 或 Property Editor。
+- **不能添加子节点**：只有 `object` 可以添加子字段；array 只能编辑唯一的 `items` 定义。
+- **不能删除字段**：根节点、`items` 节点和最后一个一级字段受保护；也可能是只读配置导致。
+- **改类型后字段消失**：类型切换会清理互斥的子结构，这是为了避免生成无效 Schema。
+- **导入后内容没变化**：检查 JSON 是否为有效的 `ExtendedJSONSchema`；失败时组件会保留原内容。
+- **联动没有效果**：确认依赖路径、条件值类型和脚本返回结构，并在 Live Preview 中改变依赖字段触发规则。
+
+## 推荐工作流
+
+先用树搭好 object/array 层级，再逐个字段配置 Basic、Validation 和 UI Config；随后配置 Linkage 或 Variants，最后在 Live Preview 和 JSON Schema 中各检查一次。保存时应保存 `onChange` 或 `getSchema()` 得到的 Schema，而不是 Preview 中的 Data。

@@ -53,7 +53,7 @@ export const useSchemaBuilder = () => {
   const context = useContext(SchemaBuilderContext)
   if (!context) {
     throw new Error(
-      'useSchemaBuilder must be used within a SchemaBuilderProvider'
+      'useSchemaBuilder must be used within a SchemaBuilderProvider',
     )
   }
   return context
@@ -71,7 +71,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
       style,
       options,
     },
-    ref
+    ref,
   ) => {
     const hidden = options?.hidden ?? {}
     const readonly = options?.readonly ?? {}
@@ -99,7 +99,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
     }
 
     // 获取初始选中路径
-    const getInitialSelectedPath = (schema: ExtendedJSONSchema): string[] => {
+    const getInitialSelectedPath = useCallback((schema: ExtendedJSONSchema): string[] => {
       if (!initialSelectedPath) {
         return getFirstLevelNodePath(schema)
       }
@@ -118,16 +118,16 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
       // 如果路径无效，回退到第一个一级节点
       console.warn('Invalid initialSelectedPath, falling back to first node')
       return getFirstLevelNodePath(schema)
-    }
+    }, [initialSelectedPath])
 
     const initialSchema = getInitialSchema()
     const initialSchemaRef = useRef(initialSchema)
     const [schema, setSchema] = useState<ExtendedJSONSchema>(initialSchema)
     const [selectedPath, setSelectedPath] = useState<string[]>(
-      getInitialSelectedPath(initialSchema)
+      getInitialSelectedPath(initialSchema),
     )
     const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>(
-      { '': true }
+      { '': true },
     )
     const [previewData, setPreviewData] = useState({})
     const [previewTab, setPreviewTab] = useState<'form' | 'json'>('form')
@@ -152,7 +152,9 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
       ref,
       () => ({
         setSchema: (newSchema: ExtendedJSONSchema) => {
-          const schemaToSet = options?.rootType ? { ...newSchema, type: options.rootType } : ensureHasFirstLevelNode(newSchema)
+          const schemaToSet = options?.rootType
+            ? { ...newSchema, type: options.rootType }
+            : ensureHasFirstLevelNode(newSchema)
           setSchema(schemaToSet)
           // 保持当前选中路径，如果路径无效则选中第一个节点
           if (!validatePath(schemaToSet, selectedPath)) {
@@ -161,14 +163,16 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
         },
         getSchema: () => schema,
         reset: () => {
-          const schemaToSet = options?.rootType ? { ...initialSchemaRef.current, type: options.rootType } : ensureHasFirstLevelNode(initialSchemaRef.current)
+          const schemaToSet = options?.rootType
+            ? { ...initialSchemaRef.current, type: options.rootType }
+            : ensureHasFirstLevelNode(initialSchemaRef.current)
           setSchema(schemaToSet)
           setSelectedPath(getInitialSelectedPath(schemaToSet))
           setExpandedPaths({ '': true })
           setPreviewData({})
         },
       }),
-      [schema, selectedPath]
+      [schema, selectedPath, getInitialSelectedPath, options?.rootType],
     )
 
     // Resize handler
@@ -190,7 +194,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           // New Width = Current Width + Movement
           const movementX = Number.isFinite(e.movementX) ? e.movementX : 0
           setLeftPanelWidth((prev) =>
-            Math.max(200, Math.min(600, prev + movementX))
+            Math.max(200, Math.min(600, prev + movementX)),
           )
         }
       }
@@ -231,7 +235,9 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
     const handleImportSchema = () => {
       try {
         const parsed: unknown = JSON.parse(importText)
-        if (!isExtendedJSONSchema(parsed)) throw new Error('Invalid schema')
+        if (!isExtendedJSONSchema(parsed)) {
+          throw new Error('Invalid schema')
+        }
         const schemaToSet = ensureHasFirstLevelNode(parsed)
         setSchema(schemaToSet)
         setSelectedPath(getFirstLevelNodePath(schemaToSet))
@@ -249,12 +255,14 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
         const pathStr = path.join('.')
         setExpandedPaths((prev) => ({ ...prev, [pathStr]: expanded }))
       },
-      []
+      [],
     )
 
     const handleUpdate = useCallback(
       (path: string[], updates: Partial<SchemaNode>, newKey?: string) => {
-        if (isReadonly) return
+        if (isReadonly) {
+          return
+        }
         setSchema((prevSchema) => {
           const nextSchema = cloneDeep(prevSchema)
           const targetPath = path.length === 0 ? [] : path
@@ -263,7 +271,9 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           const currentNode =
             path.length === 0 ? nextSchema : get(nextSchema, targetPath)
 
-          if (!currentNode) return prevSchema
+          if (!currentNode) {
+            return prevSchema
+          }
 
           // Apply updates - 对于值为 undefined 的属性，需要删除而不是赋值
           Object.keys(updates).forEach((key) => {
@@ -392,7 +402,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           return nextSchema
         })
       },
-      [isReadonly, onChange]
+      [isReadonly, onChange],
     )
 
     const handleAddChild = useCallback(
@@ -402,7 +412,9 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           const targetNode =
             path.length === 0 ? nextSchema : get(nextSchema, path)
 
-          if (!targetNode) return prevSchema
+          if (!targetNode) {
+            return prevSchema
+          }
 
           if (targetNode.type === 'object') {
             if (!targetNode.properties) {
@@ -411,7 +423,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
 
             const newKey = generateRandomKey(targetNode.properties)
 
-            let newNode: any = {
+            const newNode: any = {
               type: type,
               title: `New Field`,
             }
@@ -448,12 +460,14 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           return nextSchema
         })
       },
-      [onChange]
+      [onChange],
     )
 
     const handleAddSibling = useCallback(
       (path: string[], type: SchemaNodeType) => {
-        if (path.length === 0) return
+        if (path.length === 0) {
+          return
+        }
 
         setSchema((prevSchema) => {
           const nextSchema = cloneDeep(prevSchema)
@@ -465,7 +479,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
 
             if (propertiesNode) {
               const newKey = generateRandomKey(propertiesNode)
-              let newNode: any = {
+              const newNode: any = {
                 type: type,
                 title: `New Field`,
               }
@@ -490,7 +504,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
 
               // 替换整个 properties 对象以保持顺序
               Object.keys(propertiesNode).forEach(
-                (key) => delete propertiesNode[key]
+                (key) => delete propertiesNode[key],
               )
               Object.assign(propertiesNode, newProperties)
             }
@@ -500,12 +514,14 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           return nextSchema
         })
       },
-      [onChange]
+      [onChange],
     )
 
     const handleDelete = useCallback(
       (path: string[]) => {
-        if (path.length === 0) return
+        if (path.length === 0) {
+          return
+        }
 
         setSchema((prevSchema) => {
           const nextSchema = cloneDeep(prevSchema)
@@ -539,12 +555,14 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           })
         }, 0)
       },
-      [onChange]
+      [onChange],
     )
 
     const handleMoveUp = useCallback(
       (path: string[]) => {
-        if (path.length < 2 || path[path.length - 2] !== 'properties') return
+        if (path.length < 2 || path[path.length - 2] !== 'properties') {
+          return
+        }
 
         setSchema((prevSchema) => {
           const nextSchema = cloneDeep(prevSchema)
@@ -568,7 +586,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
               })
 
               Object.keys(propertiesNode).forEach(
-                (key) => delete propertiesNode[key]
+                (key) => delete propertiesNode[key],
               )
               Object.assign(propertiesNode, newProperties)
             }
@@ -578,12 +596,14 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           return nextSchema
         })
       },
-      [onChange]
+      [onChange],
     )
 
     const handleMoveDown = useCallback(
       (path: string[]) => {
-        if (path.length < 2 || path[path.length - 2] !== 'properties') return
+        if (path.length < 2 || path[path.length - 2] !== 'properties') {
+          return
+        }
 
         setSchema((prevSchema) => {
           const nextSchema = cloneDeep(prevSchema)
@@ -608,7 +628,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
               })
 
               Object.keys(propertiesNode).forEach(
-                (key) => delete propertiesNode[key]
+                (key) => delete propertiesNode[key],
               )
               Object.assign(propertiesNode, newProperties)
             }
@@ -618,33 +638,43 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           return nextSchema
         })
       },
-      [onChange]
+      [onChange],
     )
 
     const handleAddChildWithAccess = (
       ...args: Parameters<typeof handleAddChild>
     ) => {
-      if (!isReadonly && !readonly.addFieldActions) handleAddChild(...args)
+      if (!isReadonly && !readonly.addFieldActions) {
+        handleAddChild(...args)
+      }
     }
     const handleAddSiblingWithAccess = (
       ...args: Parameters<typeof handleAddSibling>
     ) => {
-      if (!isReadonly && !readonly.addFieldActions) handleAddSibling(...args)
+      if (!isReadonly && !readonly.addFieldActions) {
+        handleAddSibling(...args)
+      }
     }
     const handleDeleteWithAccess = (
       ...args: Parameters<typeof handleDelete>
     ) => {
-      if (!isReadonly && !readonly.deleteFieldActions) handleDelete(...args)
+      if (!isReadonly && !readonly.deleteFieldActions) {
+        handleDelete(...args)
+      }
     }
     const handleMoveUpWithAccess = (
       ...args: Parameters<typeof handleMoveUp>
     ) => {
-      if (!isReadonly && !readonly.reorderFieldActions) handleMoveUp(...args)
+      if (!isReadonly && !readonly.reorderFieldActions) {
+        handleMoveUp(...args)
+      }
     }
     const handleMoveDownWithAccess = (
       ...args: Parameters<typeof handleMoveDown>
     ) => {
-      if (!isReadonly && !readonly.reorderFieldActions) handleMoveDown(...args)
+      if (!isReadonly && !readonly.reorderFieldActions) {
+        handleMoveDown(...args)
+      }
     }
 
     const renderPreviewPanel = () => {
@@ -824,5 +854,5 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
         </Dialog>
       </SchemaBuilderContext.Provider>
     )
-  }
+  },
 )
