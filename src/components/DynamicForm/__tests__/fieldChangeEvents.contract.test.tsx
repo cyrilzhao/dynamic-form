@@ -11,6 +11,38 @@ import {
 beforeAll(setupDynamicFormTest)
 
 describe('DynamicForm 字段变更事件契约', () => {
+  const contactsSchema: ExtendedJSONSchema = {
+    type: 'object',
+    properties: {
+      contacts: {
+        type: 'array',
+        title: 'Contacts',
+        items: { type: 'object', properties: { name: { type: 'string' } } },
+      },
+    },
+  }
+
+  const getLastArrayChange = (onChange: jest.Mock) =>
+    onChange.mock.calls[onChange.mock.calls.length - 1][1].changes.find(
+      (change: { path: string }) => change.path === 'contacts',
+    )
+
+  const confirmDelete = async (container: HTMLElement, index: number) => {
+    const deleteButtons = Array.from(
+      container.querySelectorAll('[title="Delete"]'),
+    ) as HTMLButtonElement[]
+    fireEvent.click(deleteButtons[index])
+    await waitFor(() => {
+      const confirmButton = Array.from(
+        document.querySelectorAll('button'),
+      ).find((button) => button.textContent === 'Delete' && !button.title) as
+        | HTMLButtonElement
+        | undefined
+      expect(confirmButton).toBeDefined()
+      fireEvent.click(confirmButton!)
+    })
+  }
+
   it('setValues 应在一次稳定回调中按输入顺序聚合字段变化，且不包含 action 占位字段', async () => {
     const onChange = jest.fn()
     const schema: ExtendedJSONSchema = {
@@ -142,7 +174,9 @@ describe('DynamicForm 字段变更事件契约', () => {
     })
     onChange.mockClear()
 
-    fireEvent.click(container.querySelector('button.bp6-button')!)
+    fireEvent.click(
+      container.querySelector('.array-field-widget button.bp6-intent-primary')!,
+    )
     await waitFor(() => expect(onChange).toHaveBeenCalled())
 
     const [, meta] = onChange.mock.calls[onChange.mock.calls.length - 1]
@@ -157,6 +191,242 @@ describe('DynamicForm 字段变更事件契约', () => {
       }),
     ])
   })
+
+  it('已有数组元素时追加应报告新元素索引和值，而不是首元素', async () => {
+    const onChange = jest.fn()
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        contacts: {
+          type: 'array',
+          title: 'Contacts',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              phone: { type: 'string' },
+              email: { type: 'string' },
+              type: { type: 'string' },
+            },
+          },
+        },
+      },
+    }
+    const { formRef, container } = renderDynamicForm({
+      props: {
+        schema,
+        onChange,
+        defaultValues: {
+          contacts: [
+            {
+              name: '张三',
+              phone: '13800138000',
+              email: 'zhang@example.com',
+              type: 'personal',
+            },
+          ],
+        },
+      },
+    })
+    await waitForFormReady({ formRef })
+    onChange.mockClear()
+    fireEvent.click(
+      container.querySelector('.array-field-widget button.bp6-intent-primary')!,
+    )
+    await waitFor(() => expect(onChange).toHaveBeenCalled())
+    const change =
+      onChange.mock.calls[onChange.mock.calls.length - 1][1].changes[0]
+    expect(change.path).toBe('contacts')
+    expect(change.arrayAction).toEqual({
+      action: 'insert',
+      index: 1,
+      value: { name: '', phone: '', email: '', type: '' },
+    })
+  })
+
+  it('追加后移动元素不应复用上一次 insert 动作', async () => {
+    const onChange = jest.fn()
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        contacts: {
+          type: 'array',
+          title: 'Contacts',
+          items: { type: 'object', properties: { name: { type: 'string' } } },
+        },
+      },
+    }
+    const { formRef, container } = renderDynamicForm({
+      props: {
+        schema,
+        onChange,
+        defaultValues: { contacts: [{ name: '张三' }] },
+      },
+    })
+    await waitForFormReady({ formRef })
+    fireEvent.click(
+      container.querySelector('.array-field-widget button.bp6-intent-primary')!,
+    )
+    await waitFor(() => expect(onChange).toHaveBeenCalled())
+    onChange.mockClear()
+    fireEvent.click(
+      container.querySelector('[title="Move down"]:not([disabled])')!,
+    )
+    await waitFor(() => expect(onChange).toHaveBeenCalled())
+    const change =
+      onChange.mock.calls[onChange.mock.calls.length - 1][1].changes[0]
+    expect(change.arrayAction).toEqual({
+      action: 'move',
+      fromIndex: 0,
+      toIndex: 1,
+      value: { name: '张三' },
+    })
+  })
+
+  it('第二个元素上移到第一位应报告 fromIndex 1 到 toIndex 0', async () => {
+    const onChange = jest.fn()
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        contacts: {
+          type: 'array',
+          title: 'Contacts',
+          items: { type: 'object', properties: { name: { type: 'string' } } },
+        },
+      },
+    }
+    const { formRef, container } = renderDynamicForm({
+      props: {
+        schema,
+        onChange,
+        defaultValues: { contacts: [{ name: '张三' }, { name: '李四' }] },
+      },
+    })
+    await waitForFormReady({ formRef })
+    onChange.mockClear()
+    const moveUpButtons = Array.from(
+      container.querySelectorAll('[title="Move up"]'),
+    ) as HTMLButtonElement[]
+    expect(moveUpButtons).toHaveLength(2)
+    fireEvent.click(moveUpButtons[1])
+    await waitFor(() => expect(onChange).toHaveBeenCalled())
+    const change =
+      onChange.mock.calls[onChange.mock.calls.length - 1][1].changes[0]
+    expect(change.arrayAction).toEqual({
+      action: 'move',
+      fromIndex: 1,
+      toIndex: 0,
+      value: { name: '李四' },
+    })
+  })
+
+  it.each([
+    {
+      description: '删除唯一元素后数组为空',
+      contacts: [{ name: 'A' }],
+      index: 0,
+      expectedValue: { name: 'A' },
+    },
+    {
+      description: '删除多个元素中的第一个后数组不为空',
+      contacts: [{ name: 'A' }, { name: 'B' }, { name: 'C' }],
+      index: 0,
+      expectedValue: { name: 'A' },
+    },
+    {
+      description: '删除多个元素中的最后一个后数组不为空',
+      contacts: [{ name: 'A' }, { name: 'B' }, { name: 'C' }],
+      index: 2,
+      expectedValue: { name: 'C' },
+    },
+    {
+      description: '删除多个元素中的中间元素后数组不为空',
+      contacts: [{ name: 'A' }, { name: 'B' }, { name: 'C' }],
+      index: 1,
+      expectedValue: { name: 'B' },
+    },
+  ])(
+    '$description 应报告正确的 remove metadata',
+    async ({ contacts, index, expectedValue }) => {
+      const onChange = jest.fn()
+      const { formRef, container } = renderDynamicForm({
+        props: {
+          schema: contactsSchema,
+          onChange,
+          defaultValues: { contacts },
+        },
+      })
+      await waitForFormReady({ formRef })
+      onChange.mockClear()
+
+      await confirmDelete(container, index)
+      await waitFor(() => expect(onChange).toHaveBeenCalled())
+
+      expect(getLastArrayChange(onChange)).toMatchObject({
+        path: 'contacts',
+        arrayAction: { action: 'remove', index, value: expectedValue },
+      })
+    },
+  )
+
+  it.each([
+    {
+      description: '第一个元素下移',
+      buttonTitle: 'Move down',
+      buttonIndex: 0,
+      expected: { fromIndex: 0, toIndex: 1, value: { name: 'A' } },
+    },
+    {
+      description: '最后一个元素上移',
+      buttonTitle: 'Move up',
+      buttonIndex: 3,
+      expected: { fromIndex: 3, toIndex: 2, value: { name: 'D' } },
+    },
+    {
+      description: '中间元素上移',
+      buttonTitle: 'Move up',
+      buttonIndex: 1,
+      expected: { fromIndex: 1, toIndex: 0, value: { name: 'B' } },
+    },
+    {
+      description: '中间元素下移',
+      buttonTitle: 'Move down',
+      buttonIndex: 1,
+      expected: { fromIndex: 1, toIndex: 2, value: { name: 'B' } },
+    },
+  ])(
+    '四元素数组中 $description 应报告正确的 move metadata',
+    async ({ buttonTitle, buttonIndex, expected }) => {
+      const onChange = jest.fn()
+      const { formRef, container } = renderDynamicForm({
+        props: {
+          schema: contactsSchema,
+          onChange,
+          defaultValues: {
+            contacts: [
+              { name: 'A' },
+              { name: 'B' },
+              { name: 'C' },
+              { name: 'D' },
+            ],
+          },
+        },
+      })
+      await waitForFormReady({ formRef })
+      onChange.mockClear()
+
+      const buttons = Array.from(
+        container.querySelectorAll(`[title="${buttonTitle}"]`),
+      ) as HTMLButtonElement[]
+      fireEvent.click(buttons[buttonIndex])
+      await waitFor(() => expect(onChange).toHaveBeenCalled())
+
+      expect(getLastArrayChange(onChange)).toMatchObject({
+        path: 'contacts',
+        arrayAction: { action: 'move', ...expected },
+      })
+    },
+  )
 
   it('数组删除和对象元素移动应携带 remove/move 结构信息', async () => {
     const onChange = jest.fn()

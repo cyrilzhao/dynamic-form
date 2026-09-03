@@ -21,7 +21,6 @@ import type { ExtendedJSONSchema } from '../types/schema'
 import { FieldRegistry } from '../core/FieldRegistry'
 import { SchemaParser } from '../core/SchemaParser'
 import { recordArrayAction } from '../utils/arrayActionRegistry'
-import type { ArrayAction } from '../types'
 
 export interface ArrayFieldWidgetProps extends FieldWidgetProps {
   schema: ExtendedJSONSchema & {
@@ -237,7 +236,7 @@ export const ArrayFieldWidget = forwardRef<
     },
     ref,
   ) => {
-    const { control, formState, unregister } = useFormContext()
+    const { control, formState, unregister, getValues } = useFormContext()
 
     // 获取数组项的 schema，用 boolean flag 记录有效性，避免在 hooks 之前 return
     const itemSchema = schema.items as ExtendedJSONSchema
@@ -332,9 +331,13 @@ export const ArrayFieldWidget = forwardRef<
     // 添加新项
     const handleAdd = useCallback(() => {
       const defaultValue = getDefaultValue(itemSchema)
+      const currentItems = getValues(name)
+      const insertIndex = Array.isArray(currentItems)
+        ? currentItems.length
+        : fields.length
       recordArrayAction(control, name, {
         action: 'insert',
-        index: fields.length,
+        index: insertIndex,
         value:
           defaultValue &&
           typeof defaultValue === 'object' &&
@@ -343,7 +346,7 @@ export const ArrayFieldWidget = forwardRef<
             : defaultValue,
       })
       append(defaultValue)
-    }, [itemSchema, append, control, name, fields.length])
+    }, [itemSchema, append, control, name, fields.length, getValues])
 
     // 删除项
     const handleRemove = useCallback(
@@ -352,11 +355,13 @@ export const ArrayFieldWidget = forwardRef<
         recordArrayAction(control, name, {
           action: 'remove',
           index,
-          value: fields[index],
+          value: Array.isArray(getValues(name))
+            ? getValues(name)[index]
+            : fields[index],
         })
         remove(index)
       },
-      [remove, control, name, fields],
+      [remove, control, name, fields, getValues],
     )
 
     // 上移
@@ -368,12 +373,14 @@ export const ArrayFieldWidget = forwardRef<
             action: 'move',
             fromIndex: index,
             toIndex: index - 1,
-            value: fields[index],
+            value: Array.isArray(getValues(name))
+              ? getValues(name)[index]
+              : fields[index],
           })
           move(index, index - 1)
         }
       },
-      [move, control, name, fields],
+      [move, control, name, fields, getValues],
     )
 
     // 下移
@@ -385,12 +392,14 @@ export const ArrayFieldWidget = forwardRef<
             action: 'move',
             fromIndex: index,
             toIndex: index + 1,
-            value: fields[index],
+            value: Array.isArray(getValues(name))
+              ? getValues(name)[index]
+              : fields[index],
           })
           move(index, index + 1)
         }
       },
-      [move, fields.length, control, name, fields],
+      [move, fields.length, control, name, fields, getValues],
     )
 
     // ✅ 使用 useMemo 缓存所有 statusMap，避免每次渲染都创建新对象

@@ -57,8 +57,8 @@ import { LinkageOperationController } from './utils/linkageOperationController'
 import { builtInHelpers } from './utils/builtInHelpers'
 import {
   registerArrayActionStore,
-  consumeLatestArrayAction,
-  peekArrayAction,
+  consumeArrayActionForSnapshot,
+  clearArrayAction,
 } from './utils/arrayActionRegistry'
 import {
   createFieldVariantStore,
@@ -85,7 +85,9 @@ const EMPTY_HELPERS = {}
  * Select 多选不属于结构操作，因此显式排除。
  */
 function isDeepEqual(previousValue: unknown, value: unknown): boolean {
-  if (Object.is(previousValue, value)) return true
+  if (Object.is(previousValue, value)) {
+    return true
+  }
   if (Array.isArray(previousValue) && Array.isArray(value)) {
     return (
       previousValue.length === value.length &&
@@ -137,7 +139,9 @@ function inferArrayAction(
     return undefined
   }
   if (value.length > previousValue.length) {
-    if (value.length !== previousValue.length + 1) return undefined
+    if (value.length !== previousValue.length + 1) {
+      return undefined
+    }
     const candidates = value
       .map((_, index) => index)
       .filter((insertIndex) =>
@@ -152,7 +156,9 @@ function inferArrayAction(
       : undefined
   }
   if (value.length < previousValue.length) {
-    if (previousValue.length !== value.length + 1) return undefined
+    if (previousValue.length !== value.length + 1) {
+      return undefined
+    }
     const candidates = previousValue
       .map((_, index) => index)
       .filter((removeIndex) =>
@@ -853,10 +859,9 @@ const DynamicFormInner = React.memo(
       const pendingDataRef = useRef<Record<string, any> | null>(null)
       // 延迟 flush 的定时器句柄，用于合并连续同步写入。
       const changeFlushTimerRef = useRef<number | null>(null)
-      const arrayActionStore = useRef<{
-        path: string
-        action: ArrayAction
-      } | null>(null)
+      const arrayActionStore = useRef<
+        Array<{ path: string; action: ArrayAction }>
+      >([])
       registerArrayActionStore(methods.control, arrayActionStore)
       const latestOnChangeRef = useRef(onChange)
       latestOnChangeRef.current = onChange
@@ -1214,6 +1219,23 @@ const DynamicFormInner = React.memo(
 
       React.useEffect(() => {
         if (onChange) {
+          if (previousChangeDataRef.current === null) {
+            const initialData = methods.getValues()
+            const initialSchema = buildEffectiveSchemaTree({
+              schema,
+              value: initialData,
+              callbacks: callbacksRef.current,
+              helpers: mergedHelpers,
+              variantStore,
+            })
+            previousChangeDataRef.current = applyFieldTransforms(
+              transformFormData(initialData, initialSchema),
+              initialSchema,
+              callbacksRef.current,
+              mergedHelpers,
+              variantStore,
+            )
+          }
           const subscription = watch((data, { name }) => {
             const effectiveSchema = buildEffectiveSchemaTree({
               schema,
@@ -1236,24 +1258,44 @@ const DynamicFormInner = React.memo(
             const changes: FormChangeMeta['changes'] = []
             // RHF 路径优先；缺失时使用 setValue 保存的兜底路径。
             let changePath = name ?? pendingChangePathRef.current
-            const pendingArrayRecord = peekArrayAction(methods.control)
-            const explicitRecord =
-              pendingArrayRecord &&
-              (changePath === pendingArrayRecord.path ||
-                pendingArrayRecord.action.action === 'move')
-                ? consumeLatestArrayAction(methods.control)
-                : undefined
-            if (explicitRecord && explicitRecord.action.action === 'move') {
-              changePath = explicitRecord.path
+            let explicitArrayAction: ArrayAction | undefined
+            if (changePath) {
+              explicitArrayAction = consumeArrayActionForSnapshot(
+                methods.control,
+                changePath,
+                PathResolver.getNestedValue(previousData, changePath),
+                PathResolver.getNestedValue(externalData, changePath),
+              )
+              if (!explicitArrayAction) {
+                const parts = changePath.split('.')
+                for (let i = parts.length - 1; i > 0; i -= 1) {
+                  const candidate = parts.slice(0, i).join('.')
+                  const previousArray = PathResolver.getNestedValue(
+                    previousData,
+                    candidate,
+                  )
+                  const nextArray = PathResolver.getNestedValue(
+                    externalData,
+                    candidate,
+                  )
+                  if (
+                    Array.isArray(previousArray) &&
+                    Array.isArray(nextArray)
+                  ) {
+                    explicitArrayAction = consumeArrayActionForSnapshot(
+                      methods.control,
+                      candidate,
+                      previousArray,
+                      nextArray,
+                    )
+                    if (explicitArrayAction) {
+                      changePath = candidate
+                      break
+                    }
+                  }
+                }
+              }
             }
-            const explicitArrayAction =
-              explicitRecord &&
-              changePath &&
-              (changePath === explicitRecord.path ||
-                changePath.startsWith(`${explicitRecord.path}.`))
-                ? explicitRecord.action
-                : undefined
-            if (!changePath && explicitRecord) changePath = explicitRecord.path
             if (changePath && name && changePath.match(/\.\d+\.value$/)) {
               // 基本类型数组内部使用 path.value 包装，外部数据则使用数组元素路径。
               const primitiveArrayPath = changePath.replace(/\.value$/, '')
@@ -1295,7 +1337,18 @@ const DynamicFormInner = React.memo(
               )
               if (!isDeepEqual(previousValue, value)) {
                 const arrayAction =
-                  explicitArrayAction ??
+                  (explicitArrayAction &&
+                  ((explicitArrayAction.action === 'insert' &&
+                    Array.isArray(previousValue) &&
+                    Array.isArray(value) &&
+                    value.length === previousValue.length + 1) ||
+                    (explicitArrayAction.action === 'remove' &&
+                      Array.isArray(previousValue) &&
+                      Array.isArray(value) &&
+                      value.length === previousValue.length - 1) ||
+                    explicitArrayAction.action === 'move')
+                    ? explicitArrayAction
+                    : undefined) ??
                   inferArrayAction(schema, changePath, previousValue, value)
                 changes.push({
                   path: changePath,
@@ -1429,6 +1482,7 @@ const DynamicFormInner = React.memo(
                   const changesSnapshot = pendingChangesRef.current
                   pendingChangesRef.current = []
                   pendingDataRef.current = null
+                  clearArrayAction(methods.control)
                   latestOnChangeRef.current?.(nextData, {
                     changes: changesSnapshot,
                   })
@@ -1444,6 +1498,7 @@ const DynamicFormInner = React.memo(
             }
             pendingChangesRef.current = []
             pendingDataRef.current = null
+            clearArrayAction(methods.control)
           }
         }
       }, [watch])
