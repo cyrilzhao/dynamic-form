@@ -2,7 +2,7 @@
 
 ## 1. 文档信息
 
-- **状态**：设计中
+- **状态**：已确认，待实施
 - **目标版本**：待实现版本的下一个 minor 版本
 - **适用范围**：`src/components/DynamicForm`
 - **读者**：DynamicForm 维护者、组件封装者、业务接入方
@@ -139,6 +139,11 @@ export interface FieldChange {
 }
 
 export interface FormChangeMeta {
+  /**
+   * 创建本次稳定批次的顶层操作来源。
+   * 可选字段用于保持仅接收既有 meta.changes 的消费者兼容。
+   */
+  rootSource?: FieldChangeSource
   /** 本次稳定变更批次包含的字段变化 */
   changes: FieldChange[]
 }
@@ -182,9 +187,11 @@ onChange?: (
 
 一次对外字段变更事件按以下顺序产生：
 
-1. **触发修改**：用户 Widget、`ref.setValue`、`ref.setValues`、`reset` 或联动逻辑
-   向 RHF 写入值，并在操作上下文中标记 `source`；批量 API 在此阶段只增加批次
-   深度，不立即通知外部。
+1. **创建或加入稳定批次**：用户 Widget、`ref.setValue`、`ref.setValues`、`reset`
+   创建顶层批次，并在每次 RHF 写入的显式上下文中携带内部 `batchId` 与 `source`。
+   联动写入继承触发它的 `batchId`，但自身 `source` 固定为 `linkage`。批量 API 仍会
+   增加操作控制器的 batch 深度，以抑制递归写入过程中的中间联动刷新；这个内部深度
+   不是对外事件的批次边界。
 2. **watch 采集**：稳定的 watch 订阅收到 RHF 通知，取得变更 `name`（若 RHF 未
    提供路径，则使用 API 写入时保存的兜底路径）和当前原始表单快照。
 3. **外部值域转换**：使用采集时的 schema、callbacks、helpers 和 variant，依次
@@ -194,10 +201,11 @@ onChange?: (
    的新值；值未实际变化时丢弃该记录。数组结构操作在此处附加结构化 `arrayAction`。
 5. **批次归并**：按路径把记录写入待发送批次。同一路径重复写入时保留最初旧值，
    仅更新最终值、来源及数组动作；批量赋值和联动级联按稳定顺序保留多条记录。
-6. **调度 flush**：首次写入批次时安排一次微任务或零延迟定时器；后续 watch 通知
-   只更新同一批次，不重复安排 flush。
-7. **发送回调**：flush 开始时先交换出当前批次并清空队列，再读取最新的 `onChange`
-   引用，调用 `onChange(data, { changes })`。回调期间产生的新修改进入下一批次，
+6. **等待稳定**：批次只有在顶层操作已关闭、所有关联的同步/异步联动 run 都已成功
+   结束或被淘汰、且至少完成一次 RHF 通知稳定检查后，才允许安排 flush。不能仅依赖
+   微任务或零延迟定时器，因为 RHF watch 通知与联动队列的调度顺序彼此独立。
+7. **发送回调**：flush 开始时必须原子地脱离当前批次，再读取最新的 `onChange` 引用，
+   调用 `onChange(data, { rootSource, changes })`。回调期间产生的新修改必然创建下一批次，
    不会被本次清理覆盖。
 
 `data` 与 `changes` 必须来自同一个稳定快照；任何依赖变更不得重新解释已经入队的
@@ -219,7 +227,7 @@ onChange(
         source: 'user',
       },
     ],
-  }
+  },
 )
 ```
 
@@ -253,7 +261,13 @@ onChange(
 
 ### 7.4 `reset`
 
-重置产生 `source: 'reset'`；只报告前后值不同的字段。无参数重置为空值时，仍应使用字段 schema 推导出的正确空值进行比较。
+重置直接写入的字段产生 `source: 'reset'`，本次批次的 `rootSource` 为 `reset`；只报告
+前后值不同的字段。无参数重置为空值时，仍应使用字段 schema 推导出的正确空值进行比较。
+
+若 reset 的直接字段触发联动，联动目标必须标记为 `source: 'linkage'`，而不是 `reset`。
+例如 `reset({ country: 'CN' })` 使联动将 `province` 写为 `Shanghai` 时，`country` 的
+`source` 是 `reset`，`province` 的 `source` 是 `linkage`，两者都包含在
+`rootSource: 'reset'` 的同一稳定批次内。
 
 ### 7.5 联动变化
 
@@ -264,6 +278,24 @@ onChange(
 3. 后续级联目标。
 
 若联动设置的值与现值相同，不生成事件，避免循环联动产生噪声。
+
+#### 7.5.1 `rootSource` 与字段 `source`
+
+`rootSource` 描述谁开启了本次顶层逻辑操作，`FieldChange.source` 描述各路径的最终值
+由谁写入。二者的约定如下：
+
+| 顶层操作                                              | `rootSource` | 直接字段 `source` | 联动目标 `source` |
+| ----------------------------------------------------- | ------------ | ----------------- | ----------------- |
+| 用户输入                                              | `user`       | `user`            | `linkage`         |
+| `setValue`                                            | `setValue`   | `setValue`        | `linkage`         |
+| `setValues`                                           | `setValues`  | `setValues`       | `linkage`         |
+| `reset`                                               | `reset`      | `reset`           | `linkage`         |
+| 仅刷新联动（context/schema/functions 变化或显式刷新） | `linkage`    | 无                | `linkage`         |
+
+同一路径在一个批次内被多次写入时，保留批次开始前的 `previousValue` 和首次出现顺序，
+仅把 `value`、`source`、`arrayAction` 更新为最终稳定结果。因此用户输入后又被联动覆盖
+的同一路径，最终 `source` 是 `linkage`；需要知道根本触发者的消费者应读取
+`rootSource`，不能把字段 `source` 当作完整因果链。
 
 ### 7.6 数组结构操作
 
@@ -388,17 +420,53 @@ RHF 内部包装对象或引用变化误报事件。为兼容旧消费者，`met
 
 ### 9.1 批处理边界
 
-事件聚合应复用现有操作控制器的 batch 生命周期：开始批处理时创建批次上下文，期间记录前后值，批处理结束后基于最终快照一次性回调。当前控制器只有 `batchDepth`、`pendingLinkage` 和版本号，没有对外可用的 `batchId`。
+事件聚合由独立的 `ChangeBatchController` 管理，而不是复用现有
+`LinkageOperationController.batchDepth`。后者只用于阻止 `setValues` 的递归写入在中途
+刷新联动；它无法描述异步联动生命周期、对外来源和 callback 重入边界。
 
-首版不引入 `batchId`：在“一次稳定批处理对应一次 `onChange`”的契约下，`changes` 已经提供完整的批次边界。只有未来需要将同一逻辑操作拆分为多次回调，并让审计、埋点或事务追踪跨回调关联时，才应增加由表单操作上下文生成并贯穿联动传播的 `batchId`。
+每个顶层操作在内部创建 `batchId`，并通过下列上下文贯穿直接写入、watch 采集与联动
+写回：
+
+```ts
+interface FormMutationContext {
+  /** 仅供内部将 RHF 写入和联动 run 归属到正确批次，不作为公共 API 暴露。 */
+  batchId: number
+  /** 此次写入的直接来源；联动写入固定为 linkage。 */
+  source: FieldChangeSource
+  /** 区分联动写回与外部 API 的直接写入，避免从全局可变状态猜测来源。 */
+  isLinkageWrite: boolean
+}
+```
+
+`ChangeBatchController` 至少保存批次根来源、批次开始前的外部快照、按路径去重的
+`Map<string, FieldChange>`、关联的 pending linkage run、根操作关闭状态和 flush 状态。
+内部 `batchId` 是防止异步结果串批所必需的实现细节；公共 `FormChangeMeta` 不暴露它，
+因为当前每个顶层操作只允许产生一次回调，消费者没有跨回调关联的需求。
+
+所有 `beginBatch()` 必须通过 `try/finally` 与 `endBatch()` 配对，防止异常路径永久压住
+后续联动刷新。
 
 ### 9.2 异步联动
 
-异步联动的旧结果被版本控制丢弃时，不应产生字段事件。只有最终成功提交到表单状态的变化才进入 `changes`。
+linkage manager 为由某批次触发的每个联动任务创建 run，并登记其 `runId` 和 `batchId`。
+联动函数完成后，只有 token 仍有效的结果才能以 `source: 'linkage'` 写回 RHF；写回后的
+watch 通知继续归入原批次，后续级联也必须继承同一 `batchId`。
+
+无论 run 成功、无实际变化、抛错还是被新输入/`silence: true` 淘汰，都必须在 finally
+路径解除 pending 登记。只有根操作已经关闭、pending run 为空且 RHF 通知稳定后，批次
+才允许发送。失效的旧结果不得写回表单、不得写入 `changes`、不得额外触发 `onChange`。
+
+显式 `refreshLinkage()`，以及 linkageContext、schema、linkageFunctions 变更导致的纯联动
+写入，应创建 `rootSource: 'linkage'` 的批次；如果最终外部值域没有差异，不发送空回调。
 
 ### 9.3 回调异常
 
-`onChange` 抛出的异常不应回滚已经完成的表单更新，也不应阻塞联动队列和校验流程。异常交由 React 应用层错误边界或统一日志机制处理。
+稳定通知是异步的；因此 `onChange` 在调度回调中抛出的异常不能依赖 React Error Boundary
+可靠捕获。组件不得静默吞掉该异常，也不得回滚已经完成的表单更新或阻塞联动队列和校验。
+
+flush 必须在调用用户回调前原子地 detach 当前批次并完成内部清理。这样即使用户回调抛错，
+已发送批次也不会恢复或重复发送，后续用户操作仍可创建并发送新的独立批次。应用可以通过
+运行环境的异步异常机制或统一监控记录异常。
 
 ### 9.4 watch 订阅与 effect 依赖竞态
 
@@ -412,22 +480,16 @@ RHF 内部包装对象或引用变化误报事件。为兼容旧消费者，`met
 实现时应遵循以下约束：
 
 1. watch 订阅 effect 仅依赖稳定的 `watch` 引用；`onChange`、`schema`、
-   callbacks、helpers、variant 等转换配置通过 refs 保存最新值，定时器回调读取
-   refs，而不是捕获旧闭包。
-2. 待发送事件先构造成不可变的批次快照（最终 `data` 与 `changes`），再入队；
-   effect 重新执行不得清理、覆盖或重置该队列。只有组件卸载时才允许按产品策略
-   丢弃尚未发送的事件。
-3. flush 必须交换并清空当前队列后再调用最新的 `onChange`，这样回调期间产生的
-   新事件会进入下一批次，不会被清空操作覆盖。
-4. 事件采集时即完成外部值域转换并固定快照。schema 或转换配置变化后，旧批次
-   仍使用采集时的值和路径语义，新事件使用最新配置，不得重新解释旧事件。
-5. 同一路径在同一批次内多次写入时，保留批次开始前的 `previousValue`，仅更新
+   callbacks、helpers、variant 等转换配置通过 refs 保存最新值，稳定检查读取 refs，
+   不捕获旧闭包。
+2. 待发送事件属于 `ChangeBatchController`，effect 重新执行不得清理、覆盖或重置
+   已存在的批次。只有组件卸载才取消调度，并使尚未提交的 run 失效。
+3. 事件在正确的外部值域中采集并固定；schema 或转换配置变化后，旧批次仍使用
+   采集时的值和路径语义，新事件使用新配置，不得重新解释旧事件。
+4. 同一路径在同一批次内多次写入时，保留批次开始前的 `previousValue`，仅更新
    最终 `value`、`source` 和 `arrayAction`；跨 effect 重建不得重新开始比较基线。
-
-推荐使用两个 refs：`latestConfigRef` 保存所有外部依赖，`pendingBatchRef` 保存
-当前待 flush 的批次和 timer 状态。若运行环境支持 `queueMicrotask`，可用微任务
-替代零延迟定时器；无论采用何种调度方式，都必须满足上述“不因依赖变化丢事件”的
-保证。
+5. 不能把更长的 timer、更多的微任务或“等待队列暂时为空”作为稳定条件。这些方案
+   不能表达异步 run 的真实完成状态，会重新引入中间快照、重复回调或来源错标。
 
 ## 10. 兼容性与版本策略
 
@@ -435,8 +497,11 @@ RHF 内部包装对象或引用变化误报事件。为兼容旧消费者，`met
 2. 第二参数为可选，旧消费者无需修改。
 3. 新增类型通过组件入口统一导出。
 4. 不改变 Widget 层 `onChange(value)` 签名。
-5. 在变更日志中说明：只有实际值变化才会出现在 `meta.changes`。
-6. 若未来需要改变字段路径或值域，必须引入新的版本化字段，不能静默改变现有字段含义。
+5. `onChange` 是稳定批次完成后的异步通知。公开的 `setValue`、`setValues`、`reset`
+   仍返回 `void`，调用方不能 `await` 它们，也不能在同一同步调用栈中假定回调已执行。
+6. 在变更日志中说明：只有实际值变化才会出现在 `meta.changes`；调用方应等待回调或
+   订阅自身状态变化，而不是在调用 ref API 后同步读取由回调驱动的外部状态。
+7. 若未来需要改变字段路径或值域，必须引入新的版本化字段，不能静默改变现有字段含义。
 
 ## 11. 测试设计
 
@@ -449,14 +514,22 @@ RHF 内部包装对象或引用变化误报事件。为兼容旧消费者，`met
 - watch effect 因 `onChange`、schema 或转换配置变化而重建时，已排队事件仍能发送；
 - flush 使用最新的 `onChange`，且不会把回调期间产生的新事件清空；
 - 组件卸载时按约定清理订阅、定时器和待发送队列。
+- ChangeBatchController 固定首次 `previousValue` 与路径首次出现顺序，后续同路径写入
+  只更新最终 value/source/arrayAction；不同批次和 pending run 必须相互隔离。
+- 根操作未关闭、有 pending run 或尚未完成稳定检查时不得 flush；run 成功、失败、
+  无变化和淘汰都必须解除 pending 登记。
 
 ### 11.2 集成测试
 
 - 用户编辑普通字段，`source` 为 `user`；
 - `ref.setValue`，`source` 为 `setValue`；
 - `ref.setValues` 只回调一次且不暴露中间态；
-- `reset` 正确报告变化字段；
-- 联动产生的派生字段标记为 `linkage`；
+- `setValues` 直接赋值的字段又被联动覆盖时，只回调一次，快照为最终值，且同路径不重复；
+- `reset` 的直接字段为 `reset`，其联动目标为 `linkage`，整个批次 `rootSource` 为 `reset`；
+- 联动产生的派生字段标记为 `linkage`，并与触发字段及多层级联结果在同一个稳定批次内；
+- 异步联动成功时与直接字段合并；新输入或 `silence: true` 淘汰旧结果时，不得泄露旧事件；
+- 回调中调用 `setValue`、`setValues` 或 `reset` 时，新修改必须成为下一独立批次；
+- `onChange` 抛错后，表单最终值不回滚，且后续独立批次仍能正常发送；
 - 嵌套表单返回绝对路径；
 - 对象数组内字段返回如 `permissions.0.actions` 的路径；
 - 数组插入、删除和移动操作携带结构化 `arrayAction`（`insert`、`remove`、`move`），且数组结构事件的 `path` 指向数组字段；
@@ -469,14 +542,15 @@ RHF 内部包装对象或引用变化误报事件。为兼容旧消费者，`met
 ### 阶段一：契约与兼容层
 
 - 增加 `FieldChangeSource`、`ArrayAction`、`FieldChange`、`FormChangeMeta` 类型；
-- 扩展 `onChange` 类型但保持第一参数不变；
-- 明确绝对路径、存储域值和稳定批处理边界；首版不生成无实际消费方的 `batchId`。
+- 扩展 `onChange` 类型和 `FormChangeMeta.rootSource`，但保持第一参数不变；
+- 明确绝对路径、存储域值和稳定批处理边界；`batchId` 仅作为内部实现细节生成，
+  不在首版公共 meta 中暴露。
 
 ### 阶段二：变更采集与聚合
 
-- 在统一 watch 层记录字段前后值；
-- 为 ref API、reset 和联动操作标记来源；
-- 复用 batch 生命周期聚合 `setValues` 和联动级联。
+- 新增独立的 ChangeBatchController，在统一 watch 层按 batchId 记录字段前后值；
+- 为 ref API、reset 和联动操作传递显式 mutation context，避免全局 source 串批；
+- 让 linkage run 登记、完成和淘汰均回写批次生命周期，聚合 `setValues`、同步/异步联动级联。
 
 ### 阶段三：测试、文档与迁移
 
@@ -489,12 +563,13 @@ RHF 内部包装对象或引用变化误报事件。为兼容旧消费者，`met
 
 - 现有 `onChange(data)` 消费者行为不变；
 - 新消费者可通过 `meta.changes` 精确识别字段、前值、后值和来源；
-- 批量赋值不产生中间态回调；
+- 批量赋值、重置或用户输入及其同步/异步联动只产生一次最终稳定回调，且 `rootSource`
+  与每条 FieldChange.source 符合 §7.5.1；
 - 嵌套对象、数组和嵌套 DynamicForm 的路径稳定且可定位；
 - 数组结构变更能够生成正确的 `insert/remove/move` 动作，歧义场景不会误报；
-- transform、联动和异步竞态不会泄露内部值或过期事件；
+- transform、联动和异步竞态不会泄露内部值、过期事件、静默事件或卸载后事件；
 - 类型检查、现有 DynamicForm 测试及新增事件测试通过。
 
 ## 14. 结论
 
-DynamicForm 应将现有完整快照回调扩展为“完整快照 + 可选变更元数据”，而不是替换为破坏性事件对象或立即引入第二套字段回调。以 `changes`、前后值、来源和稳定批处理边界为核心的首版契约，能够覆盖当前用户交互、ref API、批量赋值、重置、联动和嵌套数组场景；未来若出现跨回调追踪需求，再独立增加 `batchId`。
+DynamicForm 应将现有完整快照回调扩展为“完整快照 + 可选变更元数据”，而不是替换为破坏性事件对象或立即引入第二套字段回调。以 `rootSource`、`changes`、前后值、字段最终来源和稳定批处理边界为核心的首版契约，能够覆盖当前用户交互、ref API、批量赋值、重置、同步/异步联动和嵌套数组场景。内部 `batchId` 仅用于保证异步传播不会串批；若未来业务确有跨回调追踪需求，再单独设计版本化的公共关联字段。
