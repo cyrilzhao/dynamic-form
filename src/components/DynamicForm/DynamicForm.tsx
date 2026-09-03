@@ -837,6 +837,14 @@ const DynamicFormInner = React.memo(
       const operationController =
         inheritedLinkageStateContext?.operationController ??
         ownOperationControllerRef.current
+      const operationControllerRef = useRef(operationController)
+      operationControllerRef.current = operationController
+
+      const schemaRef = useRef(schema)
+      schemaRef.current = schema
+
+      const variantStoreRef = useRef(variantStore)
+      variantStoreRef.current = variantStore
 
       // ✅ 使用 useRef 保持 methods 引用稳定，避免触发不必要的重新计算
       const methodsRef = React.useRef(methods)
@@ -1224,38 +1232,39 @@ const DynamicFormInner = React.memo(
 
       React.useEffect(() => {
         if (onChange) {
+          const subscribedMethods = methodsRef.current
           if (previousChangeDataRef.current === null) {
-            const initialData = methods.getValues()
+            const initialData = subscribedMethods.getValues()
             const initialSchema = buildEffectiveSchemaTree({
-              schema,
+              schema: schemaRef.current,
               value: initialData,
               callbacks: callbacksRef.current,
-              helpers: mergedHelpers,
-              variantStore,
+              helpers: helpersRef.current,
+              variantStore: variantStoreRef.current,
             })
             previousChangeDataRef.current = applyFieldTransforms(
               transformFormData(initialData, initialSchema),
               initialSchema,
               callbacksRef.current,
-              mergedHelpers,
-              variantStore,
+              helpersRef.current,
+              variantStoreRef.current,
             )
           }
           const subscription = watch((data, { name }) => {
             const effectiveSchema = buildEffectiveSchemaTree({
-              schema,
+              schema: schemaRef.current,
               value: data,
               callbacks: callbacksRef.current,
-              helpers: mergedHelpers,
-              variantStore,
+              helpers: helpersRef.current,
+              variantStore: variantStoreRef.current,
             })
             const processedData = transformFormData(data, effectiveSchema)
             const externalData = applyFieldTransforms(
               processedData,
               effectiveSchema,
               callbacksRef.current,
-              mergedHelpers,
-              variantStore,
+              helpersRef.current,
+              variantStoreRef.current,
             )
             // 以上一次对外快照为基线；首次通知没有旧快照时使用空对象。
             const previousData = previousChangeDataRef.current ?? {}
@@ -1266,7 +1275,7 @@ const DynamicFormInner = React.memo(
             let explicitArrayAction: ArrayAction | undefined
             if (changePath) {
               explicitArrayAction = consumeArrayActionForSnapshot(
-                methods.control,
+                subscribedMethods.control,
                 changePath,
                 PathResolver.getNestedValue(previousData, changePath),
                 PathResolver.getNestedValue(externalData, changePath),
@@ -1288,7 +1297,7 @@ const DynamicFormInner = React.memo(
                     Array.isArray(nextArray)
                   ) {
                     explicitArrayAction = consumeArrayActionForSnapshot(
-                      methods.control,
+                      subscribedMethods.control,
                       candidate,
                       previousArray,
                       nextArray,
@@ -1354,13 +1363,19 @@ const DynamicFormInner = React.memo(
                     explicitArrayAction.action === 'move')
                     ? explicitArrayAction
                     : undefined) ??
-                  inferArrayAction(schema, changePath, previousValue, value)
+                  inferArrayAction(
+                    schemaRef.current,
+                    changePath,
+                    previousValue,
+                    value,
+                  )
                 changes.push({
                   path: changePath,
                   previousValue,
                   value,
                   source: name
-                    ? operationController.getMutationSource() === 'linkage'
+                    ? operationControllerRef.current.getMutationSource() ===
+                      'linkage'
                       ? 'linkage'
                       : changeSourceRef.current
                     : (pendingChangeSourceRef.current ??
@@ -1382,7 +1397,7 @@ const DynamicFormInner = React.memo(
                   // 推断数组长度变化或相邻元素交换，供业务区分结构操作。
                   let arrayAction: ArrayAction | undefined
                   // 当前路径对应的 schema，用于排除 Select 多选数组。
-                  const fieldSchema = getSchemaAtPath(schema, path)
+                  const fieldSchema = getSchemaAtPath(schemaRef.current, path)
                   if (
                     fieldSchema?.type === 'array' &&
                     fieldSchema.ui?.widget !== 'select' &&
@@ -1456,7 +1471,7 @@ const DynamicFormInner = React.memo(
                     path,
                     previousValue,
                     value,
-                    source: operationController.getMutationSource(),
+                    source: operationControllerRef.current.getMutationSource(),
                     ...(arrayAction ? { arrayAction } : {}),
                   })
                 }
@@ -1487,7 +1502,7 @@ const DynamicFormInner = React.memo(
                   const changesSnapshot = pendingChangesRef.current
                   pendingChangesRef.current = []
                   pendingDataRef.current = null
-                  clearArrayAction(methods.control)
+                  clearArrayAction(subscribedMethods.control)
                   latestOnChangeRef.current?.(nextData, {
                     changes: changesSnapshot,
                   })
@@ -1503,18 +1518,10 @@ const DynamicFormInner = React.memo(
             }
             pendingChangesRef.current = []
             pendingDataRef.current = null
-            clearArrayAction(methods.control)
+            clearArrayAction(subscribedMethods.control)
           }
         }
-      }, [
-        mergedHelpers,
-        methods,
-        onChange,
-        operationController,
-        schema,
-        variantStore,
-        watch,
-      ])
+      }, [watch, onChange])
 
       // ✅ 使用 useCallback 缓存 onSubmitHandler，避免每次渲染创建新函
       const onSubmitHandler = useCallback(

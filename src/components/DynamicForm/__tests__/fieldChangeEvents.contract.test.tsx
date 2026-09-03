@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom'
 import React from 'react'
 import { act, fireEvent, waitFor } from '@testing-library/react'
+import { DynamicForm } from '../DynamicForm'
 import type { ExtendedJSONSchema } from '../types/schema'
 import {
   renderDynamicForm,
@@ -663,5 +664,53 @@ describe('DynamicForm 字段变更事件契约', () => {
     })
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('更新 schema 后应继续使用原订阅并按最新 transform 输出变更数据', async () => {
+    const onChange = jest.fn()
+    const initialSchema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: { score: { type: 'number', title: 'Score' } },
+    }
+    const transformedSchema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        score: {
+          type: 'number',
+          title: 'Score',
+          ui: { transform: { callback: 'toDecimal' } },
+        },
+      },
+    }
+    const callbacks = {
+      toDecimal: ({ value }: { value: number }) => value / 100,
+    }
+    const { formRef, rerender } = renderDynamicForm({
+      props: { schema: initialSchema, onChange, callbacks },
+    })
+    await waitForFormReady({ formRef })
+    onChange.mockClear()
+
+    rerender(
+      <DynamicForm
+        ref={formRef}
+        schema={transformedSchema}
+        onChange={onChange}
+        onSubmit={jest.fn()}
+        callbacks={callbacks}
+      />,
+    )
+
+    await act(async () => {
+      formRef.current!.setValue('score', 50)
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+
+    expect(onChange).toHaveBeenCalledWith(
+      { score: 0.5 },
+      expect.objectContaining({
+        changes: [expect.objectContaining({ path: 'score', value: 0.5 })],
+      }),
+    )
   })
 })
