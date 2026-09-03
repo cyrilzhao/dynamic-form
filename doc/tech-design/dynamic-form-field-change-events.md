@@ -297,6 +297,76 @@ onChange(
 的同一路径，最终 `source` 是 `linkage`；需要知道根本触发者的消费者应读取
 `rootSource`，不能把字段 `source` 当作完整因果链。
 
+#### 7.5.2 用户输入触发多层联动示例
+
+用户将 `country` 从 `US` 改为 `CN`，第一层联动写入 `province: 'Shanghai'`，第二层联动
+再写入 `city: 'Shanghai'`。三条变化必须在同一稳定批次中返回：
+
+```ts
+onChange(
+  { country: 'CN', province: 'Shanghai', city: 'Shanghai' },
+  {
+    rootSource: 'user',
+    changes: [
+      { path: 'country', previousValue: 'US', value: 'CN', source: 'user' },
+      {
+        path: 'province',
+        previousValue: undefined,
+        value: 'Shanghai',
+        source: 'linkage',
+      },
+      {
+        path: 'city',
+        previousValue: undefined,
+        value: 'Shanghai',
+        source: 'linkage',
+      },
+    ],
+  },
+)
+```
+
+这里 `province` 与 `city` 的 `source` 是 `linkage`，但整条变化链仍由用户开启，故
+`rootSource` 是 `user`。
+
+#### 7.5.3 `setValues` 被联动覆盖的去重示例
+
+`setValues({ country: 'CN', province: 'Beijing' })` 会先直接写入两个字段，再由联动把
+`province` 改为 `Shanghai`。最终只能产生一条 `province` 记录：它保留批次开始前的
+`previousValue` 和首次出现位置，更新为最终的值和来源。
+
+```ts
+onChange(
+  { country: 'CN', province: 'Shanghai', city: 'Shanghai' },
+  {
+    rootSource: 'setValues',
+    changes: [
+      {
+        path: 'country',
+        previousValue: undefined,
+        value: 'CN',
+        source: 'setValues',
+      },
+      {
+        path: 'province',
+        previousValue: undefined,
+        value: 'Shanghai',
+        source: 'linkage',
+      },
+      {
+        path: 'city',
+        previousValue: undefined,
+        value: 'Shanghai',
+        source: 'linkage',
+      },
+    ],
+  },
+)
+```
+
+这不是逐次 RHF 写入的日志，因此不得同时包含 `province: 'Beijing'` 和
+`province: 'Shanghai'` 两条记录。被新操作淘汰的异步联动结果同样不得进入任何批次。
+
 ### 7.6 数组结构操作
 
 数组新增、删除或移动应生成一条 `FieldChange`，其 `path` 为数组字段路径，
@@ -446,6 +516,59 @@ interface FormMutationContext {
 所有 `beginBatch()` 必须通过 `try/finally` 与 `endBatch()` 配对，防止异常路径永久压住
 后续联动刷新。
 
+#### 9.1.1 批次实体与控制器职责
+
+每个逻辑操作对应一个内部 `ChangeBatch`。其中 `changesByPath` 必须使用 `Map`：它既避免
+同路径归并时的线性查找，也固定字段第一次发生变化的输出顺序，避免对象的 numeric-string
+key 枚举规则影响事件顺序。
+
+```ts
+interface ChangeBatch {
+  /** 单调递增的内部标识，只用于关联写入和异步联动 run。 */
+  id: number
+  /** 整条逻辑操作的初始来源。 */
+  rootSource: FieldChangeSource
+  /** 批次创建时的外部存储域快照，用于固定 previousValue。 */
+  baseData: Record<string, unknown>
+  /** 以首次出现顺序归并的变化；后写同路径只更新最终结果。 */
+  changesByPath: Map<string, FieldChange>
+  /** 尚未完成、失败或淘汰处理的联动 run。 */
+  pendingLinkageRunIds: Set<string>
+  /** 顶层 API 或用户交互已结束，不再预期新的直接写入。 */
+  rootOperationClosed: boolean
+  /** 已 detach 并发送的批次不能再次接收写入。 */
+  flushed: boolean
+  /** 防止每一个 watch 通知都重复安排稳定检查。 */
+  flushCheckScheduled: boolean
+}
+```
+
+新增的 `ChangeBatchController` 应只管理对外事件批次，负责创建批次、记录变化、关联/解除
+联动 run、判断稳定、原子 detach、处理重入和卸载。它不应承担联动规则计算；规则计算和
+`LinkageRunToken` 的失效判断仍属于 `useLinkageManager` 与现有操作控制器。
+
+其对外给 DynamicForm 内部使用的方法参数超过两个时必须使用对象参数，例如
+`beginBatch({ rootSource, baseData })`、`recordChange({ batchId, change })`、
+`trackLinkageRun({ batchId, runId })`、`completeLinkageRun({ batchId, runId })`。这既满足
+项目函数参数规范，也使批次与 run 的归属不依赖位置参数或全局可变 ref。
+
+#### 9.1.2 写入上下文与归属流程
+
+写入必须携带 `FormMutationContext`，不能继续依据“最后一次全局 source”推断来源。三类
+入口的绑定规则如下：
+
+1. **同步直接写入**：Widget、`setValue`、`setValues`、`reset` 创建批次并进入上下文；
+   watch 将变化归入该 batch，顶层操作结束后关闭根操作。`setValues` 保留 `batchDepth`，
+   只在最终快照启动联动。
+2. **联动写入**：任务创建时继承触发 batchId 并登记 run；`applyLinkageResults` 在
+   `{ batchId, source: 'linkage', isLinkageWrite: true }` 上下文中写回 RHF。run 成功、无变化、
+   失败或 token 失效时都必须解除登记。
+3. **主动纯联动刷新**：`refreshLinkage` 或 linkageContext/schema/linkageFunctions 更新
+   创建 `rootSource: 'linkage'` 批次；仅记录成功提交的真实差异，无差异不回调。
+
+flush 时先 detach 并关闭旧批次，再调用用户 `onChange`。因此回调内的表单写入必然创建新
+批次，绝不能重新使用已发送批次。
+
 ### 9.2 异步联动
 
 linkage manager 为由某批次触发的每个联动任务创建 run，并登记其 `runId` 和 `batchId`。
@@ -455,6 +578,12 @@ watch 通知继续归入原批次，后续级联也必须继承同一 `batchId`�
 无论 run 成功、无实际变化、抛错还是被新输入/`silence: true` 淘汰，都必须在 finally
 路径解除 pending 登记。只有根操作已经关闭、pending run 为空且 RHF 通知稳定后，批次
 才允许发送。失效的旧结果不得写回表单、不得写入 `changes`、不得额外触发 `onChange`。
+
+批次只等待由 linkage manager 显式登记、并受 `LinkageRunToken` 管理的 run，不等待任何
+脱离控制器的业务 Promise。每个已登记 run 都必须保证“正常 settle”或“因新 mutation、
+静默写入、卸载而取消并解除登记”二者之一；联动实现若访问网络或外部资源，应在自身边界
+设置可取消请求或业务超时，不能以一个永不 settle 的 Promise 无限阻塞 `onChange`。框架
+不以任意延迟 timer 伪造超时完成，因为那会让尚未确认失效的结果在事件已发送后写回表单。
 
 显式 `refreshLinkage()`，以及 linkageContext、schema、linkageFunctions 变更导致的纯联动
 写入，应创建 `rootSource: 'linkage'` 的批次；如果最终外部值域没有差异，不发送空回调。
@@ -491,6 +620,23 @@ flush 必须在调用用户回调前原子地 detach 当前批次并完成内部
 5. 不能把更长的 timer、更多的微任务或“等待队列暂时为空”作为稳定条件。这些方案
    不能表达异步 run 的真实完成状态，会重新引入中间快照、重复回调或来源错标。
 
+### 9.5 异步与竞态风险矩阵
+
+| 风险                                | 可能表现                              | 设计保护                                                   | 必测场景                                             |
+| ----------------------------------- | ------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------- |
+| RHF watch 延后通知                  | API 返回时部分路径尚未采集            | 根操作关闭后仍执行稳定检查                                 | `setValues` 的全部递归路径均被收集                   |
+| `setValues` 中间态                  | 联动读取半成品并多次写回              | 保留 `batchDepth`，只基于最终快照启动联动                  | 多字段批量赋值只按最终值联动                         |
+| 直接写入与 linkage 交错             | 直接字段被错误标为 `linkage`          | 每次写入显式携带 batchId/source                            | 批量写入后联动覆盖同路径                             |
+| 同路径多次写入                      | 重复 path 或 previousValue 漂移       | `Map` 固定首次旧值和顺序，覆盖最终结果                     | user/API 后被 linkage 覆盖                           |
+| 多层或并行联动                      | 第一层完成就 flush，或返回顺序不稳定  | 每个 run 绑定 batch；首次发现路径固定顺序                  | `country -> province -> city`、并行两个目标          |
+| 旧异步结果晚到                      | 旧请求覆盖新用户输入并产生幽灵事件    | `LinkageRunToken.canCommit()` 与 batchId 双重校验          | 慢请求 A、快请求 B，最终仅含 B                       |
+| 新操作、reset 或 silence 打断旧 run | 旧结果写入新快照或静默操作泄露事件    | 新 mutation 使旧 token 失效；失效 run 不写回且解除 pending | 异步联动未完成时 reset；静默 setValues               |
+| 回调内重入                          | 新事件被旧 flush 清空或混入旧 meta    | flush 前原子 detach                                        | onChange 内 setValue/setValues/reset                 |
+| 回调抛异常                          | 半清理导致后续批次无法发送            | detach 后再调用回调，异常不恢复旧批次                      | 抛错后下一次操作仍可回调                             |
+| 卸载                                | timer/run 晚到后仍回调                | dispose、取消调度、解除订阅、失效 run                      | 卸载前存在待发批次或异步 run                         |
+| schema/transform/callback 更新      | 旧 batch 被新配置重解释，或调用旧回调 | 批次固定采集值；flush 读取最新 callback ref                | 配置变化时旧数据不漂移、回调更新生效                 |
+| 嵌套表单与数组操作                  | 子父重复/漏事件，或内部路径重复       | `asNestedForm` 共享根批次；数组动作绑定数组根路径          | 嵌套数组联动；独立子表单不冒泡；结构操作混合字段编辑 |
+
 ## 10. 兼容性与版本策略
 
 1. 保留 `onChange` 第一参数及其数据格式。
@@ -505,37 +651,42 @@ flush 必须在调用用户回调前原子地 detach 当前批次并完成内部
 
 ## 11. 测试设计
 
-### 11.1 单元测试
+### 11.1 ChangeBatchController 单元测试
 
-- 相同值赋值不会产生变化事件；
-- 前后值比较支持 `undefined`、`null`、数组和对象；
-- transform 前后的事件值均符合外部存储域契约；
-- `changes` 的路径、顺序和前后值正确；数组结构动作的判别联合字段正确。
-- watch effect 因 `onChange`、schema 或转换配置变化而重建时，已排队事件仍能发送；
-- flush 使用最新的 `onChange`，且不会把回调期间产生的新事件清空；
-- 组件卸载时按约定清理订阅、定时器和待发送队列。
-- ChangeBatchController 固定首次 `previousValue` 与路径首次出现顺序，后续同路径写入
-  只更新最终 value/source/arrayAction；不同批次和 pending run 必须相互隔离。
-- 根操作未关闭、有 pending run 或尚未完成稳定检查时不得 flush；run 成功、失败、
-  无变化和淘汰都必须解除 pending 登记。
+该层不依赖 React、RHF 或 timer，专门固定数据结构和 flush 不变量：
 
-### 11.2 集成测试
+- 首次记录固定 `previousValue`；同路径第二次记录保留位置，只更新最终
+  value/source/arrayAction；多路径按首次出现顺序返回；
+- 相同值、空 changes、根操作未关闭、存在 pending run、尚未完成稳定检查时均不可 flush；
+- run 成功、失败、无变化和淘汰都会解除 pending；flush 后同一 batch 拒绝再写入；
+- 新批次不影响旧批次的历史快照和 pending run，包含数字字符串路径的顺序回归。
 
-- 用户编辑普通字段，`source` 为 `user`；
-- `ref.setValue`，`source` 为 `setValue`；
-- `ref.setValues` 只回调一次且不暴露中间态；
-- `setValues` 直接赋值的字段又被联动覆盖时，只回调一次，快照为最终值，且同路径不重复；
-- `reset` 的直接字段为 `reset`，其联动目标为 `linkage`，整个批次 `rootSource` 为 `reset`；
-- 联动产生的派生字段标记为 `linkage`，并与触发字段及多层级联结果在同一个稳定批次内；
-- 异步联动成功时与直接字段合并；新输入或 `silence: true` 淘汰旧结果时，不得泄露旧事件；
-- 回调中调用 `setValue`、`setValues` 或 `reset` 时，新修改必须成为下一独立批次；
-- `onChange` 抛错后，表单最终值不回滚，且后续独立批次仍能正常发送；
-- 嵌套表单返回绝对路径；
-- 对象数组内字段返回如 `permissions.0.actions` 的路径；
-- 数组插入、删除和移动操作携带结构化 `arrayAction`（`insert`、`remove`、`move`），且数组结构事件的 `path` 指向数组字段；
-- 数组动作优先使用结构操作边界记录的索引和值；无法唯一 diff 时不猜测动作；
-- 重复数组值场景通过显式操作元数据仍能正确报告；纯快照无法判定时安全降级；
-- 现有只接收一个参数的 `onChange` 测试全部保持通过。
+### 11.2 linkage 与操作控制器集成测试
+
+该层验证 run 与 batch 的绑定，不把异步协调逻辑仅留给 DynamicForm 黑盒测试：
+
+- 一层、多层和并行联动均继承 batchId，所有 run 完成前不得 flush；
+- token 失效的旧结果、reset 打断的旧结果和 `silence: true` 打断的旧结果都不得提交；
+- `setValues` 只在 `batchDepth` 结束后的最终快照计算联动，异常路径后深度必须归零；
+- `refreshLinkage`、linkageContext、schema、linkageFunctions 刷新有真实写入时形成
+  `rootSource: 'linkage'` 批次，无差异时不产生空事件。
+
+### 11.3 DynamicForm 公共契约测试
+
+- 用户、`setValue`、`setValues`、`reset` 的 `rootSource` 与直接字段 `source` 正确；
+- 用户输入触发一层/多层联动时，所有最终字段在一次回调内返回，联动字段为 `linkage`；
+- `setValues` 的目标字段被联动覆盖时，只回调一次、无中间值、同路径不重复；
+- `reset` 的直接字段为 `reset`，联动目标为 `linkage`，整个批次 `rootSource` 为 `reset`；
+- 异步联动成功时与直接字段合并；慢请求被快请求、新输入或静默操作淘汰时不泄露旧事件；
+- callback 内 `setValue`、`setValues`、`reset` 均生成下一独立批次；回调抛错后表单值不回滚，
+  后续批次仍可发送；卸载前存在待发批次/run 时不再回调；
+- transform、reverseTransform、基本类型数组解包和 schema 过滤后的 `data`、`previousValue`、
+  `value` 始终处于同一外部存储域；
+- 嵌套表单返回绝对路径，`asNestedForm` 共享批次，独立子 DynamicForm 不向父表单冒泡；
+- 数组 insert/remove/move 携带正确 arrayAction，结构事件使用数组根路径；重复值无法可靠
+  推断时安全省略动作；结构操作与数组元素字段编辑混合时不重复记录；
+- watch effect、schema/transform 和 `onChange` 引用更新后，既有批次不丢失、不重解释，
+  且 flush 调用最新 callback；只接收一个参数的现有 onChange 测试保持通过。
 
 ## 12. 分阶段实施建议
 
