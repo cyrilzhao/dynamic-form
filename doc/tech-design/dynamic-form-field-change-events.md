@@ -614,46 +614,143 @@ flush 时先 detach 并关闭旧批次，再调用用户 `onChange`。因此回�
 
 #### 9.1.3 四类完整流程示例
 
-**场景 A：用户输入触发两层联动。** 用户将 `country` 改为 `CN` 时创建 batch #101，
-`rootSource` 为 `user`。watch 先记录 `country(source: user)`；第一层 run #A 继承 #101
-并写入 `province(source: linkage)`；第二层 run #B 仍继承 #101 并写入
-`city(source: linkage)`。根操作关闭且 #A/#B 均解除登记后，#101 一次性发送
-`[country, province, city]`。
+##### 场景 A：用户输入触发两层联动
 
 ```text
-country = CN -> batch #101 -> watch(country) -> run #A -> watch(province)
-                               -> run #B -> watch(city) -> #A/#B complete -> flush #101
+用户编辑 country = CN
+  │
+  ├─ 创建 batch #101
+  │    rootSource = user
+  │    baseData = { country: US, province: undefined, city: undefined }
+  │
+  ├─ Widget / RHF 写入 country
+  │
+  ├─ watch 收到 country
+  │    record(country, user)
+  │    changes = [country]
+  │
+  ├─ useLinkageManager 创建 run #A，绑定 batch #101
+  │
+  ├─ run #A 写入 province = Shanghai
+  │
+  ├─ watch 收到 province
+  │    record(province, linkage)
+  │    changes = [country, province]
+  │
+  ├─ province 又触发 run #B，仍绑定 batch #101
+  │
+  ├─ run #B 写入 city = Shanghai
+  │
+  ├─ watch 收到 city
+  │    record(city, linkage)
+  │    changes = [country, province, city]
+  │
+  ├─ rootOperationClosed = true
+  ├─ run #A / #B 均完成
+  └─ flush batch #101
 ```
 
-**场景 B：`setValues` 中的字段被联动覆盖。** `setValues({ country: 'CN',
-province: 'Beijing' })` 创建 batch #102，`rootSource` 为 `setValues`。递归写入期间
-`batchDepth` 阻止中间联动；watch 记录 `country` 和 `province` 的直接变化。最终快照触发
-run #C，将 `province` 写为 `Shanghai`。归并命中既有路径后保留其初始旧值和位置，但更新
-最终值与来源；#C 完成后只发送 `[country, province]`，其中 province 是 `linkage/Shanghai`。
+回调：
+
+```ts
+onChange(finalData, {
+  rootSource: 'user',
+  changes: [
+    { path: 'country', source: 'user' /* ... */ },
+    { path: 'province', source: 'linkage' /* ... */ },
+    { path: 'city', source: 'linkage' /* ... */ },
+  ],
+})
+```
+
+##### 场景 B：`setValues` 中的字段被联动覆盖
 
 ```text
-setValues -> batch #102 -> watch(country, province) -> final-snapshot run #C
-          -> watch(province = Shanghai) -> merge same path -> complete -> flush #102
+setValues({ country: CN, province: Beijing })
+  │
+  ├─ 创建 batch #102，rootSource = setValues
+  ├─ 递归写入 country、province
+  ├─ watch 记录：
+  │    country  → source setValues
+  │    province → source setValues
+  ├─ batchDepth 结束，启动最终快照联动 run #C
+  ├─ run #C 写入 province = Shanghai
+  ├─ watch 再次收到 province
+  │    命中已有 province 记录：
+  │    - 保留最初 previousValue
+  │    - 保留原位置
+  │    - 更新 value = Shanghai
+  │    - 更新 source = linkage
+  └─ run #C 完成后 flush
 ```
 
-**场景 C：reset 触发联动。** `reset({ country: 'CN', province: 'New York' })` 创建
-batch #103，`rootSource` 为 `reset`。watch 将直接字段记录为 `reset`；country 触发 run #D，
-它把 province 写为 Shanghai。归并后的 province 保留 reset 前的旧值和首次位置，最终来源
-更新为 `linkage`。#D 完成后，#103 一次发送 country(`reset`) 和 province(`linkage`)。
+最终：
+
+```ts
+{
+  rootSource: 'setValues',
+  changes: [
+    { path: 'country', source: 'setValues', value: 'CN' },
+    { path: 'province', source: 'linkage', value: 'Shanghai' },
+  ],
+}
+```
+
+不得产生两条 `province` 记录：
+
+```ts
+;[
+  { path: 'province', value: 'Beijing', source: 'setValues' },
+  { path: 'province', value: 'Shanghai', source: 'linkage' },
+]
+```
+
+##### 场景 C：reset 触发联动
 
 ```text
-reset -> batch #103 -> watch(country, province) -> run #D -> watch(province = Shanghai)
-      -> merge same path -> complete -> flush #103
+reset({ country: CN, province: New York })
+  │
+  ├─ 创建 batch #103，rootSource = reset
+  ├─ RHF reset + 递归同步 Controller
+  ├─ watch 记录 country / province 的直接变化，source = reset
+  ├─ country 触发 linkage run #D
+  ├─ run #D 写入 province = Shanghai
+  ├─ 已有 province 记录：最终 source 改为 linkage
+  └─ run #D 完成后 flush
 ```
 
-**场景 D：回调内再次写入。** batch #104 满足稳定条件时，控制器先 detach #104 并标记
-其已发送，再调用 `onChange`。如果 callback 内调用 `setValue`、`setValues` 或 `reset`，新的
-写入只能创建 batch #105。#105 在自身稳定后触发下一次回调，绝不加入 #104，也不会被 #104
-的清理逻辑删除。
+最终：
+
+```ts
+{
+  rootSource: 'reset',
+  changes: [
+    { path: 'country', source: 'reset', value: 'CN' },
+    { path: 'province', source: 'linkage', value: 'Shanghai' },
+  ],
+}
+```
+
+##### 场景 D：回调内再次写入
 
 ```text
-flush #104: detach #104 -> onChange(...) -> callback writes -> create batch #105 -> later flush #105
+batch #104 flush
+  │
+  ├─ 先交换当前 batch，并标记为 flushed
+  ├─ 再调用 onChange(...)
+  │
+  └─ onChange 内调用 setValue(...)
+       │
+       └─ 创建 batch #105
 ```
+
+不能复用 #104，否则会有两个问题：
+
+- 新变化被 #104 清理逻辑误删除；
+- 新变化与已发送快照不一致。
+
+当前实现已经通过“先清空队列再调用回调”部分规避该问题；新架构必须保留这一顺序，并将其
+提升为 ChangeBatch 的明确不变量。
 
 ### 9.2 异步联动
 
