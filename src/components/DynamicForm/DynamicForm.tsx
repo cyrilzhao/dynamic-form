@@ -453,6 +453,9 @@ function buildEffectiveSchemaTree({
  * 调用时机：getValues、onChange 回调、onSubmit 回调。
  * 原因：表单内部存储展示域值（用户输入），对外暴露的所有数据出口统一返回存储域值，
  * 使外部调用方无需感知转换逻辑。
+ *
+ * 调用方需要先通过 buildEffectiveSchemaTree 构造当前值对应的有效 schema；
+ * 本函数只负责遍历字段并应用 transform，不负责解析 Variant。
  */
 function applyFieldTransforms(
   data: any,
@@ -466,12 +469,12 @@ function applyFieldTransforms(
     return data
   }
   const result: Record<string, any> = { ...data }
-  for (const [key, rawSchema] of Object.entries(schema.properties || {})) {
+  const properties = schema.properties || {}
+  for (const [key, fieldSchema] of Object.entries(properties)) {
     if (!(key in result)) {
       continue
     }
-    const effectiveSchema = rawSchema as ExtendedJSONSchema
-    const cb = effectiveSchema.ui?.transform?.callback
+    const cb = fieldSchema.ui?.transform?.callback
     const fn = resolveTransformFn(cb, callbacks)
     if (fn) {
       try {
@@ -481,10 +484,10 @@ function applyFieldTransforms(
       }
       continue
     }
-    if (effectiveSchema.type === 'object' && effectiveSchema.properties) {
+    if (fieldSchema.type === 'object' && fieldSchema.properties) {
       result[key] = applyFieldTransforms(
         result[key],
-        effectiveSchema,
+        fieldSchema,
         callbacks,
         helpers,
         variantStore,
@@ -492,23 +495,23 @@ function applyFieldTransforms(
       )
     }
     if (
-      effectiveSchema.type === 'array' &&
-      !Array.isArray(effectiveSchema.items) &&
-      effectiveSchema.items &&
+      fieldSchema.type === 'array' &&
+      !Array.isArray(fieldSchema.items) &&
+      fieldSchema.items &&
       Array.isArray(result[key])
     ) {
       result[key] = (result[key] as any[]).map((item, index) => {
         const itemPath = path ? `${path}.${key}.${index}` : `${key}.${index}`
         const effectiveItemSchema = variantStore
           ? buildEffectiveSchemaTree({
-              schema: effectiveSchema.items as ExtendedJSONSchema,
+              schema: fieldSchema.items as ExtendedJSONSchema,
               value: item,
               callbacks,
               helpers,
               variantStore,
               path: itemPath,
             })
-          : (effectiveSchema.items as ExtendedJSONSchema)
+          : (fieldSchema.items as ExtendedJSONSchema)
         return applyFieldTransforms(
           item,
           effectiveItemSchema,
@@ -555,6 +558,9 @@ function getSchemaAtPath(
  * 调用时机：setValues、setValue、reset 等外部赋值 API。
  * 原因：表单内部存储展示域值，外部 API 统一接收存储域值，
  * 因此写入前需要先通过 reverseCallback 转换。
+ *
+ * 调用方需要先通过 buildEffectiveSchemaTree 构造当前值对应的有效 schema；
+ * 本函数只负责遍历字段并应用 reverseTransform，不负责解析 Variant。
  */
 function reverseFieldTransforms(
   data: any,
@@ -568,12 +574,12 @@ function reverseFieldTransforms(
     return data
   }
   const result: Record<string, any> = { ...data }
-  for (const [key, rawSchema] of Object.entries(schema.properties || {})) {
+  const properties = schema.properties || {}
+  for (const [key, fieldSchema] of Object.entries(properties)) {
     if (!(key in result)) {
       continue
     }
-    const effectiveSchema = rawSchema as ExtendedJSONSchema
-    const cb = effectiveSchema.ui?.transform?.reverseCallback
+    const cb = fieldSchema.ui?.transform?.reverseCallback
     const fn = resolveTransformFn(cb, callbacks)
     if (fn) {
       try {
@@ -583,10 +589,10 @@ function reverseFieldTransforms(
       }
       continue
     }
-    if (effectiveSchema.type === 'object' && effectiveSchema.properties) {
+    if (fieldSchema.type === 'object' && fieldSchema.properties) {
       result[key] = reverseFieldTransforms(
         result[key],
-        effectiveSchema,
+        fieldSchema,
         callbacks,
         helpers,
         variantStore,
@@ -594,23 +600,23 @@ function reverseFieldTransforms(
       )
     }
     if (
-      effectiveSchema.type === 'array' &&
-      !Array.isArray(effectiveSchema.items) &&
-      effectiveSchema.items &&
+      fieldSchema.type === 'array' &&
+      !Array.isArray(fieldSchema.items) &&
+      fieldSchema.items &&
       Array.isArray(result[key])
     ) {
       result[key] = (result[key] as any[]).map((item, index) => {
         const itemPath = path ? `${path}.${key}.${index}` : `${key}.${index}`
         const effectiveItemSchema = variantStore
           ? buildEffectiveSchemaTree({
-              schema: effectiveSchema.items as ExtendedJSONSchema,
+              schema: fieldSchema.items as ExtendedJSONSchema,
               value: item,
               callbacks,
               helpers,
               variantStore,
               path: itemPath,
             })
-          : (effectiveSchema.items as ExtendedJSONSchema)
+          : (fieldSchema.items as ExtendedJSONSchema)
         return reverseFieldTransforms(
           item,
           effectiveItemSchema,
