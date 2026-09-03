@@ -878,6 +878,7 @@ const DynamicFormInner = React.memo(
       registerArrayActionStore(methods.control, arrayActionStore)
       const latestOnChangeRef = useRef(onChange)
       latestOnChangeRef.current = onChange
+      const hasOnChange = Boolean(onChange)
 
       // ✅ 使用 useRef 保持 refreshLinkage 引用，避免循环依赖
       // const refreshLinkageRef = React.useRef<() => void>(() => {});
@@ -1231,7 +1232,7 @@ const DynamicFormInner = React.memo(
       )
 
       React.useEffect(() => {
-        if (onChange) {
+        if (hasOnChange) {
           const subscribedMethods = methodsRef.current
           if (previousChangeDataRef.current === null) {
             const initialData = subscribedMethods.getValues()
@@ -1521,7 +1522,7 @@ const DynamicFormInner = React.memo(
             clearArrayAction(subscribedMethods.control)
           }
         }
-      }, [watch, onChange])
+      }, [watch, hasOnChange])
 
       // ✅ 使用 useCallback 缓存 onSubmitHandler，避免每次渲染创建新函
       const onSubmitHandler = useCallback(

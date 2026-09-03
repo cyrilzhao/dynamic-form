@@ -713,4 +713,33 @@ describe('DynamicForm 字段变更事件契约', () => {
       }),
     )
   })
+
+  it('onChange 引用变化时应调用最新回调而不依赖函数身份重建订阅', async () => {
+    const firstOnChange = jest.fn()
+    const secondOnChange = jest.fn()
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: { name: { type: 'string', title: 'Name' } },
+    }
+    const { formRef, rerender } = renderDynamicForm({
+      props: { schema, onChange: firstOnChange },
+    })
+    await waitForFormReady({ formRef })
+
+    rerender(
+      <DynamicForm
+        ref={formRef}
+        schema={schema}
+        onChange={secondOnChange}
+        onSubmit={jest.fn()}
+      />,
+    )
+    await act(async () => {
+      formRef.current!.setValue('name', 'Ada')
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+
+    expect(firstOnChange).not.toHaveBeenCalled()
+    expect(secondOnChange).toHaveBeenCalled()
+  })
 })
