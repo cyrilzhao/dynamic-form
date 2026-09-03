@@ -708,20 +708,28 @@ flush 必须在调用用户回调前原子地 detach 当前批次并完成内部
 
 ### 9.5 异步与竞态风险矩阵
 
-| 风险                                | 可能表现                              | 设计保护                                                   | 必测场景                                             |
-| ----------------------------------- | ------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------- |
-| RHF watch 延后通知                  | API 返回时部分路径尚未采集            | 根操作关闭后仍执行稳定检查                                 | `setValues` 的全部递归路径均被收集                   |
-| `setValues` 中间态                  | 联动读取半成品并多次写回              | 保留 `batchDepth`，只基于最终快照启动联动                  | 多字段批量赋值只按最终值联动                         |
-| 直接写入与 linkage 交错             | 直接字段被错误标为 `linkage`          | 每次写入显式携带 batchId/source                            | 批量写入后联动覆盖同路径                             |
-| 同路径多次写入                      | 重复 path 或 previousValue 漂移       | `Map` 固定首次旧值和顺序，覆盖最终结果                     | user/API 后被 linkage 覆盖                           |
-| 多层或并行联动                      | 第一层完成就 flush，或返回顺序不稳定  | 每个 run 绑定 batch；首次发现路径固定顺序                  | `country -> province -> city`、并行两个目标          |
-| 旧异步结果晚到                      | 旧请求覆盖新用户输入并产生幽灵事件    | `LinkageRunToken.canCommit()` 与 batchId 双重校验          | 慢请求 A、快请求 B，最终仅含 B                       |
-| 新操作、reset 或 silence 打断旧 run | 旧结果写入新快照或静默操作泄露事件    | 新 mutation 使旧 token 失效；失效 run 不写回且解除 pending | 异步联动未完成时 reset；静默 setValues               |
-| 回调内重入                          | 新事件被旧 flush 清空或混入旧 meta    | flush 前原子 detach                                        | onChange 内 setValue/setValues/reset                 |
-| 回调抛异常                          | 半清理导致后续批次无法发送            | detach 后再调用回调，异常不恢复旧批次                      | 抛错后下一次操作仍可回调                             |
-| 卸载                                | timer/run 晚到后仍回调                | dispose、取消调度、解除订阅、失效 run                      | 卸载前存在待发批次或异步 run                         |
-| schema/transform/callback 更新      | 旧 batch 被新配置重解释，或调用旧回调 | 批次固定采集值；flush 读取最新 callback ref                | 配置变化时旧数据不漂移、回调更新生效                 |
-| 嵌套表单与数组操作                  | 子父重复/漏事件，或内部路径重复       | `asNestedForm` 共享根批次；数组动作绑定数组根路径          | 嵌套数组联动；独立子表单不冒泡；结构操作混合字段编辑 |
+| 风险                            | 可能表现                                        | 设计保护                                           | 必测场景                               |
+| ------------------------------- | ----------------------------------------------- | -------------------------------------------------- | -------------------------------------- |
+| RHF watch 延后通知              | API 已返回，但部分写入路径尚未采集              | 根操作关闭后仍执行稳定检查                         | `setValues` 的全部递归路径均被收集     |
+| `setValues` 中间态              | 递归写入多次触发联动，规则读取半成品            | 保留 `batchDepth`，只基于最终快照启动联动          | 多字段批量赋值只按最终值联动           |
+| 直接写入与 linkage 交错         | 直接字段被全局最后来源错误标为 `linkage`        | 每次 RHF 写入显式携带 batchId/source               | 批量写入后联动覆盖同路径               |
+| 同路径重复写入                  | changes 重复 path，或 previousValue 漂移        | `Map` 固定首次旧值与位置，覆盖最终结果             | user/API 后被 linkage 覆盖同字段       |
+| 多层联动                        | 第一层完成即 flush，漏掉后续级联                | 每个 run 绑定同一 batch，全部完成后再稳定检查      | `country -> province -> city` 一次回调 |
+| 并行联动                        | 独立目标完成顺序不稳定，导致输出顺序漂移        | 路径首次被记录时固定顺序，未出现路径按实际写入追加 | 一个输入并行更新两个字段               |
+| 异步旧结果晚到                  | 旧请求覆盖新用户输入并产生幽灵事件              | `LinkageRunToken.canCommit()` 与 batchId 双重校验  | 慢请求 A、快请求 B，最终仅含 B         |
+| 新 batch 覆盖旧 batch           | A 的异步结果写入 B 的快照                       | 新 mutation 推进版本并使旧 token/batch 失效        | setValue(A) 后立刻 setValue(B)         |
+| reset 与异步联动交错            | reset 后仍被旧请求或旧 context 覆盖             | reset 创建新批次并淘汰旧 run                       | 异步联动未完成时 reset                 |
+| `silence: true`                 | 不触发新联动但旧联动仍写回或泄露事件            | 静默 mutation 淘汰旧 token，并关闭相关等待         | 静默 setValues 后旧异步结果返回        |
+| 回调内重入                      | 新事件被当前 flush 清空或混入旧 meta            | flush 前原子 detach；重入创建新 batch              | onChange 内 setValue/setValues/reset   |
+| `onChange` 抛异常               | 当前批次半清理，后续批次受影响                  | detach 后再调用回调，异常不恢复旧 batch            | 抛错后下一次操作仍可回调               |
+| 组件卸载                        | timer/run 晚到后仍写入或回调                    | dispose、取消调度、解除订阅、失效 run              | 卸载前存在待发批次或异步 run           |
+| schema、callback 或转换配置更新 | 已采集 batch 被新配置重解释                     | batch 固定采集时的外部值域快照                     | schema/transform 更新时旧数据不漂移    |
+| `onChange` 动态替换             | 已排队批次调用旧回调引用                        | flush 读取最新 callback ref，不重算 batch 数据     | 更新 callback 后事件送达新函数         |
+| `asNestedForm` 嵌套表单         | 子父分别建批次，导致重复或漏事件                | 通过 Context 共享根 batch controller               | 数组项内 nested DynamicForm 联动       |
+| 独立子 DynamicForm              | 错误地自动向父表单冒泡                          | 不共享 controller，保持独立事件边界                | `asNestedForm=false` 不冒泡            |
+| 数组结构操作                    | useFieldArray 产生多条内部 watch 路径而重复记录 | 数组 action registry 绑定 batch，归并为数组根路径  | insert/remove/move 与字段编辑混合      |
+| 数组重复元素                    | 快照 diff 错误推断 `arrayAction`                | 显式 registry 优先；无法唯一判断时省略动作         | 重复值移动不产生错误动作               |
+| transform/reverseTransform      | 直接值与事件值不在同一值域                      | batch 仅存转换后的外部存储域差异                   | transform + linkage + setValues        |
 
 ## 10. 兼容性与版本策略
 
