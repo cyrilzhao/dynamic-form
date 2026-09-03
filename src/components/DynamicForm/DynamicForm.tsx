@@ -829,7 +829,6 @@ const DynamicFormInner = React.memo(
       // 嵌套表单模式下复用父表单的 FormContext，否则使用自己的
       const methods =
         asNestedForm && parentFormContext ? parentFormContext : ownMethods
-      const watchedValues = methods.watch()
 
       const ownOperationControllerRef = useRef(new LinkageOperationController())
       // 根表单创建控制器，嵌套表单复用 Context 中的控制器。
@@ -1507,7 +1506,15 @@ const DynamicFormInner = React.memo(
             clearArrayAction(methods.control)
           }
         }
-      }, [watch])
+      }, [
+        mergedHelpers,
+        methods,
+        onChange,
+        operationController,
+        schema,
+        variantStore,
+        watch,
+      ])
 
       // ✅ 使用 useCallback 缓存 onSubmitHandler，避免每次渲染创建新函
       const onSubmitHandler = useCallback(
