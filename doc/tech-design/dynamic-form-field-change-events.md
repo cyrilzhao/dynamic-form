@@ -367,6 +367,24 @@ onChange(
 这不是逐次 RHF 写入的日志，因此不得同时包含 `province: 'Beijing'` 和
 `province: 'Shanghai'` 两条记录。被新操作淘汰的异步联动结果同样不得进入任何批次。
 
+#### 7.5.4 稳定批次的关键规则
+
+一次顶层逻辑操作的直接字段变化，以及由它引发并最终成功提交的全部同步或异步联动变化，
+必须合并为一次稳定 `onChange(data, meta)`。该承诺由以下规则组成：
+
+1. `changes` 中同一路径最多出现一条记录；
+2. `previousValue` 固定为批次开始前的外部存储域值；
+3. `value` 取批次稳定后的最终外部存储域值；
+4. `source` 取最后一次实际写入该路径的来源；
+5. 字段输出位置按其在批次中第一次发生实际变化的顺序固定；
+6. 被新操作、reset 或 `silence: true` 淘汰的异步结果不得进入任何 `changes`；
+7. `onChange` 回调期间的表单写入必须创建下一批次和下一次回调，不能污染已 detach 的
+   当前批次。
+
+“全部联动变化”的边界是：只等待已被 linkage manager 登记、可由 token 取消或正常 settle 的
+run；不等待脱离控制器且可能无限 pending 的任意业务 Promise。该边界保证事件既包含可归属
+的最终联动结果，也不会无限期阻塞。
+
 ### 7.6 数组结构操作
 
 数组新增、删除或移动应生成一条 `FieldChange`，其 `path` 为数组字段路径，
@@ -516,6 +534,31 @@ interface FormMutationContext {
 所有 `beginBatch()` 必须通过 `try/finally` 与 `endBatch()` 配对，防止异常路径永久压住
 后续联动刷新。
 
+以下数据流刻画组件间的唯一职责传递；箭头不是新的异步队列，而是 batchId、快照和 run
+归属随既有 RHF/watch/linkage 生命周期传递的方向：
+
+```text
+顶层 API / 用户输入
+        │ 创建 ChangeBatch，写入 FormMutationContext
+        ▼
+    RHF setValue / reset ──────────────► RHF watch
+        │                                  │ 采集路径、转换外部值域
+        │                                  ▼
+        │                         ChangeBatchController.recordChange()
+        │                                  │
+        ▼                                  │
+LinkageOperationController / useLinkageManager
+        │ 创建并登记 { batchId, runId }    │
+        ▼                                  │
+evaluate linkage / applyLinkageResults ───┘
+        │ 在 linkage mutation context 中写回 RHF
+        ▼
+RHF watch 再次采集并归并
+        │ pending run 归零 + 根操作关闭 + 稳定检查完成
+        ▼
+detach ChangeBatch -> onChange(finalData, { rootSource, changes })
+```
+
 #### 9.1.1 批次实体与控制器职责
 
 每个逻辑操作对应一个内部 `ChangeBatch`。其中 `changesByPath` 必须使用 `Map`：它既避免
@@ -568,6 +611,49 @@ interface ChangeBatch {
 
 flush 时先 detach 并关闭旧批次，再调用用户 `onChange`。因此回调内的表单写入必然创建新
 批次，绝不能重新使用已发送批次。
+
+#### 9.1.3 四类完整流程示例
+
+**场景 A：用户输入触发两层联动。** 用户将 `country` 改为 `CN` 时创建 batch #101，
+`rootSource` 为 `user`。watch 先记录 `country(source: user)`；第一层 run #A 继承 #101
+并写入 `province(source: linkage)`；第二层 run #B 仍继承 #101 并写入
+`city(source: linkage)`。根操作关闭且 #A/#B 均解除登记后，#101 一次性发送
+`[country, province, city]`。
+
+```text
+country = CN -> batch #101 -> watch(country) -> run #A -> watch(province)
+                               -> run #B -> watch(city) -> #A/#B complete -> flush #101
+```
+
+**场景 B：`setValues` 中的字段被联动覆盖。** `setValues({ country: 'CN',
+province: 'Beijing' })` 创建 batch #102，`rootSource` 为 `setValues`。递归写入期间
+`batchDepth` 阻止中间联动；watch 记录 `country` 和 `province` 的直接变化。最终快照触发
+run #C，将 `province` 写为 `Shanghai`。归并命中既有路径后保留其初始旧值和位置，但更新
+最终值与来源；#C 完成后只发送 `[country, province]`，其中 province 是 `linkage/Shanghai`。
+
+```text
+setValues -> batch #102 -> watch(country, province) -> final-snapshot run #C
+          -> watch(province = Shanghai) -> merge same path -> complete -> flush #102
+```
+
+**场景 C：reset 触发联动。** `reset({ country: 'CN', province: 'New York' })` 创建
+batch #103，`rootSource` 为 `reset`。watch 将直接字段记录为 `reset`；country 触发 run #D，
+它把 province 写为 Shanghai。归并后的 province 保留 reset 前的旧值和首次位置，最终来源
+更新为 `linkage`。#D 完成后，#103 一次发送 country(`reset`) 和 province(`linkage`)。
+
+```text
+reset -> batch #103 -> watch(country, province) -> run #D -> watch(province = Shanghai)
+      -> merge same path -> complete -> flush #103
+```
+
+**场景 D：回调内再次写入。** batch #104 满足稳定条件时，控制器先 detach #104 并标记
+其已发送，再调用 `onChange`。如果 callback 内调用 `setValue`、`setValues` 或 `reset`，新的
+写入只能创建 batch #105。#105 在自身稳定后触发下一次回调，绝不加入 #104，也不会被 #104
+的清理逻辑删除。
+
+```text
+flush #104: detach #104 -> onChange(...) -> callback writes -> create batch #105 -> later flush #105
+```
 
 ### 9.2 异步联动
 
