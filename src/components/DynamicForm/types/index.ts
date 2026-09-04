@@ -462,6 +462,11 @@ export interface DynamicFormProps {
   onSubmit?: (data: Record<string, any>) => void | Promise<void>
   onChange?: (data: Record<string, any>, meta?: FormChangeMeta) => void
   /**
+   * 处理异步 onChange 回调异常。
+   * 未提供时异常会重新抛回运行环境的异步异常通道，保持错误可见且不影响批次清理。
+   */
+  onChangeError?: (error: unknown) => void
+  /**
    * 文本字段获得焦点时触发。
    * 仅 `text` Widget 会调用该回调，其他 Widget 不受影响。
    */
@@ -575,12 +580,33 @@ export type FieldChangeSource =
   | 'reset'
   | 'linkage'
 
-/** 字段变更动作 */
-export type FieldChangeAction = 'update' | 'remove' | 'reset'
+export interface ArrayInsertAction {
+  action: 'insert'
+  index: number
+  value: unknown
+}
+
+export interface ArrayRemoveAction {
+  action: 'remove'
+  index: number
+  value: unknown
+}
+
+export interface ArrayMoveAction {
+  action: 'move'
+  fromIndex: number
+  toIndex: number
+  value: unknown
+}
+
+export type ArrayAction =
+  | ArrayInsertAction
+  | ArrayRemoveAction
+  | ArrayMoveAction
 
 /** 字段级变更记录 */
 export interface FieldChange {
-  /** 完整绝对字段路径；数组项索引也编码在路径中。 */
+  /** 标准绝对字段路径。 */
   path: string
   /** 本次逻辑操作开始前的外部存储域值。 */
   previousValue: unknown
@@ -588,16 +614,26 @@ export interface FieldChange {
   value: unknown
   /** 触发变化的来源，用于区分用户输入、API、重置和联动。 */
   source: FieldChangeSource
-  /** 值变化的业务动作，例如更新、移除或重置。 */
-  action: FieldChangeAction
-  /** 数组结构变化的方向或类型；普通数组项编辑不设置此字段。 */
-  arrayAction?: 'append' | 'remove' | 'moveUp' | 'moveDown'
+  /** 数组结构变化时使用；普通字段更新时省略。 */
+  arrayAction?: ArrayAction
 }
 
 /** 表单变更元数据 */
 export interface FormChangeMeta {
+  /** 开启本次稳定变更批次的顶层来源。 */
+  rootSource?: FieldChangeSource
   /** 当前稳定回调中发生的一个或多个字段变化。 */
   changes: FieldChange[]
+}
+
+/**
+ * DynamicForm 内部写入上下文，用于把 RHF 通知和联动 run 绑定到同一事件批次。
+ * 不作为组件公开 API。
+ */
+export interface FormMutationContext {
+  batchId: number
+  source: FieldChangeSource
+  isLinkageWrite: boolean
 }
 
 /**

@@ -11,6 +11,8 @@ import {
 import { DependencyGraph } from "../utils/dependencyGraph";
 import { PathResolver } from "../utils/pathResolver";
 import type { LinkageOperationController } from "../utils/linkageOperationController";
+import type { FormMutationContext } from "../types";
+import type { PendingMutationToken } from "../utils/pendingMutationContextQueue";
 
 interface ArrayLinkageManagerOptions {
   form: UseFormReturn<any>;
@@ -24,6 +26,18 @@ interface ArrayLinkageManagerOptions {
   throwOnCycle?: boolean;
   /** 共享联动事务控制器 */
   operationController?: LinkageOperationController;
+  ensureChangeBatch?: (source: 'user' | 'linkage') => number;
+  trackChangeBatchRun?: (batchId: number) => number | undefined;
+  completeChangeBatchRun?: (batchId: number, runId: number) => void;
+  closeChangeBatch?: (batchId: number) => void;
+  registerMutationContext?: (params: {
+    context: FormMutationContext;
+    path: string;
+  }) => PendingMutationToken;
+  cancelMutationContext?: (params: {
+    path: string;
+    token: PendingMutationToken;
+  }) => boolean;
 }
 
 /**
@@ -46,6 +60,12 @@ export function useArrayLinkageManager({
   onCycleDetected,
   throwOnCycle = false,
   operationController,
+  ensureChangeBatch,
+  trackChangeBatchRun,
+  completeChangeBatchRun,
+  closeChangeBatch,
+  registerMutationContext,
+  cancelMutationContext,
 }: ArrayLinkageManagerOptions) {
   const { watch, getValues } = form;
 
@@ -196,7 +216,15 @@ export function useArrayLinkageManager({
     linkages: allLinkages,
     linkageFunctions,
     linkageContext,
+    // schema 引用才表示外部规则版本变更；不能用 allLinkages，因为数组元素增减时它也会变化。
+    linkageSchemaVersion: schema,
     operationController,
+    ensureChangeBatch,
+    trackChangeBatchRun,
+    completeChangeBatchRun,
+    closeChangeBatch,
+    registerMutationContext,
+    cancelMutationContext,
   });
 
   // 监听 allLinkages 变化，自动触发联动刷新
@@ -266,10 +294,9 @@ export function useArrayLinkageManager({
     // 步骤2: 更新计数器，触发 allLinkages 重新计算
     setRefreshCounter((prev) => prev + 1);
 
-    // 步骤3: 等待状态更新完成
-    // allLinkages 的变化会通过 useEffect 自动触发 baseLinkageRefresh
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  }, [generateDynamicLinkages]);
+    // 步骤3: 公开 ref 调用必须等待实际联动完成，不能只依赖后续 effect 间接刷新。
+    await baseLinkageRefresh();
+  }, [baseLinkageRefresh, generateDynamicLinkages]);
 
   return {
     linkageStates,

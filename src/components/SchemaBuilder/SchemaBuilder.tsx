@@ -40,6 +40,7 @@ import {
   generateRandomKey,
   parseJsonPointer,
   validatePath,
+  normalizeSchemaNumericValues,
 } from './utils/schemaBuilderUtils'
 import './SchemaBuilder.scss'
 
@@ -78,7 +79,9 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
     const isReadonly = readonly.all === true || readonly.schema === true
     // 初始化时确保至少有一个一级节点
     const getInitialSchema = () => {
-      const initialSchema = defaultValue || defaultSchema
+      const initialSchema = normalizeSchemaNumericValues(
+        defaultValue || defaultSchema,
+      )
       if (options?.rootType) {
         const nextSchema = { ...initialSchema, type: options.rootType }
         if (options.rootType === 'array' && !nextSchema.items) {
@@ -155,10 +158,11 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           const schemaToSet = options?.rootType
             ? { ...newSchema, type: options.rootType }
             : ensureHasFirstLevelNode(newSchema)
-          setSchema(schemaToSet)
+          const normalizedSchema = normalizeSchemaNumericValues(schemaToSet)
+          setSchema(normalizedSchema)
           // 保持当前选中路径，如果路径无效则选中第一个节点
-          if (!validatePath(schemaToSet, selectedPath)) {
-            setSelectedPath(getFirstLevelNodePath(schemaToSet))
+          if (!validatePath(normalizedSchema, selectedPath)) {
+            setSelectedPath(getFirstLevelNodePath(normalizedSchema))
           }
         },
         getSchema: () => schema,
@@ -166,7 +170,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           const schemaToSet = options?.rootType
             ? { ...initialSchemaRef.current, type: options.rootType }
             : ensureHasFirstLevelNode(initialSchemaRef.current)
-          setSchema(schemaToSet)
+          setSchema(normalizeSchemaNumericValues(schemaToSet))
           setSelectedPath(getInitialSelectedPath(schemaToSet))
           setExpandedPaths({ '': true })
           setPreviewData({})
@@ -238,7 +242,9 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
         if (!isExtendedJSONSchema(parsed)) {
           throw new Error('Invalid schema')
         }
-        const schemaToSet = ensureHasFirstLevelNode(parsed)
+        const schemaToSet = normalizeSchemaNumericValues(
+          ensureHasFirstLevelNode(parsed),
+        )
         setSchema(schemaToSet)
         setSelectedPath(getFirstLevelNodePath(schemaToSet))
         setExpandedPaths({ '': true })
@@ -398,8 +404,9 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
             }
           }
 
-          onChange?.(nextSchema)
-          return nextSchema
+          const normalizedSchema = normalizeSchemaNumericValues(nextSchema)
+          onChange?.(normalizedSchema)
+          return normalizedSchema
         })
       },
       [isReadonly, onChange],

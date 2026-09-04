@@ -16,7 +16,12 @@ import { SchemaParser } from './core/SchemaParser'
 import { FormField } from './layout/FormField'
 import { ErrorList } from './components/ErrorList'
 import type { DynamicFormProps, DynamicFormRef } from './types'
-import type { FieldChangeSource, FormChangeMeta } from './types'
+import type {
+  ArrayAction,
+  FieldChangeSource,
+  FormChangeMeta,
+  FormMutationContext,
+} from './types'
 import {
   parseSchemaLinkages,
   transformToAbsolutePaths,
@@ -54,7 +59,15 @@ import { resolveTransformFn } from './utils/resolveTransformFn'
 import { PathResolver } from './utils/pathResolver'
 import { mergeSchemaWithLinkage } from './utils/mergeSchemaWithLinkage'
 import { LinkageOperationController } from './utils/linkageOperationController'
+import { ChangeBatchController } from './utils/changeBatchController'
+import { PendingMutationContextQueue } from './utils/pendingMutationContextQueue'
+import type { PendingMutationToken } from './utils/pendingMutationContextQueue'
 import { builtInHelpers } from './utils/builtInHelpers'
+import {
+  registerArrayActionStore,
+  consumeArrayActionForSnapshot,
+  clearArrayAction,
+} from './utils/arrayActionRegistry'
 import {
   createFieldVariantStore,
   FieldVariantProvider,
@@ -79,12 +92,50 @@ const EMPTY_HELPERS = {}
  * 该函数独立于 watch 订阅，便于同时服务带路径和无路径的 RHF 通知；
  * Select 多选不属于结构操作，因此显式排除。
  */
+function isDeepEqual(previousValue: unknown, value: unknown): boolean {
+  if (Object.is(previousValue, value)) {
+    return true
+  }
+  if (Array.isArray(previousValue) && Array.isArray(value)) {
+    return (
+      previousValue.length === value.length &&
+      previousValue.every((item, index) => isDeepEqual(item, value[index]))
+    )
+  }
+  if (
+    previousValue &&
+    value &&
+    typeof previousValue === 'object' &&
+    typeof value === 'object'
+  ) {
+    const previousKeys = Object.keys(previousValue as Record<string, unknown>)
+    const valueRecord = value as Record<string, unknown>
+    return (
+      previousKeys.length === Object.keys(valueRecord).length &&
+      previousKeys.every(
+        (key) =>
+          key in valueRecord &&
+          isDeepEqual(
+            (previousValue as Record<string, unknown>)[key],
+            valueRecord[key],
+          ),
+      )
+    )
+  }
+  return false
+}
+
 function inferArrayAction(
   schema: ExtendedJSONSchema,
   path: string,
   previousValue: unknown,
   value: unknown,
-): 'append' | 'remove' | 'moveUp' | 'moveDown' | undefined {
+): ArrayAction | undefined {
+  if (previousValue === undefined && Array.isArray(value)) {
+    return value.length > 0
+      ? { action: 'insert', index: 0, value: value[0] }
+      : undefined
+  }
   // 仅对动态数组结构推断动作；Select 多选数组属于值更新，不应标记数组结构操作。
   const fieldSchema = getSchemaAtPath(schema, path)
   if (
@@ -96,10 +147,42 @@ function inferArrayAction(
     return undefined
   }
   if (value.length > previousValue.length) {
-    return 'append'
+    if (value.length !== previousValue.length + 1) {
+      return undefined
+    }
+    const candidates = value
+      .map((_, index) => index)
+      .filter((insertIndex) =>
+        previousValue.every((item, i) =>
+          i < insertIndex
+            ? isDeepEqual(item, value[i])
+            : isDeepEqual(item, value[i + 1]),
+        ),
+      )
+    return candidates.length === 1
+      ? { action: 'insert', index: candidates[0], value: value[candidates[0]] }
+      : undefined
   }
   if (value.length < previousValue.length) {
-    return 'remove'
+    if (previousValue.length !== value.length + 1) {
+      return undefined
+    }
+    const candidates = previousValue
+      .map((_, index) => index)
+      .filter((removeIndex) =>
+        value.every((item, i) =>
+          i < removeIndex
+            ? isDeepEqual(item, previousValue[i])
+            : isDeepEqual(item, previousValue[i + 1]),
+        ),
+      )
+    return candidates.length === 1
+      ? {
+          action: 'remove',
+          index: candidates[0],
+          value: previousValue[candidates[0]],
+        }
+      : undefined
   }
   // 首个差异位置用于判断相邻元素发生了上移还是下移。
   const changedIndex = value.findIndex(
@@ -110,17 +193,27 @@ function inferArrayAction(
   }
   if (
     changedIndex < value.length - 1 &&
-    Object.is(value[changedIndex], previousValue[changedIndex + 1]) &&
-    Object.is(value[changedIndex + 1], previousValue[changedIndex])
+    isDeepEqual(value[changedIndex], previousValue[changedIndex + 1]) &&
+    isDeepEqual(value[changedIndex + 1], previousValue[changedIndex])
   ) {
-    return 'moveUp'
+    return {
+      action: 'move',
+      fromIndex: changedIndex + 1,
+      toIndex: changedIndex,
+      value: value[changedIndex],
+    }
   }
   if (
     changedIndex > 0 &&
-    Object.is(value[changedIndex], previousValue[changedIndex - 1]) &&
-    Object.is(value[changedIndex - 1], previousValue[changedIndex])
+    isDeepEqual(value[changedIndex], previousValue[changedIndex - 1]) &&
+    isDeepEqual(value[changedIndex - 1], previousValue[changedIndex])
   ) {
-    return 'moveDown'
+    return {
+      action: 'move',
+      fromIndex: changedIndex - 1,
+      toIndex: changedIndex,
+      value: value[changedIndex],
+    }
   }
   return undefined
 }
@@ -142,17 +235,36 @@ function setValuesRecursive(
     shouldTouch?: boolean
   },
   prefix = '',
+  beforeSetValue?: (path: string) => PendingMutationToken | undefined,
+  cancelMutationContext?: (params: {
+    path: string
+    token: PendingMutationToken
+  }) => void,
 ) {
   Object.entries(obj || {}).forEach(([key, value]) => {
     const path = prefix ? `${prefix}.${key}` : key
     // 设置当前路径的值
-    methods.setValue(path, value, options)
+    const mutationToken = beforeSetValue?.(path)
+    try {
+      methods.setValue(path, value, options)
+    } catch (error) {
+      // 只有当前失败写入对应的令牌可以撤销；之前成功路径的令牌必须保留给延迟 watch 消费。
+      if (mutationToken) cancelMutationContext?.({ path, token: mutationToken })
+      throw error
+    }
     // 普通对象递归展开（数组和 null 除外）：
     // NestedFormWidget 内部只有叶子字段注册 Controller（如 address.street）。
     // 对每一层路径调用 setValue，确保嵌套表单的已挂载叶子字段同步更新。
     // 数组由 useFieldArray 管理，直接设置整体即可，无需递归展开。
     if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-      setValuesRecursive(methods, value, options, path)
+      setValuesRecursive(
+        methods,
+        value,
+        options,
+        path,
+        beforeSetValue,
+        cancelMutationContext,
+      )
     }
   })
 }
@@ -203,6 +315,8 @@ function setFormValues({
   values,
   schema,
   options,
+  beforeSetValue,
+  cancelMutationContext,
 }: {
   methods: UseFormReturn
   values: Record<string, any>
@@ -212,11 +326,23 @@ function setFormValues({
     shouldDirty?: boolean
     shouldTouch?: boolean
   }
+  beforeSetValue?: (path: string) => PendingMutationToken | undefined
+  cancelMutationContext?: (params: {
+    path: string
+    token: PendingMutationToken
+  }) => void
 }) {
   // 步骤1：基本类型数组包装
   const wrapped = wrapPrimitiveArrays(values, schema)
   // 步骤2：递归设置值
-  setValuesRecursive(methods, wrapped, options)
+  setValuesRecursive(
+    methods,
+    wrapped,
+    options,
+    '',
+    beforeSetValue,
+    cancelMutationContext,
+  )
 }
 
 /**
@@ -368,6 +494,9 @@ function buildEffectiveSchemaTree({
  * 调用时机：getValues、onChange 回调、onSubmit 回调。
  * 原因：表单内部存储展示域值（用户输入），对外暴露的所有数据出口统一返回存储域值，
  * 使外部调用方无需感知转换逻辑。
+ *
+ * 调用方需要先通过 buildEffectiveSchemaTree 构造当前值对应的有效 schema；
+ * 本函数只负责遍历字段并应用 transform，不负责解析 Variant。
  */
 function applyFieldTransforms(
   data: any,
@@ -381,12 +510,12 @@ function applyFieldTransforms(
     return data
   }
   const result: Record<string, any> = { ...data }
-  for (const [key, rawSchema] of Object.entries(schema.properties || {})) {
+  const properties = schema.properties || {}
+  for (const [key, fieldSchema] of Object.entries(properties)) {
     if (!(key in result)) {
       continue
     }
-    const effectiveSchema = rawSchema as ExtendedJSONSchema
-    const cb = effectiveSchema.ui?.transform?.callback
+    const cb = fieldSchema.ui?.transform?.callback
     const fn = resolveTransformFn(cb, callbacks)
     if (fn) {
       try {
@@ -396,10 +525,10 @@ function applyFieldTransforms(
       }
       continue
     }
-    if (effectiveSchema.type === 'object' && effectiveSchema.properties) {
+    if (fieldSchema.type === 'object' && fieldSchema.properties) {
       result[key] = applyFieldTransforms(
         result[key],
-        effectiveSchema,
+        fieldSchema,
         callbacks,
         helpers,
         variantStore,
@@ -407,23 +536,23 @@ function applyFieldTransforms(
       )
     }
     if (
-      effectiveSchema.type === 'array' &&
-      !Array.isArray(effectiveSchema.items) &&
-      effectiveSchema.items &&
+      fieldSchema.type === 'array' &&
+      !Array.isArray(fieldSchema.items) &&
+      fieldSchema.items &&
       Array.isArray(result[key])
     ) {
       result[key] = (result[key] as any[]).map((item, index) => {
         const itemPath = path ? `${path}.${key}.${index}` : `${key}.${index}`
         const effectiveItemSchema = variantStore
           ? buildEffectiveSchemaTree({
-              schema: effectiveSchema.items as ExtendedJSONSchema,
+              schema: fieldSchema.items as ExtendedJSONSchema,
               value: item,
               callbacks,
               helpers,
               variantStore,
               path: itemPath,
             })
-          : (effectiveSchema.items as ExtendedJSONSchema)
+          : (fieldSchema.items as ExtendedJSONSchema)
         return applyFieldTransforms(
           item,
           effectiveItemSchema,
@@ -470,6 +599,9 @@ function getSchemaAtPath(
  * 调用时机：setValues、setValue、reset 等外部赋值 API。
  * 原因：表单内部存储展示域值，外部 API 统一接收存储域值，
  * 因此写入前需要先通过 reverseCallback 转换。
+ *
+ * 调用方需要先通过 buildEffectiveSchemaTree 构造当前值对应的有效 schema；
+ * 本函数只负责遍历字段并应用 reverseTransform，不负责解析 Variant。
  */
 function reverseFieldTransforms(
   data: any,
@@ -483,12 +615,12 @@ function reverseFieldTransforms(
     return data
   }
   const result: Record<string, any> = { ...data }
-  for (const [key, rawSchema] of Object.entries(schema.properties || {})) {
+  const properties = schema.properties || {}
+  for (const [key, fieldSchema] of Object.entries(properties)) {
     if (!(key in result)) {
       continue
     }
-    const effectiveSchema = rawSchema as ExtendedJSONSchema
-    const cb = effectiveSchema.ui?.transform?.reverseCallback
+    const cb = fieldSchema.ui?.transform?.reverseCallback
     const fn = resolveTransformFn(cb, callbacks)
     if (fn) {
       try {
@@ -498,10 +630,10 @@ function reverseFieldTransforms(
       }
       continue
     }
-    if (effectiveSchema.type === 'object' && effectiveSchema.properties) {
+    if (fieldSchema.type === 'object' && fieldSchema.properties) {
       result[key] = reverseFieldTransforms(
         result[key],
-        effectiveSchema,
+        fieldSchema,
         callbacks,
         helpers,
         variantStore,
@@ -509,23 +641,23 @@ function reverseFieldTransforms(
       )
     }
     if (
-      effectiveSchema.type === 'array' &&
-      !Array.isArray(effectiveSchema.items) &&
-      effectiveSchema.items &&
+      fieldSchema.type === 'array' &&
+      !Array.isArray(fieldSchema.items) &&
+      fieldSchema.items &&
       Array.isArray(result[key])
     ) {
       result[key] = (result[key] as any[]).map((item, index) => {
         const itemPath = path ? `${path}.${key}.${index}` : `${key}.${index}`
         const effectiveItemSchema = variantStore
           ? buildEffectiveSchemaTree({
-              schema: effectiveSchema.items as ExtendedJSONSchema,
+              schema: fieldSchema.items as ExtendedJSONSchema,
               value: item,
               callbacks,
               helpers,
               variantStore,
               path: itemPath,
             })
-          : (effectiveSchema.items as ExtendedJSONSchema)
+          : (fieldSchema.items as ExtendedJSONSchema)
         return reverseFieldTransforms(
           item,
           effectiveItemSchema,
@@ -584,6 +716,7 @@ const DynamicFormInner = React.memo(
         defaultValues = {},
         onSubmit,
         onChange,
+        onChangeError,
         onTextFieldFocus,
         widgets,
         linkageFunctions,
@@ -738,7 +871,6 @@ const DynamicFormInner = React.memo(
       // 嵌套表单模式下复用父表单的 FormContext，否则使用自己的
       const methods =
         asNestedForm && parentFormContext ? parentFormContext : ownMethods
-      const watchedValues = methods.watch()
 
       const ownOperationControllerRef = useRef(new LinkageOperationController())
       // 根表单创建控制器，嵌套表单复用 Context 中的控制器。
@@ -747,6 +879,14 @@ const DynamicFormInner = React.memo(
       const operationController =
         inheritedLinkageStateContext?.operationController ??
         ownOperationControllerRef.current
+      const operationControllerRef = useRef(operationController)
+      operationControllerRef.current = operationController
+
+      const schemaRef = useRef(schema)
+      schemaRef.current = schema
+
+      const variantStoreRef = useRef(variantStore)
+      variantStoreRef.current = variantStore
 
       // ✅ 使用 useRef 保持 methods 引用稳定，避免触发不必要的重新计算
       const methodsRef = React.useRef(methods)
@@ -760,6 +900,25 @@ const DynamicFormInner = React.memo(
 
       // 当前写入来源；用户输入为默认值，ref API 操作期间临时切换来源。
       const changeSourceRef = useRef<FieldChangeSource>('user')
+      const changeBatchControllerRef = useRef(new ChangeBatchController())
+      const activeChangeBatchIdRef = useRef<number | null>(null)
+      const mutationContextRef = useRef<{
+        batchId: number
+        source: FieldChangeSource
+      } | null>(null)
+      // 队列将每次 RHF 写入与其后续 watch 通知一一关联；不能使用跨事件循环的全局来源。
+      const pendingMutationContextQueueRef = useRef(
+        new PendingMutationContextQueue(),
+      )
+      // 保存每个批次由外部 API 直接写入的路径。RHF 通知可能延迟或与嵌套联动交错，
+      // 仅按 token 到达顺序无法稳定区分首次直接写入，因此按批次路径保留一次性判定依据。
+      const directMutationPathsRef = useRef(new Map<number, Set<string>>())
+      // 按标准绝对路径保存最近一次直接 API 写入来源，作为 batchId 不一致时的兜底。
+      // asNestedForm 的根/子层可能因异步联动产生不同内部 batchId，但最终 RHF watch
+      // 仍只提供同一字段路径；路径级登记因此能够稳定恢复 setValue/setValues/reset 语义。
+      const directMutationSourceByPathRef = useRef(
+        new Map<string, FieldChangeSource>(),
+      )
       // 保存上一次对外快照，用于计算字段 previousValue。
       const previousChangeDataRef = useRef<Record<string, any> | null>(null)
       // RHF 未提供路径时，保存 setValue 指定的路径作为兜底。
@@ -768,12 +927,160 @@ const DynamicFormInner = React.memo(
       const pendingChangeSourceRef = useRef<FieldChangeSource | null>(null)
       // 保存 setValue 调用前的原值，供 watch 计算差异。
       const pendingPreviousValueRef = useRef<unknown>(undefined)
-      // 聚合同一事件循环内的多个字段变化，最终一次性 flush。
-      const pendingChangesRef = useRef<FormChangeMeta['changes']>([])
       // 保存当前待 flush 的完整表单快照。
       const pendingDataRef = useRef<Record<string, any> | null>(null)
       // 延迟 flush 的定时器句柄，用于合并连续同步写入。
       const changeFlushTimerRef = useRef<number | null>(null)
+      const arrayActionStore = useRef<
+        Array<{ path: string; action: ArrayAction }>
+      >([])
+      registerArrayActionStore(methods.control, arrayActionStore)
+      const latestOnChangeRef = useRef(onChange)
+      latestOnChangeRef.current = onChange
+      // 保存最新的异常处理回调；watch/flush 订阅保持稳定时仍能使用最新配置。
+      const latestOnChangeErrorRef = useRef(onChangeError)
+      latestOnChangeErrorRef.current = onChangeError
+      const hasOnChange = Boolean(onChange)
+
+      const beginChangeBatch = useCallback((rootSource: FieldChangeSource) => {
+        pendingMutationContextQueueRef.current.clear()
+        directMutationPathsRef.current.clear()
+        // linkage 刷新可能在直接 API 的 RHF 通知到达前启动；此时不能清掉路径级直接来源，
+        // 否则同路径的联动通知会抢先把直接写入标记成 linkage。新的直接 API 批次才会
+        // 淘汰旧的路径兜底，避免真正跨操作泄漏。
+        if (rootSource !== 'linkage') {
+          directMutationSourceByPathRef.current.clear()
+        }
+        // 新批次不能继承上一批次尚未消费的路径兜底信息，否则延迟 watch 会被错误标记为旧来源。
+        pendingChangePathRef.current = null
+        pendingChangeSourceRef.current = null
+        pendingPreviousValueRef.current = undefined
+        const batchId = changeBatchControllerRef.current.beginBatch({
+          rootSource,
+          baseData: previousChangeDataRef.current ?? {},
+        })
+        activeChangeBatchIdRef.current = batchId
+        mutationContextRef.current = { batchId, source: rootSource }
+        return batchId
+      }, [])
+
+      const registerMutationContext = useCallback(
+        ({ context, path }: { context: FormMutationContext; path: string }) => {
+          // 返回代表“单次 RHF 写入”的令牌；同一个批次上下文可能对应多个路径写入，
+          // 因此调用方必须持有令牌才能在某次写入失败时精确撤销，避免误删其他写入。
+          return pendingMutationContextQueueRef.current.register({
+            context,
+            path,
+          })
+        },
+        [],
+      )
+
+      const consumeMutationContext = useCallback(
+        ({ path }: { path: string }) => {
+          return pendingMutationContextQueueRef.current.consume({ path })
+        },
+        [],
+      )
+
+      const cancelMutationContext = useCallback(
+        ({ path, token }: { path: string; token: PendingMutationToken }) =>
+          pendingMutationContextQueueRef.current.cancel({ path, token }),
+        [],
+      )
+
+      const flushChangeBatch = useCallback((batchId: number) => {
+        changeBatchControllerRef.current.markStable({ batchId })
+        const meta = changeBatchControllerRef.current.tryDetach({ batchId })
+        if (!meta || !pendingDataRef.current) return
+        const nextData = pendingDataRef.current
+        pendingDataRef.current = null
+        if (activeChangeBatchIdRef.current === batchId) {
+          activeChangeBatchIdRef.current = null
+        }
+        if (mutationContextRef.current?.batchId === batchId) {
+          mutationContextRef.current = null
+        }
+        clearArrayAction(methodsRef.current.control)
+        try {
+          latestOnChangeRef.current?.(nextData, meta)
+        } catch (error) {
+          // 批次已经在回调前 detach，异常不能污染后续事件；有显式处理器时交由业务处理，
+          // 否则重新抛出到异步运行环境，避免静默吞错。
+          if (latestOnChangeErrorRef.current) {
+            latestOnChangeErrorRef.current(error)
+          } else {
+            throw error
+          }
+        }
+      }, [])
+
+      const closeChangeBatch = useCallback(
+        (batchId: number) => {
+          changeBatchControllerRef.current.closeRoot({ batchId })
+          if (changeFlushTimerRef.current !== null) {
+            clearTimeout(changeFlushTimerRef.current)
+          }
+          changeFlushTimerRef.current = window.setTimeout(() => {
+            changeFlushTimerRef.current = null
+            flushChangeBatch(batchId)
+          }, 0)
+        },
+        [flushChangeBatch],
+      )
+
+      /**
+       * 根表单自己的批次运行时。独立表单使用它；asNestedForm 子表单则通过 Context 继承
+       * 父级运行时，从而让子层联动写入仍归属到根表单唯一的 watch/onChange 边界。
+       */
+      const ownChangeBatchRuntime = useMemo(
+        () => ({
+          ensureChangeBatch: (source: 'user' | 'linkage') => {
+            if (activeChangeBatchIdRef.current !== null) {
+              return activeChangeBatchIdRef.current
+            }
+            return beginChangeBatch(source)
+          },
+          trackLinkageRun: (batchId: number) =>
+            changeBatchControllerRef.current.trackLinkageRun({ batchId }),
+          completeLinkageRun: (batchId: number, runId: number) => {
+            changeBatchControllerRef.current.completeLinkageRun({
+              batchId,
+              runId,
+            })
+            flushChangeBatch(batchId)
+          },
+          closeChangeBatch,
+          registerMutationContext,
+          cancelMutationContext,
+        }),
+        [
+          beginChangeBatch,
+          closeChangeBatch,
+          flushChangeBatch,
+          registerMutationContext,
+          cancelMutationContext,
+        ],
+      )
+
+      // 子表单只继承显式 asNestedForm 的父级运行时；独立子表单绝不读取该 Context。
+      const changeBatchRuntime =
+        inheritedLinkageStateContext?.changeBatchRuntime ??
+        ownChangeBatchRuntime
+
+      React.useEffect(() => {
+        return () => {
+          if (changeFlushTimerRef.current !== null) {
+            clearTimeout(changeFlushTimerRef.current)
+          }
+          changeBatchControllerRef.current.dispose()
+          activeChangeBatchIdRef.current = null
+          pendingDataRef.current = null
+          pendingMutationContextQueueRef.current.clear()
+          directMutationPathsRef.current.clear()
+          directMutationSourceByPathRef.current.clear()
+        }
+      }, [])
 
       // ✅ 使用 useRef 保持 refreshLinkage 引用，避免循环依赖
       // const refreshLinkageRef = React.useRef<() => void>(() => {});
@@ -895,6 +1202,12 @@ const DynamicFormInner = React.memo(
         linkageContext: stableLinkageContext,
         schema,
         operationController,
+        ensureChangeBatch: changeBatchRuntime.ensureChangeBatch,
+        trackChangeBatchRun: changeBatchRuntime.trackLinkageRun,
+        completeChangeBatchRun: changeBatchRuntime.completeLinkageRun,
+        closeChangeBatch: changeBatchRuntime.closeChangeBatch,
+        registerMutationContext: changeBatchRuntime.registerMutationContext,
+        cancelMutationContext: changeBatchRuntime.cancelMutationContext,
       })
 
       // // 更新 refreshLinkageRef
@@ -933,6 +1246,7 @@ const DynamicFormInner = React.memo(
         () => ({
           setValue: (name, value, options) => {
             operationController.markFormMutation()
+            const batchId = beginChangeBatch('setValue')
             const fieldSchema = getSchemaAtPath(schema, name)
             const effectiveSchema = fieldSchema
               ? getEffectiveVariantSchema(
@@ -953,6 +1267,24 @@ const DynamicFormInner = React.memo(
             pendingChangePathRef.current = name
             pendingChangeSourceRef.current = 'setValue'
             pendingPreviousValueRef.current = methods.getValues(name as any)
+            // 该上下文描述本次 setValue 的直接来源；watch 延迟时仍需依靠它区分
+            // 外部 API 写入和同路径后续联动写回，不能只读取可变的全局 source。
+            const mutationContext: FormMutationContext = {
+              batchId,
+              source: 'setValue',
+              isLinkageWrite: false,
+            }
+            // 记录批次内的直接路径，作为 token 顺序被嵌套联动打乱时的来源兜底。
+            const directPaths =
+              directMutationPathsRef.current.get(batchId) ?? new Set<string>()
+            directPaths.add(name)
+            directMutationPathsRef.current.set(batchId, directPaths)
+            directMutationSourceByPathRef.current.set(name, 'setValue')
+            // token 代表这一次具体的 RHF 写入，失败时只能撤销该 token，不能清空同路径队列。
+            const mutationToken = registerMutationContext({
+              context: mutationContext,
+              path: name,
+            })
             try {
               methods.setValue(
                 name,
@@ -961,8 +1293,13 @@ const DynamicFormInner = React.memo(
                   : value,
                 options,
               )
+            } catch (error) {
+              // RHF 同步拒绝本次写入时，取消刚登记的令牌，避免污染后续同路径通知。
+              cancelMutationContext({ path: name, token: mutationToken })
+              throw error
             } finally {
               changeSourceRef.current = previousSource
+              closeChangeBatch(batchId)
             }
           },
           getValue: (name: string) => {
@@ -1007,6 +1344,7 @@ const DynamicFormInner = React.memo(
             // 外部批量写入代表表单快照整体变化，必须先递增版本，让所有旧异步联动失效。
             // 之后再进入 batch，把递归 setValue 触发的多次 watch 合并为一次最终快照刷新。
             operationController.markFormMutation()
+            const batchId = beginChangeBatch('setValues')
             const previousSource = changeSourceRef.current
             changeSourceRef.current = 'setValues'
             const displayValues = reverseFieldTransforms(
@@ -1023,6 +1361,19 @@ const DynamicFormInner = React.memo(
               variantStore,
             )
             operationController.beginBatch()
+            const beforeSetValue = (path: string): PendingMutationToken => {
+              const mutationContext: FormMutationContext = {
+                batchId,
+                source: 'setValues',
+                isLinkageWrite: false,
+              }
+              const directPaths =
+                directMutationPathsRef.current.get(batchId) ?? new Set<string>()
+              directPaths.add(path)
+              directMutationPathsRef.current.set(batchId, directPaths)
+              directMutationSourceByPathRef.current.set(path, 'setValues')
+              return registerMutationContext({ context: mutationContext, path })
+            }
             try {
               if (options?.silence) {
                 // silence 语义是”不触发新联动”，不是”允许旧联动继续提交”。
@@ -1033,6 +1384,8 @@ const DynamicFormInner = React.memo(
                     values: displayValues,
                     schema,
                     options,
+                    beforeSetValue,
+                    cancelMutationContext,
                   })
                 })
               } else {
@@ -1041,6 +1394,8 @@ const DynamicFormInner = React.memo(
                   values: displayValues,
                   schema,
                   options,
+                  beforeSetValue,
+                  cancelMutationContext,
                 })
               }
             } finally {
@@ -1051,12 +1406,29 @@ const DynamicFormInner = React.memo(
                 void refreshLinkage()
               }
               changeSourceRef.current = previousSource
+              closeChangeBatch(batchId)
             }
           },
           reset: (values) => {
             operationController.markFormMutation()
+            const batchId = beginChangeBatch('reset')
             const previousSource = changeSourceRef.current
+            const previousMutationSource =
+              operationController.setMutationSource('reset')
             changeSourceRef.current = 'reset'
+            const beforeSetValue = (path: string): PendingMutationToken => {
+              const mutationContext: FormMutationContext = {
+                batchId,
+                source: 'reset',
+                isLinkageWrite: false,
+              }
+              const directPaths =
+                directMutationPathsRef.current.get(batchId) ?? new Set<string>()
+              directPaths.add(path)
+              directMutationPathsRef.current.set(batchId, directPaths)
+              directMutationSourceByPathRef.current.set(path, 'reset')
+              return registerMutationContext({ context: mutationContext, path })
+            }
             try {
               if (values && Object.keys(values).length > 0) {
                 const reversed = reverseFieldTransforms(
@@ -1074,15 +1446,36 @@ const DynamicFormInner = React.memo(
                 )
                 const processed = wrapPrimitiveArrays(reversed, schema)
                 methods.reset(processed)
-                setValuesRecursive(methods, processed)
+                setValuesRecursive(
+                  methods,
+                  processed,
+                  undefined,
+                  '',
+                  beforeSetValue,
+                  cancelMutationContext,
+                )
               } else {
                 // 清空：构建类型恰当的空值，确保受控组件正确清除
                 const emptyValues = buildEmptyValues(schema)
                 methods.reset(emptyValues)
-                setValuesRecursive(methods, emptyValues)
+                setValuesRecursive(
+                  methods,
+                  emptyValues,
+                  undefined,
+                  '',
+                  beforeSetValue,
+                  cancelMutationContext,
+                )
               }
             } finally {
               changeSourceRef.current = previousSource
+              closeChangeBatch(batchId)
+              // RHF 的 reset/setValue 通知可能在当前调用栈结束后才派发，保持来源到下一轮事件循环。
+              window.setTimeout(
+                () =>
+                  operationController.setMutationSource(previousMutationSource),
+                0,
+              )
             }
           },
           validate: async (name) => {
@@ -1104,29 +1497,72 @@ const DynamicFormInner = React.memo(
             return { isDirty, isValid, isSubmitting, isSubmitted, submitCount }
           },
           refreshLinkage: async () => {
-            await refreshLinkage()
+            operationController.markFormMutation()
+            const batchId = beginChangeBatch('linkage')
+            try {
+              await refreshLinkage()
+            } finally {
+              closeChangeBatch(batchId)
+            }
           },
         }),
-        [methods, schema, refreshLinkage, operationController, mergedHelpers, setValueWithoutLinkage, variantStore],
+        [
+          methods,
+          schema,
+          refreshLinkage,
+          operationController,
+          mergedHelpers,
+          setValueWithoutLinkage,
+          variantStore,
+          beginChangeBatch,
+          closeChangeBatch,
+          registerMutationContext,
+          cancelMutationContext,
+        ],
       )
 
       React.useEffect(() => {
-        if (onChange) {
+        if (hasOnChange) {
+          const subscribedMethods = methodsRef.current
+          if (previousChangeDataRef.current === null) {
+            const initialData = subscribedMethods.getValues()
+            const initialSchema = buildEffectiveSchemaTree({
+              schema: schemaRef.current,
+              value: initialData,
+              callbacks: callbacksRef.current,
+              helpers: helpersRef.current,
+              variantStore: variantStoreRef.current,
+            })
+            previousChangeDataRef.current = applyFieldTransforms(
+              transformFormData(initialData, initialSchema),
+              initialSchema,
+              callbacksRef.current,
+              helpersRef.current,
+              variantStoreRef.current,
+            )
+          }
           const subscription = watch((data, { name }) => {
+            const mutationContext = name
+              ? consumeMutationContext({ path: name })
+              : undefined
+            const implicitBatchId =
+              mutationContext?.batchId ??
+              activeChangeBatchIdRef.current ??
+              beginChangeBatch('user')
             const effectiveSchema = buildEffectiveSchemaTree({
-              schema,
+              schema: schemaRef.current,
               value: data,
               callbacks: callbacksRef.current,
-              helpers: mergedHelpers,
-              variantStore,
+              helpers: helpersRef.current,
+              variantStore: variantStoreRef.current,
             })
             const processedData = transformFormData(data, effectiveSchema)
             const externalData = applyFieldTransforms(
               processedData,
               effectiveSchema,
               callbacksRef.current,
-              mergedHelpers,
-              variantStore,
+              helpersRef.current,
+              variantStoreRef.current,
             )
             // 以上一次对外快照为基线；首次通知没有旧快照时使用空对象。
             const previousData = previousChangeDataRef.current ?? {}
@@ -1134,6 +1570,44 @@ const DynamicFormInner = React.memo(
             const changes: FormChangeMeta['changes'] = []
             // RHF 路径优先；缺失时使用 setValue 保存的兜底路径。
             let changePath = name ?? pendingChangePathRef.current
+            let explicitArrayAction: ArrayAction | undefined
+            if (changePath) {
+              explicitArrayAction = consumeArrayActionForSnapshot(
+                subscribedMethods.control,
+                changePath,
+                PathResolver.getNestedValue(previousData, changePath),
+                PathResolver.getNestedValue(externalData, changePath),
+              )
+              if (!explicitArrayAction) {
+                const parts = changePath.split('.')
+                for (let i = parts.length - 1; i > 0; i -= 1) {
+                  const candidate = parts.slice(0, i).join('.')
+                  const previousArray = PathResolver.getNestedValue(
+                    previousData,
+                    candidate,
+                  )
+                  const nextArray = PathResolver.getNestedValue(
+                    externalData,
+                    candidate,
+                  )
+                  if (
+                    Array.isArray(previousArray) &&
+                    Array.isArray(nextArray)
+                  ) {
+                    explicitArrayAction = consumeArrayActionForSnapshot(
+                      subscribedMethods.control,
+                      candidate,
+                      previousArray,
+                      nextArray,
+                    )
+                    if (explicitArrayAction) {
+                      changePath = candidate
+                      break
+                    }
+                  }
+                }
+              }
+            }
             if (changePath && name && changePath.match(/\.\d+\.value$/)) {
               // 基本类型数组内部使用 path.value 包装，外部数据则使用数组元素路径。
               const primitiveArrayPath = changePath.replace(/\.value$/, '')
@@ -1164,35 +1638,110 @@ const DynamicFormInner = React.memo(
             }
             if (changePath) {
               // 读取外部值域的旧值；setValue 无路径通知时使用调用前保存的原值。
-              const previousValue =
+              const observedPreviousValue =
                 !name && pendingChangePathRef.current === changePath
                   ? pendingPreviousValueRef.current
                   : PathResolver.getNestedValue(previousData, changePath)
+              const directSource =
+                pendingChangeSourceRef.current &&
+                pendingChangePathRef.current === changePath
+                  ? pendingChangeSourceRef.current
+                  : undefined
+              // 路径级来源是跨嵌套层 batchId 不一致时的兜底；它只表示该路径存在
+              // 尚未消费的直接 API 写入，不能被同路径 linkage 通知提前清除。
+              const directSourceByPath =
+                directMutationSourceByPathRef.current.get(changePath)
+              // 读取当前批次的直接路径登记；该登记优先于可能被异步联动抢先消费的 token。
+              const directPathsForBatch =
+                directMutationPathsRef.current.get(implicitBatchId)
+              const isRegisteredDirectPath = Boolean(
+                directPathsForBatch?.has(changePath) || directSourceByPath,
+              )
+              const previousValue =
+                changeBatchControllerRef.current.getBaseValue({
+                  batchId: implicitBatchId,
+                  path: changePath,
+                }) ?? observedPreviousValue
               // 读取转换后的外部新值，确保与 onChange 第一参数保持同一数据契约。
               const value = PathResolver.getNestedValue(
                 externalData,
                 changePath,
               )
-              if (!Object.is(previousValue, value)) {
+              if (!isDeepEqual(previousValue, value)) {
+                const arrayAction =
+                  (explicitArrayAction &&
+                  ((explicitArrayAction.action === 'insert' &&
+                    Array.isArray(previousValue) &&
+                    Array.isArray(value) &&
+                    value.length === previousValue.length + 1) ||
+                    (explicitArrayAction.action === 'remove' &&
+                      Array.isArray(previousValue) &&
+                      Array.isArray(value) &&
+                      value.length === previousValue.length - 1) ||
+                    explicitArrayAction.action === 'move')
+                    ? explicitArrayAction
+                    : undefined) ??
+                  inferArrayAction(
+                    schemaRef.current,
+                    changePath,
+                    previousValue,
+                    value,
+                  )
                 changes.push({
                   path: changePath,
                   previousValue,
                   value,
-                  source: name
-                    ? changeSourceRef.current
-                    : (pendingChangeSourceRef.current ??
-                      changeSourceRef.current),
-                  action: value === undefined ? 'remove' : 'update',
-                  arrayAction: inferArrayAction(
-                    schema,
-                    changePath,
-                    previousValue,
-                    value,
-                  ),
+                  // 当前 API 调用保存的 pending source 优先于延迟到达的路径令牌，
+                  // 这样嵌套表单同路径联动不会抢先把根 setValue 误标为 linkage。
+                  // 没有明确 pending source 时，再使用令牌的 isLinkageWrite/source。
+                  source: mutationContext?.isLinkageWrite
+                    ? 'linkage'
+                    : isRegisteredDirectPath
+                      ? (directSource ??
+                        directSourceByPath ??
+                        (mutationContext?.source === 'reset'
+                          ? 'reset'
+                          : mutationContext?.source === 'setValues'
+                            ? 'setValues'
+                            : 'setValue'))
+                    : directSource
+                      ? directSource
+                      : mutationContext !== undefined
+                        ? mutationContext.isLinkageWrite
+                          ? 'linkage'
+                          : mutationContext.source
+                        : operationControllerRef.current.getMutationSource() ===
+                            'linkage'
+                          ? 'linkage'
+                          : changeSourceRef.current,
+                  ...(arrayAction ? { arrayAction } : {}),
                 })
               }
-              pendingChangePathRef.current = null
-              pendingChangeSourceRef.current = null
+              // 仅清理与当前通知匹配的兜底路径；其他路径的延迟通知仍可能需要各自来源。
+              // linkage 通知可能抢先到达同一路径；此时保留直接 API 的兜底来源，等待真实
+              // 直接写入通知消费。只有非 linkage 通知才可以清理该兜底状态。
+              const shouldClearPendingSource =
+                mutationContext?.isLinkageWrite === false ||
+                (!isRegisteredDirectPath && mutationContext === undefined)
+              if (
+                shouldClearPendingSource &&
+                pendingChangePathRef.current === changePath
+              ) {
+                pendingChangePathRef.current = null
+                pendingChangeSourceRef.current = null
+                pendingPreviousValueRef.current = undefined
+              }
+              // 只有明确的直接写入通知才能消费路径登记；联动通知即使碰巧落在同一路径，
+              // 也必须保留登记，等待真正的 API watch 到达后再移除。
+              if (isRegisteredDirectPath && shouldClearPendingSource) {
+                directPathsForBatch?.delete(changePath)
+                if (directPathsForBatch?.size === 0) {
+                  directMutationPathsRef.current.delete(implicitBatchId)
+                }
+                // 路径级登记要保留到当前事件批次结束：RHF 可能为同一次直接写入派发
+                // 重复 watch 通知，后续无 token 的重复通知仍需沿用直接来源；真正的 linkage
+                // 通知由上面的 mutationContext 优先级标记为 linkage，不会污染该判断。
+              }
             } else if (previousChangeDataRef.current) {
               Object.keys(externalData).forEach((path) => {
                 // 无具体 name 时按顶层路径比较快照，用于数组结构等整节点变化。
@@ -1201,16 +1750,11 @@ const DynamicFormInner = React.memo(
                   path,
                 )
                 const value = PathResolver.getNestedValue(externalData, path)
-                if (!Object.is(previousValue, value)) {
+                if (!isDeepEqual(previousValue, value)) {
                   // 推断数组长度变化或相邻元素交换，供业务区分结构操作。
-                  let arrayAction:
-                    | 'append'
-                    | 'remove'
-                    | 'moveUp'
-                    | 'moveDown'
-                    | undefined
+                  let arrayAction: ArrayAction | undefined
                   // 当前路径对应的 schema，用于排除 Select 多选数组。
-                  const fieldSchema = getSchemaAtPath(schema, path)
+                  const fieldSchema = getSchemaAtPath(schemaRef.current, path)
                   if (
                     fieldSchema?.type === 'array' &&
                     fieldSchema.ui?.widget !== 'select' &&
@@ -1218,9 +1762,25 @@ const DynamicFormInner = React.memo(
                     Array.isArray(value)
                   ) {
                     if (value.length > previousValue.length) {
-                      arrayAction = 'append'
+                      const index = previousValue.findIndex(
+                        (item, i) => !isDeepEqual(item, value[i]),
+                      )
+                      const insertIndex = index < 0 ? value.length - 1 : index
+                      arrayAction = {
+                        action: 'insert',
+                        index: insertIndex,
+                        value: value[insertIndex],
+                      }
                     } else if (value.length < previousValue.length) {
-                      arrayAction = 'remove'
+                      const index = value.findIndex(
+                        (item, i) => !isDeepEqual(item, previousValue[i]),
+                      )
+                      const removeIndex = index < 0 ? value.length : index
+                      arrayAction = {
+                        action: 'remove',
+                        index: removeIndex,
+                        value: previousValue[removeIndex],
+                      }
                     } else {
                       // 计算数组首个差异索引，识别相邻元素移动方向。
                       const changedIndex = value.findIndex(
@@ -1229,28 +1789,38 @@ const DynamicFormInner = React.memo(
                       if (
                         changedIndex >= 0 &&
                         changedIndex < value.length - 1 &&
-                        Object.is(
+                        isDeepEqual(
                           value[changedIndex],
                           previousValue[changedIndex + 1],
                         ) &&
-                        Object.is(
+                        isDeepEqual(
                           value[changedIndex + 1],
                           previousValue[changedIndex],
                         )
                       ) {
-                        arrayAction = 'moveUp'
+                        arrayAction = {
+                          action: 'move',
+                          fromIndex: changedIndex + 1,
+                          toIndex: changedIndex,
+                          value: value[changedIndex],
+                        }
                       } else if (
                         changedIndex > 0 &&
-                        Object.is(
+                        isDeepEqual(
                           value[changedIndex],
                           previousValue[changedIndex - 1],
                         ) &&
-                        Object.is(
+                        isDeepEqual(
                           value[changedIndex - 1],
                           previousValue[changedIndex],
                         )
                       ) {
-                        arrayAction = 'moveDown'
+                        arrayAction = {
+                          action: 'move',
+                          fromIndex: changedIndex - 1,
+                          toIndex: changedIndex,
+                          value: value[changedIndex],
+                        }
                       }
                     }
                   }
@@ -1258,9 +1828,8 @@ const DynamicFormInner = React.memo(
                     path,
                     previousValue,
                     value,
-                    source: changeSourceRef.current,
-                    action: value === undefined ? 'remove' : 'update',
-                    arrayAction,
+                    source: operationControllerRef.current.getMutationSource(),
+                    ...(arrayAction ? { arrayAction } : {}),
                   })
                 }
               })
@@ -1268,27 +1837,27 @@ const DynamicFormInner = React.memo(
             previousChangeDataRef.current = externalData
             pendingDataRef.current = externalData
             changes.forEach((change) => {
-              const existing = pendingChangesRef.current.find(
-                (item) => item.path === change.path,
-              )
-              if (existing) {
-                existing.value = change.value
-                existing.action = change.action
-                existing.source = change.source
-              } else {
-                pendingChangesRef.current.push(change)
-              }
+              changeBatchControllerRef.current.recordChange({
+                batchId: implicitBatchId,
+                change,
+              })
             })
-            if (changeFlushTimerRef.current === null) {
-              changeFlushTimerRef.current = window.setTimeout(() => {
-                changeFlushTimerRef.current = null
-                const nextData = pendingDataRef.current
-                if (nextData) {
-                  onChange(nextData, { changes: pendingChangesRef.current })
-                }
-                pendingDataRef.current = null
-                pendingChangesRef.current = []
-              }, 0)
+            // setValues/reset 可能在 RHF watch 通知到达前就关闭根操作，导致首次定时检查时
+            // changes 为空而无法 detach。晚到通知记录真实变化后必须重新安排稳定检查，
+            // 否则该批次会永久滞留并让后续 setValue 继续继承旧批次。
+            if (
+              changes.length > 0 &&
+              implicitBatchId === activeChangeBatchIdRef.current
+            ) {
+              closeChangeBatch(implicitBatchId)
+            }
+            if (
+              changes.length > 0 &&
+              implicitBatchId === activeChangeBatchIdRef.current
+            ) {
+              const isImplicitUserBatch =
+                mutationContextRef.current?.source === 'user'
+              if (isImplicitUserBatch) closeChangeBatch(implicitBatchId)
             }
           })
           return () => {
@@ -1297,9 +1866,10 @@ const DynamicFormInner = React.memo(
               clearTimeout(changeFlushTimerRef.current)
               changeFlushTimerRef.current = null
             }
+            clearArrayAction(subscribedMethods.control)
           }
         }
-      }, [watch, onChange, schema, mergedHelpers, variantStore])
+      }, [watch, hasOnChange])
 
       // ✅ 使用 useCallback 缓存 onSubmitHandler，避免每次渲染创建新函
       const onSubmitHandler = useCallback(
@@ -1352,6 +1922,8 @@ const DynamicFormInner = React.memo(
           pathPrefix: pathPrefix,
           linkageFunctions: effectiveLinkageFunctions,
           operationController,
+          // 仅暴露操作，不暴露根表单的内部 refs，避免子层重置父级批次或快照。
+          changeBatchRuntime,
         }),
         [
           linkageStates,
@@ -1360,6 +1932,7 @@ const DynamicFormInner = React.memo(
           pathPrefix,
           effectiveLinkageFunctions,
           operationController,
+          changeBatchRuntime,
         ], // ✅ 移除 methods 依赖
       )
 
