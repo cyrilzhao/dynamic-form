@@ -63,6 +63,10 @@ export const BasicArrayExample: React.FC = () => {
         schema={schema}
         defaultValues={defaultValues}
         onSubmit={handleSubmit}
+        onChange={(data, meta) => {
+          console.info('cyril data: ', data)
+          console.info('cyril meta: ', JSON.stringify(meta, null, 4))
+        }}
       />
 
       <Card style={{ marginTop: '20px' }}>

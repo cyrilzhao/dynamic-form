@@ -26,6 +26,8 @@ import {
 } from '../utils/linkageOperationController'
 import { useHelpers } from '../context/HelpersContext'
 import { executeInlineScript } from '../utils/executeInlineScript'
+import type { FormMutationContext } from '../types'
+import type { PendingMutationToken } from '../utils/pendingMutationContextQueue'
 
 // 用于执行动态脚本
 const DynamicFn = globalThis['Function'] as FunctionConstructor // trusted-dynamic-code
@@ -173,7 +175,25 @@ interface LinkageManagerOptions {
   linkages: Record<string, LinkageConfig[]> // v3.1: 支持多联动类型
   linkageFunctions?: Record<string, LinkageFunction>
   linkageContext?: Record<string, any> // 联动函数的外部上下文数据
+  /**
+   * 触发纯联动刷新的 schema 版本标识。
+   * 运行时数组元素增减也会重建 linkages，此处不能直接复用 linkages 引用，
+   * 否则会把正常的动态实例化误判为外部 schema 更新并打断当前根批次。
+   */
+  linkageSchemaVersion?: unknown
   operationController?: LinkageOperationController
+  ensureChangeBatch?: (source: 'user' | 'linkage') => number
+  trackChangeBatchRun?: (batchId: number) => number | undefined
+  completeChangeBatchRun?: (batchId: number, runId: number) => void
+  closeChangeBatch?: (batchId: number) => void
+  registerMutationContext?: (params: {
+    context: FormMutationContext
+    path: string
+  }) => PendingMutationToken
+  cancelMutationContext?: (params: {
+    path: string
+    token: PendingMutationToken
+  }) => boolean
 }
 
 /**
@@ -186,7 +206,14 @@ export function useLinkageManager({
   linkages,
   linkageFunctions = {},
   linkageContext = {},
+  linkageSchemaVersion,
   operationController,
+  ensureChangeBatch,
+  trackChangeBatchRun,
+  completeChangeBatchRun,
+  closeChangeBatch,
+  registerMutationContext,
+  cancelMutationContext,
 }: LinkageManagerOptions) {
   const { watch, getValues, setValue } = form
 
@@ -272,12 +299,14 @@ export function useLinkageManager({
       updatedFormData,
       preMarkFields = false,
       token,
+      mutationContext,
     }: {
       fields: string[]
       states: Record<string, LinkageResult>
       updatedFormData: Record<string, any>
       preMarkFields?: boolean
       token?: LinkageRunToken
+      mutationContext?: FormMutationContext
     }) => {
       if (token && !controller.canCommit(token)) {
         return { committed: false }
@@ -285,6 +314,24 @@ export function useLinkageManager({
 
       taskQueue.setUpdatingForm(true)
       const previousMutationSource = controller.setMutationSource('linkage')
+
+      const setLinkageValue = ({ fieldName, value }: { fieldName: string; value: unknown }) => {
+        const mutationToken = mutationContext
+          ? registerMutationContext?.({ context: mutationContext, path: fieldName })
+          : undefined
+        try {
+          setValue(fieldName, value, {
+            shouldValidate: false,
+            shouldDirty: false,
+          })
+        } catch (error) {
+          // 联动写回失败时只撤销这次路径令牌，避免迟到的失败令牌污染后续 watch 来源。
+          if (mutationToken) {
+            cancelMutationContext?.({ token: mutationToken, path: fieldName })
+          }
+          throw error
+        }
+      }
 
       try {
         // 预先标记字段：processQueue 场景中，setValue 会触发 watch，
@@ -313,10 +360,7 @@ export function useLinkageManager({
               if (!preMarkFields) {
                 taskQueue.markFieldUpdating(fieldName)
               }
-              setValue(fieldName, nextValue, {
-                shouldValidate: false,
-                shouldDirty: false,
-              })
+              setLinkageValue({ fieldName, value: nextValue })
             }
           }
 
@@ -359,10 +403,7 @@ export function useLinkageManager({
                   if (!preMarkFields) {
                     taskQueue.markFieldUpdating(fieldName)
                   }
-                  setValue(fieldName, nextValue, {
-                    shouldValidate: false,
-                    shouldDirty: false,
-                  })
+                  setLinkageValue({ fieldName, value: nextValue })
                 }
               } else if (!optionValues.includes(currentValue)) {
                 const fallbackValue = effectiveOptionsLinkage?.fallbackValue
@@ -377,10 +418,7 @@ export function useLinkageManager({
                 if (!preMarkFields) {
                   taskQueue.markFieldUpdating(fieldName)
                 }
-                setValue(fieldName, nextValue, {
-                  shouldValidate: false,
-                  shouldDirty: false,
-                })
+                setLinkageValue({ fieldName, value: nextValue })
               }
             }
           }
@@ -421,7 +459,16 @@ export function useLinkageManager({
         taskQueue.setUpdatingForm(false)
       }
     },
-    [linkages, getValues, setValue, taskQueue, setLinkageStates, controller],
+    [
+      linkages,
+      getValues,
+      setValue,
+      taskQueue,
+      setLinkageStates,
+      controller,
+    registerMutationContext,
+    cancelMutationContext,
+    ],
   )
 
   // ✅ 运行时依赖 ref：每次 render 阶段同步更新
@@ -488,10 +535,14 @@ export function useLinkageManager({
         // 检查任务是否仍然有效（可能已被更新的任务替代）
         /* istanbul ignore if -- 竞态条件边缘情况，难以在测试中稳定触发 */
         if (!taskQueue.isTaskValid(task.fieldName, task.timestamp)) {
+          if (task.changeBatchId !== undefined && task.changeBatchRunId !== undefined) {
+            completeChangeBatchRun?.(task.changeBatchId, task.changeBatchRunId)
+          }
           continue
         }
 
         let taskToken = task.token
+        try {
         if (taskToken && !controller.canCommit(taskToken)) {
           // 任务还没有开始计算时，如果 token 已经过期，不直接丢弃任务。
           // 典型场景是初始化阶段连续 setValue：第一个依赖字段创建了任务，
@@ -543,7 +594,20 @@ export function useLinkageManager({
           updatedFormData,
           preMarkFields: true, // processQueue 需要预先标记，防止级联触发
           token: taskToken,
+          mutationContext:
+            task.changeBatchId !== undefined
+              ? {
+                  batchId: task.changeBatchId,
+                  source: 'linkage',
+                  isLinkageWrite: true,
+                }
+              : undefined,
         })
+        } finally {
+          if (task.changeBatchId !== undefined && task.changeBatchRunId !== undefined) {
+            completeChangeBatchRun?.(task.changeBatchId, task.changeBatchRunId)
+          }
+        }
       }
     } finally {
       taskQueue.setProcessing(false)
@@ -646,7 +710,28 @@ export function useLinkageManager({
       // 将任务加入队列
       syncOperationVersions()
       const token = controller.createRun(scopeId)
-      taskQueue.enqueue(name, affectedFields, token)
+      const batchId = ensureChangeBatch?.(
+        controller.getMutationSource() === 'linkage' ? 'linkage' : 'user',
+      )
+      const runId =
+        batchId === undefined ? undefined : trackChangeBatchRun?.(batchId)
+      const replacedTask = taskQueue.enqueue(
+        name,
+        affectedFields,
+        token,
+        batchId !== undefined && runId !== undefined
+          ? { batchId, runId }
+          : undefined,
+      )
+      if (
+        replacedTask?.changeBatchId !== undefined &&
+        replacedTask.changeBatchRunId !== undefined
+      ) {
+        completeChangeBatchRun?.(
+          replacedTask.changeBatchId,
+          replacedTask.changeBatchRunId,
+        )
+      }
 
       // 如果队列正在处理中，不重复触发（队列会自动继续处理）
       if (taskQueue.getProcessing()) {
@@ -680,6 +765,8 @@ export function useLinkageManager({
    * 用于初始化或需要重新计算所有联动的场景
    */
   const refreshLinkage = useCallback(async () => {
+    const batchId = ensureChangeBatch?.('linkage')
+    const runId = batchId === undefined ? undefined : trackChangeBatchRun?.(batchId)
     try {
       // 等待 processQueue 完成（避免并发）
       while (taskQueue.getProcessing()) {
@@ -741,10 +828,20 @@ export function useLinkageManager({
         updatedFormData,
         preMarkFields: false, // refreshLinkage 不需要预先标记
         token,
+        mutationContext:
+          batchId !== undefined
+            ? { batchId, source: 'linkage', isLinkageWrite: true }
+            : undefined,
       })
     } catch (error) {
       console.error('[useLinkageManager] Error in refreshLinkage:', error)
     } finally {
+      if (batchId !== undefined && runId !== undefined) {
+        completeChangeBatchRun?.(batchId, runId)
+      }
+      if (batchId !== undefined) {
+        closeChangeBatch?.(batchId)
+      }
       // 清除刷新标志
       taskQueue.setRefreshing(false)
     }
@@ -755,6 +852,10 @@ export function useLinkageManager({
     controller,
     scopeId,
     syncOperationVersions,
+    ensureChangeBatch,
+    trackChangeBatchRun,
+    completeChangeBatchRun,
+    closeChangeBatch,
   ])
 
   /**
@@ -776,6 +877,24 @@ export function useLinkageManager({
   // 监听 linkageContext 变化，自动刷新联动
   // 使用 ref 实现 shallow compare，避免不必要的刷新
   const prevLinkageContextRef = useRef<Record<string, any>>(linkageContext)
+  // 记录上一次联动函数集合；函数引用变化必须触发重算，否则新业务逻辑不会反映到表单值。
+  const prevLinkageFunctionsRef = useRef(linkageFunctions)
+  // 记录上一次 schema 输入版本。schema 更新会重新解析规则，即使当前值没有 watch 通知，
+  // 新规则也可能对当前快照产生不同结果；而数组项增减造成的动态 linkages 更新不应走这里。
+  // 保存 schema 规则的结构化签名，而不是直接保存 schema 对象引用。
+  // DynamicForm 父组件可能在无语义变化的重渲染中重建 schema 对象；引用比较会误触发
+  // 刷新。签名只用于联动规则版本判断，真正的字段值和转换仍从最新 schema ref 读取。
+  const getSchemaVersionKey = (value: unknown): string => {
+    if (value === undefined) return ''
+    try {
+      return JSON.stringify(value) ?? ''
+    } catch {
+      return String(value)
+    }
+  }
+  const prevLinkageSchemaVersionRef = useRef(
+    getSchemaVersionKey(linkageSchemaVersion),
+  )
 
   useEffect(() => {
     // 如果没有联动配置，不需要监听
@@ -785,6 +904,20 @@ export function useLinkageManager({
 
     const prev = prevLinkageContextRef.current
     const next = linkageContext
+    // 联动函数集合通常由父组件在渲染中重新创建；仅比较对象引用会把内容未变化的
+    // 重渲染误判为规则变化并重复执行异步联动。这里比较 key 集合及每个函数引用，
+    // 只有实际替换、增删函数时才触发刷新。
+    const previousFunctions = prevLinkageFunctionsRef.current
+    const previousFunctionKeys = Object.keys(previousFunctions)
+    const nextFunctionKeys = Object.keys(linkageFunctions)
+    const functionsChanged =
+      previousFunctionKeys.length !== nextFunctionKeys.length ||
+      nextFunctionKeys.some(
+        (key) => previousFunctions[key] !== linkageFunctions[key],
+      )
+    const nextSchemaVersionKey = getSchemaVersionKey(linkageSchemaVersion)
+    const schemaChanged =
+      prevLinkageSchemaVersionRef.current !== nextSchemaVersionKey
 
     // Shallow compare：比较 key 集合和每个 key 的引用
     const prevKeys = Object.keys(prev)
@@ -794,12 +927,16 @@ export function useLinkageManager({
       prevKeys.length !== nextKeys.length ||
       nextKeys.some((key) => prev[key] !== next[key])
 
-    if (hasChanged) {
+    if (hasChanged || functionsChanged || schemaChanged) {
       prevLinkageContextRef.current = next
-      // linkageContext 变化时，触发联动刷新
+      prevLinkageFunctionsRef.current = linkageFunctions
+      // 同步保存三类输入的版本，避免同一次 render 在后续 effect 中被重复识别为变化。
+      prevLinkageSchemaVersionRef.current = nextSchemaVersionKey
+      // context、函数实现或 schema 解析出的规则变化都必须刷新当前快照；refreshLinkage
+      // 会在没有实际值变化时抑制空事件。
       void refreshLinkage()
     }
-  }, [linkageContext, linkages, refreshLinkage])
+  }, [linkageContext, linkageFunctions, linkageSchemaVersion, linkages, refreshLinkage])
 
   return { linkageStates, refreshLinkage, setValueWithoutLinkage }
 }

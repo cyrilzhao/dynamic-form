@@ -327,6 +327,20 @@ export const ArrayFieldWidget = forwardRef<
     const canDeleteItems = canModifyItems && canRemove
     const canMoveItems = canModifyItems && canReorder
 
+    // 基本类型数组在 RHF 内部以 { value } 包装元素，以便 Controller 注册叶子路径；
+    // arrayAction 属于公共事件元数据，必须回到外部存储域，不能把内部包装对象暴露给消费者。
+    const getArrayActionValue = useCallback((item: unknown): unknown => {
+      if (
+        item &&
+        typeof item === 'object' &&
+        !Array.isArray(item) &&
+        'value' in item
+      ) {
+        return (item as { value: unknown }).value
+      }
+      return item
+    }, [])
+
     // ✅ 使用 useCallback 缓存回调函数，避免每次渲染都创建新函数
     // 添加新项
     const handleAdd = useCallback(() => {
@@ -355,9 +369,11 @@ export const ArrayFieldWidget = forwardRef<
         recordArrayAction(control, name, {
           action: 'remove',
           index,
-          value: Array.isArray(getValues(name))
-            ? getValues(name)[index]
-            : fields[index],
+          value: getArrayActionValue(
+            Array.isArray(getValues(name))
+              ? getValues(name)[index]
+              : fields[index],
+          ),
         })
         remove(index)
       },
@@ -368,38 +384,52 @@ export const ArrayFieldWidget = forwardRef<
     const handleMoveUp = useCallback(
       (index: number) => {
         if (index > 0) {
-          // 移动项时不触发验证
+          // 先记录操作前索引和值，再执行 move；registry 会用这两个位置校验 RHF
+          // 后续快照，防止连续移动或延迟通知误消费上一条动作。
           recordArrayAction(control, name, {
             action: 'move',
             fromIndex: index,
             toIndex: index - 1,
-            value: Array.isArray(getValues(name))
-              ? getValues(name)[index]
-              : fields[index],
+            value: getArrayActionValue(
+              Array.isArray(getValues(name))
+                ? getValues(name)[index]
+                : fields[index],
+            ),
           })
           move(index, index - 1)
         }
       },
-      [move, control, name, fields, getValues],
+      [move, control, name, fields, getValues, getArrayActionValue],
     )
 
     // 下移
     const handleMoveDown = useCallback(
       (index: number) => {
         if (index < fields.length - 1) {
-          // 移动项时不触发验证
+          // 先记录操作前索引和值，再执行 move；value 已通过 getArrayActionValue
+          // 解包为外部值域，避免基本类型数组的内部 { value } 结构泄露到公共 meta。
           recordArrayAction(control, name, {
             action: 'move',
             fromIndex: index,
             toIndex: index + 1,
-            value: Array.isArray(getValues(name))
-              ? getValues(name)[index]
-              : fields[index],
+            value: getArrayActionValue(
+              Array.isArray(getValues(name))
+                ? getValues(name)[index]
+                : fields[index],
+            ),
           })
           move(index, index + 1)
         }
       },
-      [move, fields.length, control, name, fields, getValues],
+      [
+        move,
+        fields.length,
+        control,
+        name,
+        fields,
+        getValues,
+        getArrayActionValue,
+      ],
     )
 
     // ✅ 使用 useMemo 缓存所有 statusMap，避免每次渲染都创建新对象

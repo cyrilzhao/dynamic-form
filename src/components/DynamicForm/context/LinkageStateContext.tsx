@@ -7,6 +7,37 @@ import type {
 } from "../types/linkage";
 import type { ExtendedJSONSchema } from "../types/schema";
 import type { LinkageOperationController } from "../utils/linkageOperationController";
+import type { FormMutationContext } from "../types";
+import type { PendingMutationToken } from "../utils/pendingMutationContextQueue";
+
+/**
+ * 根表单拥有的字段事件批次运行时操作。
+ *
+ * asNestedForm 子表单共享同一 RHF form，但不负责发送 onChange；它只能通过这组操作把
+ * 联动 run 和字段写入归属到根表单的批次，避免子父各自维护 batch 导致遗漏或重复事件。
+ */
+export interface RootChangeBatchRuntime {
+  /** 创建根批次或加入当前尚未完成的根批次。 */
+  ensureChangeBatch: (source: "user" | "linkage") => number;
+  /** 登记子层联动 run，阻止根批次在异步结果完成前 flush。 */
+  trackLinkageRun: (batchId: number) => number | undefined;
+  /** 解除子层联动 run 的登记，使根批次可以重新检查稳定状态。 */
+  completeLinkageRun: (batchId: number, runId: number) => void;
+  /** 关闭主动纯联动刷新创建或加入的根批次。 */
+  closeChangeBatch: (batchId: number) => void;
+  /**
+   * 在子层写入前登记路径令牌；根表单的 watch 按路径消费它，不能依赖全局来源猜测。
+   */
+  registerMutationContext: (params: {
+    context: FormMutationContext;
+    path: string;
+  }) => PendingMutationToken;
+  /** RHF 同步拒绝写入时撤销该次登记，保留同路径其他延迟通知令牌。 */
+  cancelMutationContext: (params: {
+    path: string;
+    token: PendingMutationToken;
+  }) => boolean;
+}
 
 /**
  * 联动状态 Context 值类型
@@ -37,6 +68,11 @@ export interface LinkageStateContextValue {
    * 使用同一套版本校验，防止不同层级各自提交旧结果。
    */
   operationController?: LinkageOperationController;
+  /**
+   * 根表单的字段事件批次运行时。
+   * 仅 asNestedForm=true 的子表单继承；独立 DynamicForm 必须保持 undefined。
+   */
+  changeBatchRuntime?: RootChangeBatchRuntime;
 }
 
 /**
