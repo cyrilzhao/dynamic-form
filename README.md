@@ -207,7 +207,7 @@ const handleChange = (data: any) => {
 
 #### Change Metadata
 
-`onChange` 的第二个参数是可选的 `FormChangeMeta`。当表单存在真实可观察变化时，DynamicForm 会在一次稳定批次中同时返回完整外部数据快照和字段级变化元数据：
+The second `onChange` argument is the optional `FormChangeMeta`. When the form has an observable change, DynamicForm returns the complete external snapshot and field-level change metadata in one stable batch:
 
 ```typescript
 const handleChange = (data: Record<string, unknown>, meta?: FormChangeMeta) => {
@@ -217,12 +217,12 @@ const handleChange = (data: Record<string, unknown>, meta?: FormChangeMeta) => {
 }
 ```
 
-`meta.changes` 每条记录包含 `path`、`previousValue`、`value` 和 `source`；数组结构变化时还会包含 `arrayAction`（`insert`、`remove` 或 `move`）。路径使用绝对点号格式，例如 `items.0.price`。这些值与 `data` 一样都处于外部存储域，已完成 transform 和基本类型数组解包，不会暴露 RHF 内部 `{ value }` 包装对象。
+Each `meta.changes` entry contains `path`, `previousValue`, `value`, and `source`; array structure changes also include `arrayAction` (`insert`, `remove`, or `move`). Paths use absolute dot notation such as `items.0.price`. These values use the same external stored domain as `data`, after transforms and primitive-array unwrapping, and never expose RHF's internal `{ value }` wrapper.
 
-一次 `setValues`、reset 或联动级联会在所有相关同步/异步联动稳定后发送一次回调；同一路径重复写入保留批次开始前的 `previousValue` 并更新最终值。没有真实差异时不会发送空回调。`asNestedForm` 子表单由根表单发送一次绝对路径事件，独立 `asNestedForm={false}` 表单保持独立事件边界。
+One `setValues`, reset, or linkage cascade sends one callback after all related synchronous and asynchronous work is stable. Repeated writes to one path retain the batch's initial `previousValue` and update the final value. No callback is sent when there is no observable difference. An `asNestedForm` child is reported once by the root form with absolute paths; an independent `asNestedForm={false}` form keeps its own event boundary.
 
 ```typescript
-// 数组动作位于数组路径对应的 FieldChange 上
+// Array actions are attached to the FieldChange for the array path.
 {
   path: 'items',
   previousValue: [{ id: 'a' }],
@@ -2298,6 +2298,10 @@ const schema = {
 };
 
 function MyForm() {
+  // Keep the widget registry stable so the provider and widget tree are not
+  // rebuilt on every render. Move this to module scope when it never changes.
+  const widgets = useMemo(() => ({ upload: UploadWidget }), []);
+
   // Keep this reference stable with useMemo. A new object on every render
   // would continuously re-render all widgets in CallbacksContext.
   const callbacks = useMemo(() => ({
@@ -2317,7 +2321,7 @@ function MyForm() {
     <DynamicForm
       schema={schema}
       callbacks={callbacks}
-      widgets={{ upload: UploadWidget }}
+      widgets={widgets}
       onSubmit={handleSubmit}
     />
   );
@@ -2514,10 +2518,7 @@ Additional UI customization options:
 
 **Note:** Help text should be set using the top-level `description` field (JSON Schema standard), not `ui.help`.
 
-`ui.order` 只控制 object schema 直接子字段的渲染顺序；未列出的属性会按 `properties` 原始顺序追加，
-不会从提交数据中删除。样式类配置只影响渲染，不改变数据契约；`validators` 仍遵循表单验证触发时机。
-`ui.transform.hideConvertedValue` 控制是否隐藏输入框下方的转换后值预览，默认显示；它只影响展示，
-不会改变 `getValues`、`onChange` 或 `onSubmit` 的存储域数据。
+`ui.order` controls only the render order of direct child properties in an object schema. Unlisted properties are appended in their original `properties` order and are not removed from submitted data. Style options affect rendering only; `validators` still follow the form's validation timing. `ui.transform.hideConvertedValue` controls the converted-value preview below an input and defaults to visible; it does not change the stored-domain data returned by `getValues`, `onChange`, or `onSubmit`.
 
 #### Value Transform (`ui.transform`)
 
@@ -3289,24 +3290,81 @@ All helper-aware functions use an object parameter:
 #### Async Validation with ofetch
 
 ```typescript
-const callbacks = {
-  checkUsernameAvailability: async ({ value, helpers }) => {
-    if (!value) return null;
+import { useMemo } from 'react';
+import { DynamicForm } from '@/components/DynamicForm';
 
-    const result = await helpers.ofetch('/check-username', {
-      method: 'POST',
-      body: { username: value },
-    });
+function App() {
+  const callbacks = useMemo(
+    () => ({
+      checkUsernameAvailability: async ({ value, helpers }) => {
+        if (!value) return null;
 
-    return result.available ? null : 'Username is already taken';
-  },
-};
+        const result = await helpers.ofetch('/check-username', {
+          method: 'POST',
+          body: { username: value },
+        });
 
-<DynamicForm
-  schema={schema}
-  callbacks={callbacks}
-/>
+        return result.available ? null : 'Username is already taken';
+      },
+    }),
+    [],
+  );
+
+  return <DynamicForm schema={schema} callbacks={callbacks} />;
+}
 ```
+
+In a React component, `callbacks` should be wrapped with `useMemo`. This is not required for correctness: DynamicForm reads the latest callback implementation through an internal ref. However, creating a new object on every render repeats field parsing, transform, validator, and `ui.callbackProps` calculations that depend on callbacks.
+
+### Reference Stability of DynamicForm Props
+
+Reference stability should be based on whether a value represents a business input change; do not memoize every object unconditionally.
+
+The examples in this document declare many `schema`, `linkageFunctions`, `callbacks`,
+`helpers`, `widgets`, and `customFormats` objects at module scope. Module-scope constants are
+created once and are already stable. If the same object is declared inside a React component,
+wrap it with `useMemo` and include every real external dependency. Inline callback props such as
+`onSubmit` and `onChange` remain valid because DynamicForm reads their latest implementation.
+
+| Parameter                               | Must be stable?                                             | Description                                                                                                                    |
+| --------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `schema`                                | Recommended for static schemas; dynamic changes are allowed | A new reference can reparse fields and linkage rules; change it only for a real schema update                                  |
+| `callbacks`                             | Recommended, not required                                   | The latest functions are read through a ref; stability avoids repeated transform, validator, and callback-prop work            |
+| `linkageFunctions`                      | Recommended; use a new reference for implementation changes | Function references are compared and real changes refresh linkage; meaningless new objects add work                            |
+| `linkageContext`                        | Recommended; use a new reference when context data changes  | Shallow key/value comparison triggers linkage refresh for real changes; a new object every render causes unnecessary refreshes |
+| `helpers`                               | Recommended                                                 | Helpers are merged into the runtime; unstable references recreate the merged object and dependent calculations                 |
+| `widgets`                               | Recommended                                                 | A changed registry updates the provider and field tree; use a module constant or `useMemo` for static registries               |
+| `customFormats`                         | Recommended                                                 | Custom formats are resolver configuration; unstable references cause repeated resolver setup                                   |
+| `onChange`, `onChangeError`, `onSubmit` | No                                                          | DynamicForm reads the latest callback through refs; update the function when its closure inputs change                         |
+| `defaultValues`                         | Usually used only at initialization                         | Reload data with `ref.setValues` or `ref.reset` instead of relying on a new object reference                                   |
+
+Recommended pattern:
+
+```typescript
+const schema = useMemo(() => createSchema(), []);
+const callbacks = useMemo(() => createCallbacks(), []);
+const linkageFunctions = useMemo(() => ({ calculateTotal }), []);
+const linkageContext = useMemo(() => ({ apiData }), [apiData]);
+const helpers = useMemo(() => ({ money, dateFns }), [money, dateFns]);
+const widgets = useMemo(() => ({ upload: UploadWidget }), []);
+const customFormats = useMemo(() => ({ phone: isPhone }), []);
+
+return (
+  <DynamicForm
+    schema={schema}
+    callbacks={callbacks}
+    linkageFunctions={linkageFunctions}
+    linkageContext={linkageContext}
+    helpers={helpers}
+    widgets={widgets}
+    customFormats={customFormats}
+    onChange={handleChange}
+    onSubmit={handleSubmit}
+  />
+);
+```
+
+Do not hide real business updates in the name of stability. When `linkageContext`, `linkageFunctions`, or schema linkage rules actually change, create a new reference so DynamicForm refreshes; `useMemo` dependencies must include those real inputs.
 
 #### Transform with Lodash
 
@@ -3764,7 +3822,7 @@ function EmployeeForm() {
     loadData();
   }, []);
 
-  const schema = {
+  const schema = useMemo(() => ({
     type: 'object',
     properties: {
       department: {
@@ -3794,9 +3852,9 @@ function EmployeeForm() {
         }
       }
     }
-  };
+  }), []);
 
-  const linkageFunctions = {
+  const linkageFunctions = useMemo(() => ({
     getDepartmentOptions: () => {
       return departments.map(dept => ({
         label: dept.name,
@@ -3814,7 +3872,7 @@ function EmployeeForm() {
           value: emp.id
         }));
     }
-  };
+  }), [departments, employees]);
 
   return (
     <DynamicForm
@@ -3841,14 +3899,16 @@ function EmployeeForm() {
 Here's a comprehensive example demonstrating all available methods:
 
 ```typescript
-import React, { useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { DynamicForm } from '@/components/DynamicForm';
 import type { DynamicFormRef } from '@/components/DynamicForm';
 
 function UserManagementForm() {
   const formRef = useRef<DynamicFormRef>(null);
 
-  const schema = {
+  // This schema is static for the lifetime of the form, so memoize it when it
+  // is declared inside the component instead of allocating it per render.
+  const schema = useMemo(() => ({
     type: 'object',
     properties: {
       username: {
@@ -3870,7 +3930,7 @@ function UserManagementForm() {
       }
     },
     required: ['username', 'email']
-  };
+  }), []);
 
   // Example: Programmatically set values
   const handleLoadUserData = () => {
