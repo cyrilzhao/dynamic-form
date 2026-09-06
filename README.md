@@ -173,18 +173,18 @@ Object defaults are recursively merged with child object defaults. Explicit keys
 
 ```ts
 const schema = {
-  type: "object",
+  type: 'object',
   properties: {
     settings: {
-      type: "object",
-      default: { theme: "custom" },
+      type: 'object',
+      default: { theme: 'custom' },
       properties: {
-        theme: { type: "string", default: "light" },
-        language: { type: "string", default: "en" },
+        theme: { type: 'string', default: 'light' },
+        language: { type: 'string', default: 'en' },
       },
     },
   },
-};
+}
 
 // { settings: { theme: 'custom', language: 'en' } }
 ```
@@ -203,6 +203,33 @@ const handleChange = (data: any) => {
   onChange={handleChange}
   onSubmit={handleSubmit}
 />
+```
+
+#### Change Metadata
+
+`onChange` 的第二个参数是可选的 `FormChangeMeta`。当表单存在真实可观察变化时，DynamicForm 会在一次稳定批次中同时返回完整外部数据快照和字段级变化元数据：
+
+```typescript
+const handleChange = (data: Record<string, unknown>, meta?: FormChangeMeta) => {
+  console.log(data)
+  console.log(meta?.rootSource) // user | setValue | setValues | reset | linkage
+  console.log(meta?.changes)
+}
+```
+
+`meta.changes` 每条记录包含 `path`、`previousValue`、`value` 和 `source`；数组结构变化时还会包含 `arrayAction`（`insert`、`remove` 或 `move`）。路径使用绝对点号格式，例如 `items.0.price`。这些值与 `data` 一样都处于外部存储域，已完成 transform 和基本类型数组解包，不会暴露 RHF 内部 `{ value }` 包装对象。
+
+一次 `setValues`、reset 或联动级联会在所有相关同步/异步联动稳定后发送一次回调；同一路径重复写入保留批次开始前的 `previousValue` 并更新最终值。没有真实差异时不会发送空回调。`asNestedForm` 子表单由根表单发送一次绝对路径事件，独立 `asNestedForm={false}` 表单保持独立事件边界。
+
+```typescript
+// 数组动作位于数组路径对应的 FieldChange 上
+{
+  path: 'items',
+  previousValue: [{ id: 'a' }],
+  value: [{ id: 'b' }, { id: 'a' }],
+  source: 'user',
+  arrayAction: { action: 'insert', index: 0, value: { id: 'b' } },
+}
 ```
 
 ### Form Layout Options
@@ -777,37 +804,51 @@ The `ui` field provides extensive customization options:
     className: 'custom-class',  // CSS class
     layout: 'horizontal',       // Layout override
     labelWidth: 120,            // Label width (horizontal layout)
+    order: ['email'],           // Object child render order (object schemas)
+    help: 'Shown near the field',// UI-specific help text (description is preferred)
+    style: { marginTop: 8 },    // Field container style
+    prefixLabel: 'Account',      // Label prefix for flattened fields
     errorMessages: {            // Custom error messages
       required: 'Email is required',
       pattern: 'Invalid email format'
-    }
+    },
+    variants: [],                // Alternative field modes
+    defaultVariant: 'default',   // Fallback variant name
+    validators: [],              // Field-level custom validators
+    transform: {                 // Display/input ↔ stored value conversion
+      callback: 'toStored',
+      reverseCallback: 'toInput',
+      hideConvertedValue: false,
+    },
+    widgetProps: {},             // Static widget props
+    callbackProps: {},           // Runtime callback references
   }
 }
 ```
 
 #### Supported Widget Types
 
-| Widget          | Field Type          | Description                       |
-| --------------- | ------------------- | --------------------------------- |
-| `text`          | string              | Single-line text input            |
-| `textarea`      | string              | Multi-line text input             |
-| `password`      | string              | Password input                    |
-| `email`         | string              | Email input                       |
-| `number`        | number/integer      | Number input                      |
-| `select`        | string/number/array | Dropdown select                   |
-| `radio`         | string/number       | Radio buttons                     |
-| `checkboxes`    | array               | Multiple checkboxes               |
-| `checkbox`      | boolean             | Single checkbox                   |
-| `switch`        | boolean             | Toggle switch                     |
-| `url`           | string              | URL input                         |
-| `checkbox-group`| array/non-boolean   | Multiple checkbox group           |
-| `nested-form`   | object              | Nested form                       |
-| `code-editor`   | string              | Code editor with syntax highlight |
-| `object-editor` | object              | JSON object editor                |
-| `key-value-array` | array              | Key-value pair table              |
-| `table-array`   | array of objects    | Object table with optional virtual scroll |
-| `variant`       | any                 | Polymorphic field editor          |
-| `schema-builder`| object              | Schema builder editor             |
+| Widget            | Field Type          | Description                               |
+| ----------------- | ------------------- | ----------------------------------------- |
+| `text`            | string              | Single-line text input                    |
+| `textarea`        | string              | Multi-line text input                     |
+| `password`        | string              | Password input                            |
+| `email`           | string              | Email input                               |
+| `number`          | number/integer      | Number input                              |
+| `select`          | string/number/array | Dropdown select                           |
+| `radio`           | string/number       | Radio buttons                             |
+| `checkboxes`      | array               | Multiple checkboxes                       |
+| `checkbox`        | boolean             | Single checkbox                           |
+| `switch`          | boolean             | Toggle switch                             |
+| `url`             | string              | URL input                                 |
+| `checkbox-group`  | array/non-boolean   | Multiple checkbox group                   |
+| `nested-form`     | object              | Nested form                               |
+| `code-editor`     | string              | Code editor with syntax highlight         |
+| `object-editor`   | object              | JSON object editor                        |
+| `key-value-array` | array               | Key-value pair table                      |
+| `table-array`     | array of objects    | Object table with optional virtual scroll |
+| `variant`         | any                 | Polymorphic field editor                  |
+| `schema-builder`  | object              | Schema builder editor                     |
 
 ### 2. Field Validation
 
@@ -879,21 +920,21 @@ Fields that are hidden or disabled via **linkage** are automatically excluded fr
 // Example: creditCardNumber is hidden when paymentMethod !== 'credit_card'
 // → creditCardNumber will NOT be validated when hidden, even if it's in `required`
 const schema = {
-  type: "object",
+  type: 'object',
   properties: {
-    paymentMethod: { type: "string", title: "Payment Method" },
+    paymentMethod: { type: 'string', title: 'Payment Method' },
     creditCardNumber: {
-      type: "string",
-      title: "Card Number",
+      type: 'string',
+      title: 'Card Number',
       ui: {
         linkages: [
           {
-            type: "visibility",
-            dependencies: ["#/properties/paymentMethod"],
+            type: 'visibility',
+            dependencies: ['#/properties/paymentMethod'],
             when: {
-              field: "#/properties/paymentMethod",
-              operator: "==",
-              value: "credit_card",
+              field: '#/properties/paymentMethod',
+              operator: '==',
+              value: 'credit_card',
             },
             fulfill: { state: { visible: true } },
             otherwise: { state: { visible: false } },
@@ -902,8 +943,8 @@ const schema = {
       },
     },
   },
-  required: ["creditCardNumber"],
-};
+  required: ['creditCardNumber'],
+}
 ```
 
 **Rules:**
@@ -945,20 +986,20 @@ Use JSON Schema's conditional validation keywords:
 For complex validation logic beyond JSON Schema's built-in rules, you can use custom validation functions:
 
 ```typescript
-const formRef = useRef<DynamicFormRef>(null);
+const formRef = useRef<DynamicFormRef>(null)
 
 // Add custom validation after form creation
 const handleValidatePasswords = () => {
-  const password = formRef.current?.getValue("password");
-  const confirmPassword = formRef.current?.getValue("confirmPassword");
+  const password = formRef.current?.getValue('password')
+  const confirmPassword = formRef.current?.getValue('confirmPassword')
 
   if (password !== confirmPassword) {
-    formRef.current?.setError("confirmPassword", {
-      type: "manual",
-      message: "Passwords do not match",
-    });
+    formRef.current?.setError('confirmPassword', {
+      type: 'manual',
+      message: 'Passwords do not match',
+    })
   }
-};
+}
 ```
 
 #### Custom Format Validators
@@ -1108,15 +1149,15 @@ Provide a complete JavaScript function string for simple, one-off validation.
 **Function signature:**
 
 ```typescript
-({
+;({
   value,
   formValues,
   helpers,
 }: {
-  value: any;
-  formValues: Record<string, any>;
-  helpers: Record<string, any>;
-}) => string | null | Promise<string | null>;
+  value: any
+  formValues: Record<string, any>
+  helpers: Record<string, any>
+}) => string | null | Promise<string | null>
 ```
 
 **Parameters:**
@@ -1410,46 +1451,46 @@ Options linkage supports both static and dynamic (function-based) configurations
 
 ```typescript
 const schema = {
-  type: "object",
+  type: 'object',
   properties: {
     country: {
-      type: "string",
-      title: "Country",
-      enum: ["china", "usa"],
-      enumNames: ["China", "USA"],
+      type: 'string',
+      title: 'Country',
+      enum: ['china', 'usa'],
+      enumNames: ['China', 'USA'],
     },
     province: {
-      type: "string",
-      title: "Province/State",
+      type: 'string',
+      title: 'Province/State',
       ui: {
         linkages: [
           {
-            type: "options",
-            dependencies: ["#/properties/country"],
-            fulfill: { function: "getProvinceOptions" },
+            type: 'options',
+            dependencies: ['#/properties/country'],
+            fulfill: { function: 'getProvinceOptions' },
           },
         ],
       },
     },
   },
-};
+}
 
 const linkageFunctions = {
   getProvinceOptions: ({ formData }: { formData: Record<string, any> }) => {
-    if (formData.country === "china") {
+    if (formData.country === 'china') {
       return [
-        { label: "Beijing", value: "beijing" },
-        { label: "Shanghai", value: "shanghai" },
-      ];
-    } else if (formData.country === "usa") {
+        { label: 'Beijing', value: 'beijing' },
+        { label: 'Shanghai', value: 'shanghai' },
+      ]
+    } else if (formData.country === 'usa') {
       return [
-        { label: "California", value: "ca" },
-        { label: "New York", value: "ny" },
-      ];
+        { label: 'California', value: 'ca' },
+        { label: 'New York', value: 'ny' },
+      ]
     }
-    return [];
+    return []
   },
-};
+}
 ```
 
 **Using Static Values:**
@@ -1560,52 +1601,52 @@ Dynamically change nested form structure based on field values:
 ```typescript
 const userSchemas = {
   personal: {
-    type: "object",
+    type: 'object',
     properties: {
-      firstName: { type: "string", title: "First Name" },
-      lastName: { type: "string", title: "Last Name" },
+      firstName: { type: 'string', title: 'First Name' },
+      lastName: { type: 'string', title: 'Last Name' },
     },
   },
   company: {
-    type: "object",
+    type: 'object',
     properties: {
-      companyName: { type: "string", title: "Company Name" },
-      taxId: { type: "string", title: "Tax ID" },
+      companyName: { type: 'string', title: 'Company Name' },
+      taxId: { type: 'string', title: 'Tax ID' },
     },
   },
-};
+}
 
 const schema = {
-  type: "object",
+  type: 'object',
   properties: {
     userType: {
-      type: "string",
-      title: "User Type",
-      enum: ["personal", "company"],
-      enumNames: ["Personal", "Company"],
+      type: 'string',
+      title: 'User Type',
+      enum: ['personal', 'company'],
+      enumNames: ['Personal', 'Company'],
     },
     details: {
-      type: "object",
-      title: "Details",
+      type: 'object',
+      title: 'Details',
       ui: {
-        widget: "nested-form",
+        widget: 'nested-form',
         linkages: [
           {
-            type: "schema",
-            dependencies: ["userType"],
-            fulfill: { function: "loadUserSchema" },
+            type: 'schema',
+            dependencies: ['userType'],
+            fulfill: { function: 'loadUserSchema' },
           },
         ],
       },
     },
   },
-};
+}
 
 const linkageFunctions = {
   loadUserSchema: ({ formData }: { formData: Record<string, any> }) => {
-    return userSchemas[formData.userType] || { type: "object", properties: {} };
+    return userSchemas[formData.userType] || { type: 'object', properties: {} }
   },
-};
+}
 ```
 
 **Effective Schema After Linkage:**
@@ -1701,65 +1742,65 @@ Schema linkage also works on primitive field types (string, number, boolean) to 
 ```typescript
 // Change validation pattern based on document type
 const schema = {
-  type: "object",
+  type: 'object',
   properties: {
     documentType: {
-      type: "string",
-      title: "Document Type",
-      enum: ["passport", "id_card", "license"],
-      enumNames: ["Passport", "ID Card", "Driver License"],
+      type: 'string',
+      title: 'Document Type',
+      enum: ['passport', 'id_card', 'license'],
+      enumNames: ['Passport', 'ID Card', 'Driver License'],
     },
     documentNumber: {
-      type: "string",
-      title: "Document Number",
+      type: 'string',
+      title: 'Document Number',
       ui: {
         linkages: [
           {
-            type: "schema",
-            dependencies: ["#/properties/documentType"],
-            fulfill: { function: "getDocumentValidation" },
+            type: 'schema',
+            dependencies: ['#/properties/documentType'],
+            fulfill: { function: 'getDocumentValidation' },
           },
         ],
       },
     },
   },
-};
+}
 
 const linkageFunctions = {
   getDocumentValidation: ({ formData }: { formData: Record<string, any> }) => {
-    const { documentType } = formData;
+    const { documentType } = formData
 
     // Return different validation rules based on document type
-    if (documentType === "passport") {
+    if (documentType === 'passport') {
       return {
-        pattern: "^[A-Z]{2}[0-9]{7}$",
+        pattern: '^[A-Z]{2}[0-9]{7}$',
         minLength: 9,
         maxLength: 9,
-        ui: { placeholder: "e.g., AB1234567" },
-      };
+        ui: { placeholder: 'e.g., AB1234567' },
+      }
     }
 
-    if (documentType === "id_card") {
+    if (documentType === 'id_card') {
       return {
-        pattern: "^[0-9]{9}$",
+        pattern: '^[0-9]{9}$',
         minLength: 9,
         maxLength: 9,
-        ui: { placeholder: "e.g., 123456789" },
-      };
+        ui: { placeholder: 'e.g., 123456789' },
+      }
     }
 
-    if (documentType === "license") {
+    if (documentType === 'license') {
       return {
-        pattern: "^[A-Z]{1}[0-9]{8}$",
+        pattern: '^[A-Z]{1}[0-9]{8}$',
         minLength: 9,
         maxLength: 9,
-        ui: { placeholder: "e.g., D12345678" },
-      };
+        ui: { placeholder: 'e.g., D12345678' },
+      }
     }
 
-    return {};
+    return {}
   },
-};
+}
 ```
 
 **Example 2 — Dynamic widget:**
@@ -1767,57 +1808,57 @@ const linkageFunctions = {
 ```typescript
 // Change widget based on input type
 const schema = {
-  type: "object",
+  type: 'object',
   properties: {
     inputType: {
-      type: "string",
-      title: "Input Type",
-      enum: ["short", "long", "formatted"],
-      enumNames: ["Short Text", "Long Text", "Formatted Text"],
+      type: 'string',
+      title: 'Input Type',
+      enum: ['short', 'long', 'formatted'],
+      enumNames: ['Short Text', 'Long Text', 'Formatted Text'],
     },
     content: {
-      type: "string",
-      title: "Content",
+      type: 'string',
+      title: 'Content',
       ui: {
         linkages: [
           {
-            type: "schema",
-            dependencies: ["#/properties/inputType"],
-            fulfill: { function: "getContentWidget" },
+            type: 'schema',
+            dependencies: ['#/properties/inputType'],
+            fulfill: { function: 'getContentWidget' },
           },
         ],
       },
     },
   },
-};
+}
 
 const linkageFunctions = {
   getContentWidget: ({ formData }: { formData: Record<string, any> }) => {
-    const { inputType } = formData;
+    const { inputType } = formData
 
-    if (inputType === "short") {
+    if (inputType === 'short') {
       return {
-        ui: { widget: "input", placeholder: "Enter short text" },
+        ui: { widget: 'input', placeholder: 'Enter short text' },
         maxLength: 100,
-      };
+      }
     }
 
-    if (inputType === "long") {
+    if (inputType === 'long') {
       return {
-        ui: { widget: "textarea", placeholder: "Enter long text" },
+        ui: { widget: 'textarea', placeholder: 'Enter long text' },
         maxLength: 1000,
-      };
+      }
     }
 
-    if (inputType === "formatted") {
+    if (inputType === 'formatted') {
       return {
-        ui: { widget: "markdown", placeholder: "Enter markdown text" },
-      };
+        ui: { widget: 'markdown', placeholder: 'Enter markdown text' },
+      }
     }
 
-    return {};
+    return {}
   },
-};
+}
 ```
 
 #### Multiple Linkages of the Same Type
@@ -1840,20 +1881,20 @@ A single field can have multiple linkage configs of the same type in its `linkag
 ui: {
   linkages: [
     {
-      type: "visibility",
-      dependencies: ["#/properties/isLoggedIn"],
-      when: { field: "#/properties/isLoggedIn", operator: "==", value: true },
+      type: 'visibility',
+      dependencies: ['#/properties/isLoggedIn'],
+      when: { field: '#/properties/isLoggedIn', operator: '==', value: true },
       fulfill: { state: { visible: true } },
       otherwise: { state: { visible: false } },
     },
     {
-      type: "visibility",
-      dependencies: ["#/properties/role"],
-      when: { field: "#/properties/role", operator: "==", value: "admin" },
+      type: 'visibility',
+      dependencies: ['#/properties/role'],
+      when: { field: '#/properties/role', operator: '==', value: 'admin' },
       fulfill: { state: { visible: true } },
       otherwise: { state: { visible: false } },
     },
-  ];
+  ]
 }
 // → visible only when isLoggedIn === true AND role === 'admin'
 ```
@@ -1865,24 +1906,24 @@ ui: {
 ui: {
   linkages: [
     {
-      type: "disabled",
-      dependencies: ["#/properties/isReadonlyMode"],
+      type: 'disabled',
+      dependencies: ['#/properties/isReadonlyMode'],
       when: {
-        field: "#/properties/isReadonlyMode",
-        operator: "==",
+        field: '#/properties/isReadonlyMode',
+        operator: '==',
         value: true,
       },
       fulfill: { state: { disabled: true } },
       otherwise: { state: { disabled: false } },
     },
     {
-      type: "disabled",
-      dependencies: ["#/properties/userRole"],
-      when: { field: "#/properties/userRole", operator: "==", value: "guest" },
+      type: 'disabled',
+      dependencies: ['#/properties/userRole'],
+      when: { field: '#/properties/userRole', operator: '==', value: 'guest' },
       fulfill: { state: { disabled: true } },
       otherwise: { state: { disabled: false } },
     },
-  ];
+  ]
 }
 // → disabled when isReadonlyMode === true OR userRole === 'guest'
 ```
@@ -1901,33 +1942,33 @@ When multiple linkage configs of the same type use **async linkage functions** (
 
 ```typescript
 const schema = {
-  type: "object",
+  type: 'object',
   properties: {
     price: {
-      type: "number",
-      title: "Price",
+      type: 'number',
+      title: 'Price',
       ui: {
         linkages: [
           {
-            type: "value",
-            dependencies: ["country"],
-            fulfill: { function: "fetchPriceFromAPI1" },
+            type: 'value',
+            dependencies: ['country'],
+            fulfill: { function: 'fetchPriceFromAPI1' },
           }, // async, returns 100
           {
-            type: "value",
-            dependencies: ["country"],
-            fulfill: { function: "fetchPriceFromAPI2" },
+            type: 'value',
+            dependencies: ['country'],
+            fulfill: { function: 'fetchPriceFromAPI2' },
           }, // async, returns 200
           {
-            type: "value",
-            dependencies: ["country"],
-            fulfill: { function: "fetchPriceFromAPI3" },
+            type: 'value',
+            dependencies: ['country'],
+            fulfill: { function: 'fetchPriceFromAPI3' },
           }, // async, returns 300
         ],
       },
     },
   },
-};
+}
 
 // Result: price = 300 (always the last defined linkage, regardless of which completes first)
 ```
@@ -2018,20 +2059,20 @@ const linkageFunctions = {
     formData,
     helpers,
   }: {
-    formData: Record<string, any>;
-    helpers: Record<string, any>;
+    formData: Record<string, any>
+    helpers: Record<string, any>
   }) => {
-    const countryId = formData.country;
-    if (!countryId) return [];
+    const countryId = formData.country
+    if (!countryId) return []
 
-    const cities = await helpers.ofetch("/api/cities", {
+    const cities = await helpers.ofetch('/api/cities', {
       query: { country: countryId },
-    });
+    })
 
     return helpers._.map(cities, (city: any) => ({
       label: city.name,
       value: city.id,
-    }));
+    }))
   },
 
   // Async function to validate and compute value
@@ -2039,43 +2080,43 @@ const linkageFunctions = {
     formData,
     helpers,
   }: {
-    formData: Record<string, any>;
-    helpers: Record<string, any>;
+    formData: Record<string, any>
+    helpers: Record<string, any>
   }) => {
-    const { weight, destination } = formData;
-    if (!weight || !destination) return 0;
+    const { weight, destination } = formData
+    if (!weight || !destination) return 0
 
-    const result = await helpers.ofetch("/api/calculate-shipping", {
-      method: "POST",
+    const result = await helpers.ofetch('/api/calculate-shipping', {
+      method: 'POST',
       body: { weight, destination },
-    });
+    })
 
-    return result.cost;
+    return result.cost
   },
-};
+}
 
 const schema = {
-  type: "object",
+  type: 'object',
   properties: {
     country: {
-      type: "string",
-      title: "Country",
+      type: 'string',
+      title: 'Country',
     },
     city: {
-      type: "string",
-      title: "City",
+      type: 'string',
+      title: 'City',
       ui: {
         linkages: [
           {
-            type: "options",
-            dependencies: ["#/properties/country"],
-            fulfill: { function: "loadCityOptions" },
+            type: 'options',
+            dependencies: ['#/properties/country'],
+            fulfill: { function: 'loadCityOptions' },
           },
         ],
       },
     },
   },
-};
+}
 ```
 
 **Important:** Async functions are automatically handled - just return a Promise or use `async/await`.
@@ -2089,12 +2130,12 @@ Control when linkage effects are applied using the `when`/`fulfill`/`otherwise` 
   ui: {
     linkages: [
       {
-        type: "visibility",
-        dependencies: ["#/properties/userType"],
+        type: 'visibility',
+        dependencies: ['#/properties/userType'],
         when: {
-          field: "#/properties/userType",
-          operator: "==",
-          value: "premium",
+          field: '#/properties/userType',
+          operator: '==',
+          value: 'premium',
         },
         fulfill: {
           state: { visible: true },
@@ -2103,7 +2144,7 @@ Control when linkage effects are applied using the `when`/`fulfill`/`otherwise` 
           state: { visible: false },
         },
       },
-    ];
+    ]
   }
 }
 ```
@@ -2134,15 +2175,15 @@ Declare which fields the linkage depends on using JSON Pointer format:
   ui: {
     linkages: [
       {
-        type: "value",
+        type: 'value',
         dependencies: [
-          "#/properties/price", // Top-level field
-          "#/properties/address/city", // Nested object field
-          "#/properties/items", // Entire array (to react to any item change)
+          '#/properties/price', // Top-level field
+          '#/properties/address/city', // Nested object field
+          '#/properties/items', // Entire array (to react to any item change)
         ],
-        fulfill: { function: "calculate" },
+        fulfill: { function: 'calculate' },
       },
-    ];
+    ]
   }
 }
 ```
@@ -2167,28 +2208,28 @@ Configure field appearance, behavior, and layout using the `ui` field.
 
 DynamicForm automatically selects appropriate widgets based on field type, but you can override this:
 
-| Widget          | Field Type          | Description                       |
-| --------------- | ------------------- | --------------------------------- |
-| `text`          | string              | Single-line text input            |
-| `textarea`      | string              | Multi-line text input             |
-| `password`      | string              | Password input                    |
-| `email`         | string              | Email input                       |
-| `number`        | number/integer      | Number input                      |
-| `select`        | string/number/array | Dropdown select                   |
-| `radio`         | string/number       | Radio buttons                     |
-| `checkboxes`    | array               | Multiple checkboxes               |
-| `checkbox`      | boolean             | Single checkbox                   |
-| `switch`        | boolean             | Toggle switch                     |
-| `url`           | string              | URL input                         |
-| `checkbox-group`| array/non-boolean   | Multiple checkbox group           |
-| `nested-form`   | object              | Nested form (auto for objects)    |
-| `array`         | array               | Array widget (auto for arrays)    |
-| `code-editor`   | string              | Code editor with syntax highlight |
-| `object-editor` | object              | JSON object editor                |
-| `key-value-array` | array              | Key-value pair table              |
-| `table-array`   | array of objects    | Object table with optional virtual scroll |
-| `variant`       | any                 | Polymorphic field editor          |
-| `schema-builder`| object              | Schema builder editor             |
+| Widget            | Field Type          | Description                               |
+| ----------------- | ------------------- | ----------------------------------------- |
+| `text`            | string              | Single-line text input                    |
+| `textarea`        | string              | Multi-line text input                     |
+| `password`        | string              | Password input                            |
+| `email`           | string              | Email input                               |
+| `number`          | number/integer      | Number input                              |
+| `select`          | string/number/array | Dropdown select                           |
+| `radio`           | string/number       | Radio buttons                             |
+| `checkboxes`      | array               | Multiple checkboxes                       |
+| `checkbox`        | boolean             | Single checkbox                           |
+| `switch`          | boolean             | Toggle switch                             |
+| `url`             | string              | URL input                                 |
+| `checkbox-group`  | array/non-boolean   | Multiple checkbox group                   |
+| `nested-form`     | object              | Nested form (auto for objects)            |
+| `array`           | array               | Array widget (auto for arrays)            |
+| `code-editor`     | string              | Code editor with syntax highlight         |
+| `object-editor`   | object              | JSON object editor                        |
+| `key-value-array` | array               | Key-value pair table                      |
+| `table-array`     | array of objects    | Object table with optional virtual scroll |
+| `variant`         | any                 | Polymorphic field editor                  |
+| `schema-builder`  | object              | Schema builder editor                     |
 
 **Example:**
 
@@ -2287,27 +2328,27 @@ function MyForm() {
 
 ```typescript
 const schema = {
-  type: "object",
+  type: 'object',
   properties: {
     avatar: {
-      type: "string",
-      title: "Avatar",
+      type: 'string',
+      title: 'Avatar',
       ui: {
-        widget: "upload",
+        widget: 'upload',
         callbackProps: {
           onFormatFileName: {
-            type: "script",
+            type: 'script',
             code: `function({ args, helpers }) {
               const [file] = args;
               return file.name.toUpperCase();
             }`,
           },
         },
-        widgetProps: { accept: "image/*" },
+        widgetProps: { accept: 'image/*' },
       },
     },
   },
-};
+}
 ```
 
 **Rules:**
@@ -2436,33 +2477,47 @@ Additional UI customization options:
 
 **All UI Options:**
 
-| Option          | Type      | Description                                                                                                |
-| --------------- | --------- | ---------------------------------------------------------------------------------------------------------- |
-| `widget`        | `string`  | Widget type                                                                                                |
-| `placeholder`   | `string`  | Input placeholder text                                                                                     |
-| `className`     | `string`  | Custom CSS class                                                                                           |
-| `disabled`      | `boolean` | Disable field                                                                                              |
-| `readonly`      | `boolean` | Make field readonly                                                                                        |
-| `hidden`        | `boolean` | Hide field                                                                                                 |
-| `layout`        | `string`  | Layout override                                                                                            |
-| `labelWidth`    | `number`  | Label width (horizontal layout)                                                                            |
-| `columnsCount`  | `number`  | Multi-column layout count for `object` schemas only                                                        |
-| `colSpan`       | `number`  | Number of columns a child field spans in an object multi-column layout                                     |
-| `linkages`      | `array`   | Field linkage configurations                                                                               |
-| `flattenPath`   | `boolean` | Flatten nested path                                                                                        |
-| `flattenPrefix` | `boolean` | Add parent title as prefix                                                                                 |
-| `errorMessages` | `object`  | Custom error messages                                                                                      |
-| `widgetProps`   | `object`  | Props passed to widget component                                                                           |
-| `callbackProps` | `object`  | Callback function refs (key=prop name, value=function name from `callbacks` or `{ type: 'script', code }`) |
-| `transform`     | `object`  | Value transform config (see below)                                                                         |
-| `arrayMode`     | `'dynamic' \| 'static'` | Array editing mode                                                                     |
-| `showAddButton` / `showRemoveButton` / `showMoveButtons` | `boolean` | Array action visibility                         |
-| `enableDragSort`| `boolean` | Enable drag sorting for arrays                                                                       |
-| `addButtonText` / `removeButtonText` / `emptyText` | `string` | Array action and empty-state text                         |
-| `itemLayout`    | `string`  | Layout for array items                                                                              |
-| `autogenerate`  | `'uuid'`   | Auto-generate array item IDs                                                                         |
+| Option                                                   | Type                    | Description                                                                                                |
+| -------------------------------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `widget`                                                 | `string`                | Widget type                                                                                                |
+| `placeholder`                                            | `string`                | Input placeholder text                                                                                     |
+| `help`                                                   | `string`                | Additional UI help text; prefer the top-level JSON Schema `description`                                    |
+| `className`                                              | `string`                | Custom CSS class                                                                                           |
+| `style`                                                  | `React.CSSProperties`   | Inline style for the field container                                                                       |
+| `disabled`                                               | `boolean`               | Disable field                                                                                              |
+| `readonly`                                               | `boolean`               | Make field readonly                                                                                        |
+| `hidden`                                                 | `boolean`               | Hide field                                                                                                 |
+| `order`                                                  | `string[]`              | Explicit render order of direct child properties in an object schema                                       |
+| `layout`                                                 | `string`                | Layout override                                                                                            |
+| `labelWidth`                                             | `number`                | Label width (horizontal layout)                                                                            |
+| `prefixLabel`                                            | `string`                | Prefix added to a field label, mainly for flattened nested objects                                         |
+| `columnsCount`                                           | `number`                | Multi-column layout count for `object` schemas only                                                        |
+| `colSpan`                                                | `number`                | Number of columns a child field spans in an object multi-column layout                                     |
+| `linkages`                                               | `array`                 | Field linkage configurations                                                                               |
+| `flattenPath`                                            | `boolean`               | Flatten nested path                                                                                        |
+| `flattenPrefix`                                          | `boolean`               | Add parent title as prefix                                                                                 |
+| `errorMessages`                                          | `object`                | Custom error messages                                                                                      |
+| `widgetProps`                                            | `object`                | Props passed to widget component                                                                           |
+| `callbackProps`                                          | `object`                | Callback function refs (key=prop name, value=function name from `callbacks` or `{ type: 'script', code }`) |
+| `transform`                                              | `object`                | Value transform config (see below)                                                                         |
+| `arrayMode`                                              | `'dynamic' \| 'static'` | Array editing mode                                                                                         |
+| `showAddButton` / `showRemoveButton` / `showMoveButtons` | `boolean`               | Array action visibility                                                                                    |
+| `enableDragSort`                                         | `boolean`               | Enable drag sorting for arrays                                                                             |
+| `addButtonText` / `removeButtonText` / `emptyText`       | `string`                | Array action and empty-state text                                                                          |
+| `itemLayout`                                             | `string`                | Layout for array items                                                                                     |
+| `itemClassName`                                          | `string`                | Custom CSS class applied to array items                                                                    |
+| `itemStyle`                                              | `React.CSSProperties`   | Inline style applied to array items                                                                        |
+| `autogenerate`                                           | `'uuid'`                | Auto-generate array item IDs                                                                               |
+| `variants`                                               | `FieldVariant[]`        | Alternative field schemas/widgets selected by the Variant widget                                           |
+| `defaultVariant`                                         | `string`                | Variant name used when no variant can be inferred                                                          |
+| `validators`                                             | `ValidatorRule[]`       | Field-level custom validation rules                                                                        |
 
 **Note:** Help text should be set using the top-level `description` field (JSON Schema standard), not `ui.help`.
+
+`ui.order` 只控制 object schema 直接子字段的渲染顺序；未列出的属性会按 `properties` 原始顺序追加，
+不会从提交数据中删除。样式类配置只影响渲染，不改变数据契约；`validators` 仍遵循表单验证触发时机。
+`ui.transform.hideConvertedValue` 控制是否隐藏输入框下方的转换后值预览，默认显示；它只影响展示，
+不会改变 `getValues`、`onChange` 或 `onSubmit` 的存储域数据。
 
 #### Value Transform (`ui.transform`)
 
@@ -2642,42 +2697,42 @@ mode-specific JSON Schema and UI configuration in `schema`:
 
 ```typescript
 const schema = {
-  type: "object",
+  type: 'object',
   properties: {
     identifier: {
-      type: "string",
-      title: "Identifier",
+      type: 'string',
+      title: 'Identifier',
       ui: {
-        widget: "variant",
-        defaultVariant: "email",
+        widget: 'variant',
+        defaultVariant: 'email',
         variants: [
           {
-            name: "email",
-            label: "Email",
-            type: "string",
-            widget: "email",
+            name: 'email',
+            label: 'Email',
+            type: 'string',
+            widget: 'email',
             schema: {
-              type: "string",
-              format: "email",
+              type: 'string',
+              format: 'email',
               ui: {
-                placeholder: "name@example.com",
-                validators: [{ type: "script", callback: "validateEmail" }],
+                placeholder: 'name@example.com',
+                validators: [{ type: 'script', callback: 'validateEmail' }],
                 transform: {
-                  callback: "normalizeEmail",
-                  reverseCallback: "restoreEmail",
+                  callback: 'normalizeEmail',
+                  reverseCallback: 'restoreEmail',
                 },
               },
             },
           },
           {
-            name: "object",
-            label: "Object",
-            type: "object",
-            widget: "object-editor",
+            name: 'object',
+            label: 'Object',
+            type: 'object',
+            widget: 'object-editor',
             schema: {
-              type: "object",
+              type: 'object',
               properties: {
-                name: { type: "string", title: "Name" },
+                name: { type: 'string', title: 'Name' },
               },
             },
           },
@@ -2685,7 +2740,7 @@ const schema = {
       },
     },
   },
-};
+}
 ```
 
 #### What the Effective Schema Looks Like
@@ -2744,8 +2799,8 @@ and returns a truthy value when the Variant matches:
 ```typescript
 const callbacks = {
   detectEmail: ({ value }) =>
-    typeof value === "string" && /^[^@]+@[^@]+\\.[^@]+$/.test(value),
-};
+    typeof value === 'string' && /^[^@]+@[^@]+\\.[^@]+$/.test(value),
+}
 ```
 
 DynamicForm attempts detection during initialization and when external values change. After a
@@ -2861,48 +2916,48 @@ const linkageFunctions = {
 
 ```typescript
 const schema = {
-  type: "object",
+  type: 'object',
   properties: {
     country: {
-      type: "string",
-      title: "Country",
-      enum: ["china", "usa"],
-      enumNames: ["China", "USA"],
+      type: 'string',
+      title: 'Country',
+      enum: ['china', 'usa'],
+      enumNames: ['China', 'USA'],
     },
     province: {
-      type: "string",
-      title: "Province/State",
+      type: 'string',
+      title: 'Province/State',
       ui: {
         linkages: [
           {
-            type: "options",
-            dependencies: ["#/properties/country"],
+            type: 'options',
+            dependencies: ['#/properties/country'],
             fulfill: {
-              function: "getProvinceOptions",
+              function: 'getProvinceOptions',
             },
           },
         ],
       },
     },
   },
-};
+}
 
 const linkageFunctions = {
   getProvinceOptions: ({ formData }: { formData: Record<string, any> }) => {
-    if (formData.country === "china") {
+    if (formData.country === 'china') {
       return [
-        { label: "Beijing", value: "beijing" },
-        { label: "Shanghai", value: "shanghai" },
-      ];
-    } else if (formData.country === "usa") {
+        { label: 'Beijing', value: 'beijing' },
+        { label: 'Shanghai', value: 'shanghai' },
+      ]
+    } else if (formData.country === 'usa') {
       return [
-        { label: "California", value: "ca" },
-        { label: "New York", value: "ny" },
-      ];
+        { label: 'California', value: 'ca' },
+        { label: 'New York', value: 'ny' },
+      ]
     }
-    return [];
+    return []
   },
-};
+}
 ```
 
 **Using Static Values:**
@@ -2911,37 +2966,37 @@ You can also set options directly without using functions:
 
 ```typescript
 const schema = {
-  type: "object",
+  type: 'object',
   properties: {
     category: {
-      type: "string",
-      title: "Category",
-      enum: ["electronics", "books"],
-      enumNames: ["Electronics", "Books"],
+      type: 'string',
+      title: 'Category',
+      enum: ['electronics', 'books'],
+      enumNames: ['Electronics', 'Books'],
     },
     subcategory: {
-      type: "string",
-      title: "Subcategory",
+      type: 'string',
+      title: 'Subcategory',
       ui: {
         linkages: [
           {
-            type: "options",
-            dependencies: ["#/properties/category"],
+            type: 'options',
+            dependencies: ['#/properties/category'],
             when: {
-              field: "#/properties/category",
-              operator: "==",
-              value: "electronics",
+              field: '#/properties/category',
+              operator: '==',
+              value: 'electronics',
             },
             fulfill: {
               options: [
-                { label: "Laptop", value: "laptop" },
-                { label: "Phone", value: "phone" },
+                { label: 'Laptop', value: 'laptop' },
+                { label: 'Phone', value: 'phone' },
               ],
             },
             otherwise: {
               options: [
-                { label: "Fiction", value: "fiction" },
-                { label: "Non-Fiction", value: "nonfiction" },
+                { label: 'Fiction', value: 'fiction' },
+                { label: 'Non-Fiction', value: 'nonfiction' },
               ],
             },
           },
@@ -2949,7 +3004,7 @@ const schema = {
       },
     },
   },
-};
+}
 ```
 
 The options-linkage cleanup behavior and `invalidValuePolicy` are documented in
@@ -2961,24 +3016,24 @@ The options-linkage cleanup behavior and `invalidValuePolicy` are documented in
 
 ```typescript
 const schema = {
-  type: "object",
+  type: 'object',
   properties: {
     name: {
-      type: "string",
-      title: "Name",
+      type: 'string',
+      title: 'Name',
     },
     address: {
-      type: "object",
-      title: "Address",
+      type: 'object',
+      title: 'Address',
       properties: {
-        street: { type: "string", title: "Street" },
-        city: { type: "string", title: "City" },
-        zipCode: { type: "string", title: "Zip Code" },
+        street: { type: 'string', title: 'Street' },
+        city: { type: 'string', title: 'City' },
+        zipCode: { type: 'string', title: 'Zip Code' },
       },
-      required: ["city"],
+      required: ['city'],
     },
   },
-};
+}
 ```
 
 #### Dynamic Nested Forms
@@ -3053,32 +3108,32 @@ Simplify deeply nested parameter display:
 
 ```typescript
 const schema = {
-  type: "object",
+  type: 'object',
   properties: {
     auth: {
-      type: "object",
-      title: "Authentication",
+      type: 'object',
+      title: 'Authentication',
       ui: {
         flattenPath: true,
         flattenPrefix: true,
       },
       properties: {
         content: {
-          type: "object",
+          type: 'object',
           ui: {
             flattenPath: true,
           },
           properties: {
             apiKey: {
-              type: "string",
-              title: "API Key",
+              type: 'string',
+              title: 'API Key',
             },
           },
         },
       },
     },
   },
-};
+}
 // Display: "Authentication - API Key"
 // Submit: { auth: { content: { apiKey: 'xxx' } } }
 ```
@@ -3114,7 +3169,7 @@ Use the `helpers` prop to add application-specific utilities. DynamicForm merges
 const mergedHelpers = {
   ...builtInHelpers,
   ...userHelpers,
-};
+}
 ```
 
 User-provided helpers take priority, so you can override a built-in helper when needed. Keep the `helpers` object stable with `useMemo` to avoid unnecessary recalculation and rerenders.
@@ -3161,11 +3216,11 @@ Custom helpers are available in every helper-aware function:
 const callbacks = {
   validateUsername: ({ value, helpers }) => {
     if (helpers.userService.isReservedUsername(value)) {
-      return "This username is reserved";
+      return 'This username is reserved'
     }
-    return null;
+    return null
   },
-};
+}
 ```
 
 Inline scripts can use the same custom helpers:
@@ -3277,18 +3332,18 @@ const callbacks = {
 ```typescript
 const linkageFunctions = {
   loadCityOptions: async ({ formData, helpers }) => {
-    if (!formData.country) return [];
+    if (!formData.country) return []
 
-    const cities = await helpers.ofetch("/cities", {
+    const cities = await helpers.ofetch('/cities', {
       query: { country: formData.country },
-    });
+    })
 
     return helpers._.map(cities, (city) => ({
       label: city.name,
       value: city.id,
-    }));
+    }))
   },
-};
+}
 ```
 
 #### callbackProps with Helpers
@@ -3336,36 +3391,37 @@ Helpers are dependency injection, not a sandbox. Inline scripts still use dynami
 
 ### DynamicForm Props
 
-| Prop               | Type                                            | Required | Default          | Description                                                                           |
-| ------------------ | ----------------------------------------------- | -------- | ---------------- | ------------------------------------------------------------------------------------- |
-| `schema`           | `ExtendedJSONSchema`                            | Yes      | -                | JSON Schema definition                                                                |
-| `defaultValues`    | `Record<string, any>`                           | No       | `{}`             | Initial form values                                                                   |
-| `onSubmit`         | `(data: any) => void \| Promise<void>`          | No       | -                | Submit handler                                                                        |
-| `onChange`         | `(data: any) => void`                           | No       | -                | Change handler                                                                        |
-| `onTextFieldFocus` | `(payload: TextFieldFocusPayload) => void`      | No       | -                | Focus callback for `text` widgets                                                      |
-| `widgets`          | `Record<string, ComponentType>`                 | No       | `{}`             | Custom widgets                                                                        |
-| `helpers`          | `Record<string, any>`                           | No       | built-in helpers | Helper utilities available in inline scripts and callbacks                            |
-| `linkageFunctions` | `Record<string, Function>`                      | No       | `{}`             | Helper-aware linkage functions                                                        |
-| `callbacks`        | `Record<string, Function>`                      | No       | `{}`             | Helper-aware callback registry used by validators, transforms, and `ui.callbackProps` |
-| `customFormats`    | `Record<string, Function>`                      | No       | `{}`             | Custom format validators                                                              |
-| `layout`           | `'vertical' \| 'horizontal' \| 'inline'`        | No       | `'vertical'`     | Form layout                                                                           |
-| `labelWidth`       | `number \| string`                              | No       | -                | Label width (horizontal layout)                                                       |
-| `columnsCount`     | `number`                                        | No       | `1`              | Number of columns for object layouts                                                  |
-| `showErrorList`    | `boolean`                                       | No       | `false`          | Show aggregated error list                                                            |
-| `showSubmitButton` | `boolean`                                       | No       | `true`           | Show submit button                                                                    |
-| `renderAsForm`     | `boolean`                                       | No       | `true`           | Render as `<form>` tag                                                                |
-| `validateMode`     | `'onSubmit' \| 'onBlur' \| 'onChange' \| 'all'` | No       | `'onSubmit'`     | Validation mode                                                                       |
-| `reValidateMode`   | `'onSubmit' \| 'onBlur' \| 'onChange'`        | No       | `'onChange'`     | Re-validation mode                                                                   |
-| `loading`          | `boolean`                                       | No       | `false`          | Loading state                                                                         |
-| `disabled`         | `boolean`                                       | No       | `false`          | Disable all fields                                                                    |
-| `readonly`         | `boolean`                                       | No       | `false`          | Make all fields readonly                                                              |
-| `enableVirtualScroll` | `boolean`                                    | No       | `false`          | Enable virtual scrolling for array fields                                             |
-| `virtualScrollHeight` | `number`                                    | No       | `600`            | Virtual-scroll viewport height                                                       |
-| `className`        | `string`                                        | No       | -                | CSS class name                                                                        |
-| `style`            | `React.CSSProperties`                           | No       | -                | Inline styles                                                                         |
-| `fieldsWrapperStyle` / `fieldRowStyle` / `fieldLabelStyle` / `fieldControlStyle` | `React.CSSProperties` | No | - | Form layout styles |
-| `pathPrefix`        | `string`                                       | No       | `''`             | Path prefix for nested forms                                                          |
-| `asNestedForm`      | `boolean`                                      | No       | `false`          | Reuse the parent form context                                                         |
+| Prop                                                                             | Type                                                         | Required | Default          | Description                                                                           |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------ | -------- | ---------------- | ------------------------------------------------------------------------------------- |
+| `schema`                                                                         | `ExtendedJSONSchema`                                         | Yes      | -                | JSON Schema definition                                                                |
+| `defaultValues`                                                                  | `Record<string, any>`                                        | No       | `{}`             | Initial form values                                                                   |
+| `onSubmit`                                                                       | `(data: any) => void \| Promise<void>`                       | No       | -                | Submit handler                                                                        |
+| `onChange`                                                                       | `(data: Record<string, any>, meta?: FormChangeMeta) => void` | No       | -                | Change handler with optional field change metadata                                    |
+| `onChangeError`                                                                  | `(error: unknown) => void`                                   | No       | -                | Handles errors thrown by `onChange` without corrupting later batches                  |
+| `onTextFieldFocus`                                                               | `(payload: TextFieldFocusPayload) => void`                   | No       | -                | Focus callback for `text` widgets                                                     |
+| `widgets`                                                                        | `Record<string, ComponentType>`                              | No       | `{}`             | Custom widgets                                                                        |
+| `helpers`                                                                        | `Record<string, any>`                                        | No       | built-in helpers | Helper utilities available in inline scripts and callbacks                            |
+| `linkageFunctions`                                                               | `Record<string, Function>`                                   | No       | `{}`             | Helper-aware linkage functions                                                        |
+| `callbacks`                                                                      | `Record<string, Function>`                                   | No       | `{}`             | Helper-aware callback registry used by validators, transforms, and `ui.callbackProps` |
+| `customFormats`                                                                  | `Record<string, Function>`                                   | No       | `{}`             | Custom format validators                                                              |
+| `layout`                                                                         | `'vertical' \| 'horizontal' \| 'inline'`                     | No       | `'vertical'`     | Form layout                                                                           |
+| `labelWidth`                                                                     | `number \| string`                                           | No       | -                | Label width (horizontal layout)                                                       |
+| `columnsCount`                                                                   | `number`                                                     | No       | `1`              | Number of columns for object layouts                                                  |
+| `showErrorList`                                                                  | `boolean`                                                    | No       | `false`          | Show aggregated error list                                                            |
+| `showSubmitButton`                                                               | `boolean`                                                    | No       | `true`           | Show submit button                                                                    |
+| `renderAsForm`                                                                   | `boolean`                                                    | No       | `true`           | Render as `<form>` tag                                                                |
+| `validateMode`                                                                   | `'onSubmit' \| 'onBlur' \| 'onChange' \| 'all'`              | No       | `'onSubmit'`     | Validation mode                                                                       |
+| `reValidateMode`                                                                 | `'onSubmit' \| 'onBlur' \| 'onChange'`                       | No       | `'onChange'`     | Re-validation mode                                                                    |
+| `loading`                                                                        | `boolean`                                                    | No       | `false`          | Loading state                                                                         |
+| `disabled`                                                                       | `boolean`                                                    | No       | `false`          | Disable all fields                                                                    |
+| `readonly`                                                                       | `boolean`                                                    | No       | `false`          | Make all fields readonly                                                              |
+| `enableVirtualScroll`                                                            | `boolean`                                                    | No       | `false`          | Enable virtual scrolling for array fields                                             |
+| `virtualScrollHeight`                                                            | `number`                                                     | No       | `600`            | Virtual-scroll viewport height                                                        |
+| `className`                                                                      | `string`                                                     | No       | -                | CSS class name                                                                        |
+| `style`                                                                          | `React.CSSProperties`                                        | No       | -                | Inline styles                                                                         |
+| `fieldsWrapperStyle` / `fieldRowStyle` / `fieldLabelStyle` / `fieldControlStyle` | `React.CSSProperties`                                        | No       | -                | Form layout styles                                                                    |
+| `pathPrefix`                                                                     | `string`                                                     | No       | `''`             | Path prefix for nested forms                                                          |
+| `asNestedForm`                                                                   | `boolean`                                                    | No       | `false`          | Reuse the parent form context                                                         |
 
 ### DynamicFormRef Methods
 
@@ -3386,23 +3442,23 @@ DynamicForm exposes several methods via ref that allow you to programmatically c
 Set a single field value programmatically.
 
 ```typescript
-const formRef = useRef<DynamicFormRef>(null);
+const formRef = useRef<DynamicFormRef>(null)
 
 // Set a simple field
-formRef.current?.setValue("username", "john_doe");
+formRef.current?.setValue('username', 'john_doe')
 
 // Set with validation
-formRef.current?.setValue("email", "john@example.com", {
+formRef.current?.setValue('email', 'john@example.com', {
   shouldValidate: true, // Trigger validation
   shouldDirty: true, // Mark field as dirty
   shouldTouch: true, // Mark field as touched
-});
+})
 
 // Set nested field
-formRef.current?.setValue("address.city", "Beijing");
+formRef.current?.setValue('address.city', 'Beijing')
 
 // Set array element
-formRef.current?.setValue("contacts.0.name", "Alice");
+formRef.current?.setValue('contacts.0.name', 'Alice')
 ```
 
 **`getValue(name)` - Get Field Value**
@@ -3410,9 +3466,9 @@ formRef.current?.setValue("contacts.0.name", "Alice");
 Get a single field value by name.
 
 ```typescript
-const username = formRef.current?.getValue("username");
-const city = formRef.current?.getValue("address.city");
-const firstContact = formRef.current?.getValue("contacts.0");
+const username = formRef.current?.getValue('username')
+const city = formRef.current?.getValue('address.city')
+const firstContact = formRef.current?.getValue('contacts.0')
 ```
 
 **`getValues()` - Get All Values**
@@ -3420,8 +3476,8 @@ const firstContact = formRef.current?.getValue("contacts.0");
 Get all form values as an object.
 
 ```typescript
-const allValues = formRef.current?.getValues();
-console.log(allValues);
+const allValues = formRef.current?.getValues()
+console.log(allValues)
 // { username: 'john_doe', email: 'john@example.com', address: { city: 'Beijing' } }
 ```
 
@@ -3433,47 +3489,47 @@ Set multiple field values at once. Supports nested objects, deep nesting, and ar
 // Set top-level fields
 formRef.current?.setValues(
   {
-    username: "jane_doe",
-    email: "jane@example.com",
+    username: 'jane_doe',
+    email: 'jane@example.com',
   },
   { shouldValidate: true },
-);
+)
 
 // Set a nested object (recursively expanded so nested form fields update correctly)
 formRef.current?.setValues({
   address: {
-    street: "123 Main St",
-    city: "Shanghai",
-    zipCode: "200000",
+    street: '123 Main St',
+    city: 'Shanghai',
+    zipCode: '200000',
   },
-});
+})
 
 // Set a deeply nested object
 formRef.current?.setValues({
   company: {
-    companyName: "Acme Inc",
+    companyName: 'Acme Inc',
     location: {
-      country: "China",
-      city: "Beijing",
+      country: 'China',
+      city: 'Beijing',
     },
   },
-});
+})
 
 // Set an array (primitive arrays are automatically wrapped internally)
 formRef.current?.setValues({
-  tags: ["frontend", "react", "typescript"],
+  tags: ['frontend', 'react', 'typescript'],
   contacts: [
-    { contactName: "Alice", phone: "123-4567" },
-    { contactName: "Bob", phone: "890-1234" },
+    { contactName: 'Alice', phone: '123-4567' },
+    { contactName: 'Bob', phone: '890-1234' },
   ],
-});
+})
 
 // Set mixed data: top-level fields, nested objects, and arrays
 formRef.current?.setValues({
-  username: "john_doe",
-  address: { street: "456 Oak Ave", city: "Shenzhen" },
-  tags: ["vue", "angular"],
-});
+  username: 'john_doe',
+  address: { street: '456 Oak Ave', city: 'Shenzhen' },
+  tags: ['vue', 'angular'],
+})
 ```
 
 > **Implementation details**: `setValues` internally:
@@ -3488,20 +3544,20 @@ Reset form to default values or provided values. Supports nested objects and arr
 ```typescript
 // Clear the form (each field is reset to a type-appropriate empty value)
 // string -> '', array -> [], object -> recursively empty object, number/boolean -> undefined
-formRef.current?.reset();
-formRef.current?.reset({});
+formRef.current?.reset()
+formRef.current?.reset({})
 
 // Reset with complete data (supports nested objects and arrays)
 formRef.current?.reset({
-  username: "john_doe",
-  email: "john@example.com",
+  username: 'john_doe',
+  email: 'john@example.com',
   address: {
-    street: "123 Main St",
-    city: "Beijing",
+    street: '123 Main St',
+    city: 'Beijing',
   },
-  tags: ["frontend", "react"],
-  contacts: [{ contactName: "Alice", phone: "123-4567" }],
-});
+  tags: ['frontend', 'react'],
+  contacts: [{ contactName: 'Alice', phone: '123-4567' }],
+})
 ```
 
 > **Note**:
@@ -3525,22 +3581,22 @@ Trigger validation for a specific field, multiple fields, or the entire form.
 
 ```typescript
 // Validate entire form
-const isValid = await formRef.current?.validate();
+const isValid = await formRef.current?.validate()
 if (isValid) {
-  console.log("Form is valid");
+  console.log('Form is valid')
 }
 
 // Validate specific field
-const isEmailValid = await formRef.current?.validate("email");
+const isEmailValid = await formRef.current?.validate('email')
 
 // Validate multiple fields
 const areFieldsValid = await formRef.current?.validate([
-  "email",
-  "username",
-  "password",
-]);
+  'email',
+  'username',
+  'password',
+])
 if (areFieldsValid) {
-  console.log("All specified fields are valid");
+  console.log('All specified fields are valid')
 }
 ```
 
@@ -3549,8 +3605,8 @@ if (areFieldsValid) {
 Get all current validation errors.
 
 ```typescript
-const errors = formRef.current?.getErrors();
-console.log(errors);
+const errors = formRef.current?.getErrors()
+console.log(errors)
 // { email: { type: 'pattern', message: 'Invalid email format' } }
 ```
 
@@ -3560,13 +3616,13 @@ Clear validation errors for a specific field, multiple fields, or entire form.
 
 ```typescript
 // Clear specific field error
-formRef.current?.clearErrors("email");
+formRef.current?.clearErrors('email')
 
 // Clear multiple fields' errors
-formRef.current?.clearErrors(["email", "username", "password"]);
+formRef.current?.clearErrors(['email', 'username', 'password'])
 
 // Clear all errors
-formRef.current?.clearErrors();
+formRef.current?.clearErrors()
 ```
 
 **`setError(name, error)` - Set Error**
@@ -3575,64 +3631,64 @@ Manually set a validation error for a field. Useful for async validation, server
 
 ```typescript
 // Basic usage: Set a manual error
-formRef.current?.setError("username", {
-  type: "manual",
-  message: "This username is already taken",
-});
+formRef.current?.setError('username', {
+  type: 'manual',
+  message: 'This username is already taken',
+})
 
 // Async validation example: Check username availability
 const handleCheckUsername = async () => {
-  const username = formRef.current?.getValue("username");
+  const username = formRef.current?.getValue('username')
 
   try {
-    const response = await fetch(`/api/check-username?username=${username}`);
-    const { available } = await response.json();
+    const response = await fetch(`/api/check-username?username=${username}`)
+    const { available } = await response.json()
 
     if (!available) {
-      formRef.current?.setError("username", {
-        type: "manual",
-        message: "This username is already taken",
-      });
+      formRef.current?.setError('username', {
+        type: 'manual',
+        message: 'This username is already taken',
+      })
     } else {
-      formRef.current?.clearErrors("username");
+      formRef.current?.clearErrors('username')
     }
   } catch (error) {
-    formRef.current?.setError("username", {
-      type: "manual",
-      message: "Failed to check username availability",
-    });
+    formRef.current?.setError('username', {
+      type: 'manual',
+      message: 'Failed to check username availability',
+    })
   }
-};
+}
 
 // Server-side validation example: Handle API errors
 const handleSubmit = async (data: any) => {
   try {
-    await api.createUser(data);
+    await api.createUser(data)
   } catch (error: any) {
     // Set errors from server response
     if (error.response?.data?.errors) {
       Object.entries(error.response.data.errors).forEach(([field, message]) => {
         formRef.current?.setError(field, {
-          type: "server",
+          type: 'server',
           message: message as string,
-        });
-      });
+        })
+      })
     }
   }
-};
+}
 
 // Custom business logic validation
 const handleValidatePassword = () => {
-  const password = formRef.current?.getValue("password");
-  const confirmPassword = formRef.current?.getValue("confirmPassword");
+  const password = formRef.current?.getValue('password')
+  const confirmPassword = formRef.current?.getValue('confirmPassword')
 
   if (password !== confirmPassword) {
-    formRef.current?.setError("confirmPassword", {
-      type: "manual",
-      message: "Passwords do not match",
-    });
+    formRef.current?.setError('confirmPassword', {
+      type: 'manual',
+      message: 'Passwords do not match',
+    })
   }
-};
+}
 ```
 
 **`getFormState()` - Get Form State**
@@ -3640,8 +3696,8 @@ const handleValidatePassword = () => {
 Get current form state information.
 
 ```typescript
-const formState = formRef.current?.getFormState();
-console.log(formState);
+const formState = formRef.current?.getFormState()
+console.log(formState)
 // {
 //   isDirty: true,      // Has any field been modified
 //   isValid: false,     // Are all fields valid
@@ -4052,13 +4108,13 @@ properties: {
 ```typescript
 const schema = useMemo(
   () => ({
-    type: "object",
+    type: 'object',
     properties: {
       // ... schema definition
     },
   }),
   [],
-);
+)
 ```
 
 **2. Debounce onChange Callbacks**
@@ -4102,11 +4158,11 @@ For forms with 50+ fields, consider splitting into multiple steps.
 ```typescript
 const handleSubmit = async (data: any) => {
   try {
-    await api.submitForm(data);
+    await api.submitForm(data)
   } catch (error) {
-    toast.error("Submission failed. Please try again.");
+    toast.error('Submission failed. Please try again.')
   }
-};
+}
 ```
 
 ---
