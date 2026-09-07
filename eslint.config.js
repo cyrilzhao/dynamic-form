@@ -27,8 +27,15 @@ export default defineConfig([
     },
     rules: {
       'prettier/prettier': 'error',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-      'curly': ['error', 'all'],
+      // Hooks 依赖数组必须与闭包实际使用的值保持同步。
+      'react-hooks/exhaustive-deps': 'error',
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_' },
+      ],
+      // 当前项目中存在较多历史 any 用法，暂时放开该限制，后续再逐步收敛类型。
+      '@typescript-eslint/no-explicit-any': 'off',
+      curly: ['error', 'all'],
     },
   },
 ])

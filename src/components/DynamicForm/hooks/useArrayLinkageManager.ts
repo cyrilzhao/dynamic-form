@@ -184,7 +184,6 @@ export function useArrayLinkageManager({
     dynamicLinkages,
     onCycleDetected,
     throwOnCycle,
-    refreshCounter,
   ]);
 
   // 使用基础联动管理器

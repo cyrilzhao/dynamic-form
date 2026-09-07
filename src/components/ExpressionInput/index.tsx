@@ -157,7 +157,7 @@ export const ExpressionInput: React.FC<ExpressionInputProps> = ({
   // Sync scrollbar width when value changes
   useEffect(() => {
     handleScroll();
-  }, [value]);
+  }, [value, handleScroll]);
 
   // Calculate popover position when it opens
   useEffect(() => {

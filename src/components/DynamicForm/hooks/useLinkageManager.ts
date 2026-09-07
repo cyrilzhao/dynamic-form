@@ -747,14 +747,9 @@ export function useLinkageManager({
       taskQueue.setRefreshing(false);
     }
   }, [
-    linkages,
-    linkageFunctions,
-    dependencyGraph,
-    getValues,
     taskQueue,
     asyncSequenceManager,
     cache,
-    applyLinkageResults,
     controller,
     scopeId,
     syncOperationVersions,

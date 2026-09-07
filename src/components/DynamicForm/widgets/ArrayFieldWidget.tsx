@@ -371,7 +371,7 @@ export const ArrayFieldWidget = forwardRef<
         isFirstItem: index === 0,
         isLastItem: index === fields.length - 1,
       }));
-    }, [fields.length, minItems]);
+    }, [fields, minItems]);
 
     // ✅ 使用 useCallback 缓存虚拟滚动的 itemContent 回调
     const renderItem = useCallback(
@@ -792,7 +792,7 @@ const ArrayItem = React.memo<ArrayItemProps>(
       const rules = SchemaParser.getValidationRules(schema, false);
 
       return rules;
-    }, [schema, name]);
+    }, [schema]);
 
     return (
       <div

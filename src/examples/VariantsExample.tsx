@@ -97,7 +97,7 @@ export const VariantsExample: React.FC = () => {
       },
       required: ['identifier'],
     }),
-    []
+    [],
   )
 
   const callbacks = useMemo(
@@ -117,7 +117,7 @@ export const VariantsExample: React.FC = () => {
       detectEmail: ({ value }: { value: unknown }) =>
         typeof value === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value),
     }),
-    []
+    [],
   )
 
   return (

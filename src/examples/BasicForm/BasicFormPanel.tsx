@@ -5,7 +5,10 @@ import { Card } from '@blueprintjs/core'
 import { CodeEditorWidget } from '@/components/DynamicForm'
 import { ObjectEditorWidget } from '@/components/DynamicForm'
 import { SchemaBuilderWidget } from '@/components/DynamicForm/widgets/SchemaBuilderWidget'
-import type { CallbackFunction } from '@/components/DynamicForm/types'
+import type {
+  CallbackFunction,
+  FormChangeMeta,
+} from '@/components/DynamicForm/types'
 
 export const BasicFormPanel: React.FC = () => {
   const formRef = useRef<DynamicFormRef>(null)
@@ -438,8 +441,9 @@ export const BasicFormPanel: React.FC = () => {
     alert('提交成功！请查看控制台输出')
   }
 
-  const handleChange = (data: any) => {
-    console.log('handleChange:', data)
+  const handleChange = (data: any, meta: FormChangeMeta) => {
+    console.log('handleChange data:', data)
+    console.log('handleChange meta:', meta)
   }
 
   // 自定义格式验证器

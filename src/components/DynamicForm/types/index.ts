@@ -1,35 +1,35 @@
-import type { FocusEvent } from "react";
-import type { FieldErrors } from "react-hook-form";
-import type { ExtendedJSONSchema, FieldOption } from "./schema";
-import type { LinkageFunction } from "./linkage";
+import type { FocusEvent } from 'react'
+import type { FieldErrors } from 'react-hook-form'
+import type { ExtendedJSONSchema, FieldOption } from './schema'
+import type { LinkageFunction } from './linkage'
 
 /**
  * Widget 回调函数类型 - 用于 ui.callbackProps
  * Widget 决定传递哪些参数，统一包装为 args 数组
  */
 export type WidgetCallback = (params: {
-  args: any[];
-  helpers: Record<string, any>;
-}) => any;
+  args: any[]
+  helpers: Record<string, any>
+}) => any
 
 /**
  * Transform 回调函数类型 - 用于 ui.transform.callback 和 ui.transform.reverseCallback
  * 将值在展示域和存储域之间转换
  */
 export type TransformCallback = (params: {
-  value: any;
-  helpers: Record<string, any>;
-}) => any;
+  value: any
+  helpers: Record<string, any>
+}) => any
 
 /**
  * Validator 回调函数类型 - 用于 ui.validators
  * 返回 null 表示验证通过，返回字符串表示错误信息
  */
 export type ValidatorCallback = (params: {
-  value: any;
-  formValues: Record<string, any>;
-  helpers: Record<string, any>;
-}) => string | null | Promise<string | null>;
+  value: any
+  formValues: Record<string, any>
+  helpers: Record<string, any>
+}) => string | null | Promise<string | null>
 
 /**
  * Callback 函数联合类型
@@ -38,16 +38,16 @@ export type ValidatorCallback = (params: {
 export type CallbackFunction =
   | WidgetCallback
   | TransformCallback
-  | ValidatorCallback;
+  | ValidatorCallback
 
 /**
  * 文本字段获得焦点时通知页面层的数据。
  * 页面可基于 name 查询业务元数据，例如文档审核场景中的原文位置。
  */
 export interface TextFieldFocusPayload {
-  name: string;
-  value: string;
-  event: FocusEvent<HTMLInputElement>;
+  name: string
+  value: string
+  event: FocusEvent<HTMLInputElement>
 }
 
 /**
@@ -107,11 +107,11 @@ export interface DynamicFormRef {
     name: string,
     value: any,
     options?: {
-      shouldValidate?: boolean;
-      shouldDirty?: boolean;
-      shouldTouch?: boolean;
+      shouldValidate?: boolean
+      shouldDirty?: boolean
+      shouldTouch?: boolean
     },
-  ) => void;
+  ) => void
 
   /**
    * 获取单个字段的值
@@ -136,7 +136,7 @@ export interface DynamicFormRef {
    * const itemName = formRef.current?.getValue('items.0.name');
    * ```
    */
-  getValue: (name: string) => any;
+  getValue: (name: string) => any
 
   /**
    * 获取所有表单值
@@ -172,7 +172,7 @@ export interface DynamicFormRef {
    * });
    * ```
    */
-  getValues: () => Record<string, any>;
+  getValues: () => Record<string, any>
 
   /**
    * 批量设置表单值
@@ -218,12 +218,12 @@ export interface DynamicFormRef {
   setValues: (
     values: Record<string, any>,
     options?: {
-      shouldValidate?: boolean;
-      shouldDirty?: boolean;
-      shouldTouch?: boolean;
-      silence?: boolean;
+      shouldValidate?: boolean
+      shouldDirty?: boolean
+      shouldTouch?: boolean
+      silence?: boolean
     },
-  ) => void;
+  ) => void
 
   /**
    * 重置表单到初始值或指定值
@@ -254,7 +254,7 @@ export interface DynamicFormRef {
    * });
    * ```
    */
-  reset: (values?: Record<string, any>) => void;
+  reset: (values?: Record<string, any>) => void
 
   /**
    * 触发表单验证
@@ -287,7 +287,7 @@ export interface DynamicFormRef {
    * ]);
    * ```
    */
-  validate: (name?: string | string[]) => Promise<boolean>;
+  validate: (name?: string | string[]) => Promise<boolean>
 
   /**
    * 获取表单错误
@@ -314,7 +314,7 @@ export interface DynamicFormRef {
    * }
    * ```
    */
-  getErrors: () => FieldErrors;
+  getErrors: () => FieldErrors
 
   /**
    * 清除表单错误
@@ -338,7 +338,7 @@ export interface DynamicFormRef {
    * formRef.current?.clearErrors(['email', 'address.city']);
    * ```
    */
-  clearErrors: (name?: string | string[]) => void;
+  clearErrors: (name?: string | string[]) => void
 
   /**
    * 设置字段错误
@@ -374,7 +374,7 @@ export interface DynamicFormRef {
    * }
    * ```
    */
-  setError: (name: string, error: { type: string; message: string }) => void;
+  setError: (name: string, error: { type: string; message: string }) => void
 
   /**
    * 获取表单状态
@@ -405,12 +405,12 @@ export interface DynamicFormRef {
    * ```
    */
   getFormState: () => {
-    isDirty: boolean;
-    isValid: boolean;
-    isSubmitting: boolean;
-    isSubmitted: boolean;
-    submitCount: number;
-  };
+    isDirty: boolean
+    isValid: boolean
+    isSubmitting: boolean
+    isSubmitted: boolean
+    submitCount: number
+  }
 
   /**
    * 重新触发联动计算
@@ -447,7 +447,7 @@ export interface DynamicFormRef {
    * }, [linkageContext]);
    * ```
    */
-  refreshLinkage: () => Promise<void>;
+  refreshLinkage: () => Promise<void>
 }
 
 /**
@@ -455,22 +455,22 @@ export interface DynamicFormRef {
  */
 export interface DynamicFormProps {
   // 必需属性
-  schema: ExtendedJSONSchema;
+  schema: ExtendedJSONSchema
 
   // 可选属性
-  defaultValues?: Record<string, any>;
-  onSubmit?: (data: Record<string, any>) => void | Promise<void>;
-  onChange?: (data: Record<string, any>) => void;
+  defaultValues?: Record<string, any>
+  onSubmit?: (data: Record<string, any>) => void | Promise<void>
+  onChange?: (data: Record<string, any>, meta?: FormChangeMeta) => void
   /**
    * 文本字段获得焦点时触发。
    * 仅 `text` Widget 会调用该回调，其他 Widget 不受影响。
    */
-  onTextFieldFocus?: (payload: TextFieldFocusPayload) => void;
+  onTextFieldFocus?: (payload: TextFieldFocusPayload) => void
 
   // 自定义配置
-  widgets?: Record<string, React.ComponentType<any>>;
-  linkageFunctions?: Record<string, LinkageFunction>; // 联动函数（详见 UI_LINKAGE_DESIGN.md）
-  linkageContext?: Record<string, any>; // 联动函数的外部上下文数据（如页面级 state、API 数据等）
+  widgets?: Record<string, React.ComponentType<any>>
+  linkageFunctions?: Record<string, LinkageFunction> // 联动函数（详见 UI_LINKAGE_DESIGN.md）
+  linkageContext?: Record<string, any> // 联动函数的外部上下文数据（如页面级 state、API 数据等）
   /**
    * 回调函数注册表，用于 Widget callbacks、Transform、Validators
    *
@@ -503,8 +503,8 @@ export interface DynamicFormProps {
    * };
    * ```
    */
-  callbacks?: Record<string, CallbackFunction>;
-  customFormats?: Record<string, (value: string) => boolean>; // 自定义格式验证器
+  callbacks?: Record<string, CallbackFunction>
+  customFormats?: Record<string, (value: string) => boolean> // 自定义格式验证器
 
   /**
    * 帮助函数和工具库，可在 inline script 和 callbacks 中使用
@@ -528,62 +528,95 @@ export interface DynamicFormProps {
    * />
    * ```
    */
-  helpers?: Record<string, any>;
+  helpers?: Record<string, any>
 
   // UI 配置
-  layout?: "vertical" | "horizontal" | "inline";
-  labelWidth?: number | string; // 全局标签宽度（仅 horizontal layout 下生效）
-  columnsCount?: number; // 多列布局列数（默认 1，使用 CSS Grid 实现）
-  showErrorList?: boolean; // 是否显示错误列表
-  showSubmitButton?: boolean; // 是否显示提交按钮
-  renderAsForm?: boolean; // 是否渲染为 <form> 标签（默认 true）
+  layout?: 'vertical' | 'horizontal' | 'inline'
+  labelWidth?: number | string // 全局标签宽度（仅 horizontal layout 下生效）
+  columnsCount?: number // 多列布局列数（默认 1，使用 CSS Grid 实现）
+  showErrorList?: boolean // 是否显示错误列表
+  showSubmitButton?: boolean // 是否显示提交按钮
+  renderAsForm?: boolean // 是否渲染为 <form> 标签（默认 true）
 
   // 性能优化配置
-  enableVirtualScroll?: boolean; // 是否启用虚拟滚动（用于数组字段）
-  virtualScrollHeight?: number; // 虚拟滚动容器高度（像素，默认 600）
+  enableVirtualScroll?: boolean // 是否启用虚拟滚动（用于数组字段）
+  virtualScrollHeight?: number // 虚拟滚动容器高度（像素，默认 600）
 
   // 表单行为
-  validateMode?: "onSubmit" | "onBlur" | "onChange" | "all";
-  reValidateMode?: "onSubmit" | "onBlur" | "onChange"; // 重新验证模式
+  validateMode?: 'onSubmit' | 'onBlur' | 'onChange' | 'all'
+  reValidateMode?: 'onSubmit' | 'onBlur' | 'onChange' // 重新验证模式
 
   // 样式
-  className?: string;
-  style?: React.CSSProperties;
-  fieldsWrapperStyle?: React.CSSProperties;
-  fieldRowStyle?: React.CSSProperties;
-  fieldLabelStyle?: React.CSSProperties;
-  fieldControlStyle?: React.CSSProperties;
+  className?: string
+  style?: React.CSSProperties
+  fieldsWrapperStyle?: React.CSSProperties
+  fieldRowStyle?: React.CSSProperties
+  fieldLabelStyle?: React.CSSProperties
+  fieldControlStyle?: React.CSSProperties
 
   // 其他
-  loading?: boolean;
-  disabled?: boolean;
-  readonly?: boolean;
-  pathPrefix?: string; // 路径前缀（用于嵌套表单）
+  loading?: boolean
+  disabled?: boolean
+  readonly?: boolean
+  pathPrefix?: string // 路径前缀（用于嵌套表单）
   /**
    * 是否作为嵌套表单运行
    * - true: 复用父表单的 FormContext，不创建新的 useForm，字段直接注册到父表单
    * - false: 创建独立的 useForm 实例（默认）
    */
-  asNestedForm?: boolean;
+  asNestedForm?: boolean
+}
+
+/** 字段变更来源 */
+export type FieldChangeSource =
+  | 'user'
+  | 'setValue'
+  | 'setValues'
+  | 'reset'
+  | 'linkage'
+
+/** 字段变更动作 */
+export type FieldChangeAction = 'update' | 'remove' | 'reset'
+
+/** 字段级变更记录 */
+export interface FieldChange {
+  /** 完整绝对字段路径；数组项索引也编码在路径中。 */
+  path: string
+  /** 本次逻辑操作开始前的外部存储域值。 */
+  previousValue: unknown
+  /** 本次逻辑操作稳定后的外部存储域值。 */
+  value: unknown
+  /** 触发变化的来源，用于区分用户输入、API、重置和联动。 */
+  source: FieldChangeSource
+  /** 值变化的业务动作，例如更新、移除或重置。 */
+  action: FieldChangeAction
+  /** 数组结构变化的方向或类型；普通数组项编辑不设置此字段。 */
+  arrayAction?: 'append' | 'remove' | 'moveUp' | 'moveDown'
+}
+
+/** 表单变更元数据 */
+export interface FormChangeMeta {
+  /** 当前稳定回调中发生的一个或多个字段变化。 */
+  changes: FieldChange[]
 }
 
 /**
  * 字段组件属性
  */
 export interface FieldWidgetProps {
-  name: string;
-  label?: string;
-  placeholder?: string;
-  disabled?: boolean;
-  readonly?: boolean;
-  required?: boolean;
-  error?: string;
-  value?: any;
-  onChange?: (value: any) => void;
-  onBlur?: () => void;
-  options?: FieldOption[];
-  schema?: ExtendedJSONSchema;
-  [key: string]: any;
+  name: string
+  label?: string
+  placeholder?: string
+  disabled?: boolean
+  readonly?: boolean
+  required?: boolean
+  error?: string
+  value?: any
+  onChange?: (value: any) => void
+  onBlur?: () => void
+  options?: FieldOption[]
+  schema?: ExtendedJSONSchema
+  [key: string]: any
 }
 
 /**
@@ -592,11 +625,11 @@ export interface FieldWidgetProps {
  * 结构 Widget 不拥有对象路径的值，因此不接收 value、onChange、onBlur 或字段 ref。
  */
 export interface NestedFormWidgetProps {
-  name: string;
-  schema: ExtendedJSONSchema;
-  disabled?: boolean;
-  readonly?: boolean;
-  layout?: "vertical" | "horizontal" | "inline";
-  labelWidth?: number | string;
-  noCard?: boolean;
+  name: string
+  schema: ExtendedJSONSchema
+  disabled?: boolean
+  readonly?: boolean
+  layout?: 'vertical' | 'horizontal' | 'inline'
+  labelWidth?: number | string
+  noCard?: boolean
 }

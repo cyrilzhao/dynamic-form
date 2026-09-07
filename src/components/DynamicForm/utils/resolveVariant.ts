@@ -2,15 +2,15 @@ import type {
   CallbackPropRef,
   ExtendedJSONSchema,
   FieldVariant,
-} from "../types/schema";
-import { executeInlineScript } from "./executeInlineScript";
+} from '../types/schema'
+import { executeInlineScript } from './executeInlineScript'
 
 export interface VariantDetectContext {
   /** 字段在当前表单中的完整路径，用于嵌套对象和数组元素定位。 */
-  fieldPath?: string;
+  fieldPath?: string
   /** 数组字段中的元素索引；普通字段没有该值。 */
-  arrayIndex?: number;
-  [key: string]: unknown;
+  arrayIndex?: number
+  [key: string]: unknown
 }
 
 /**
@@ -25,8 +25,8 @@ export function buildVariantSchema(
   baseSchema: ExtendedJSONSchema,
   variant: FieldVariant,
 ): ExtendedJSONSchema {
-  const variantSchema = variant.schema || {};
-  const variantUi = variantSchema.ui || {};
+  const variantSchema = variant.schema || {}
+  const variantUi = variantSchema.ui || {}
   const effective: ExtendedJSONSchema = {
     ...baseSchema,
     ...variantSchema,
@@ -37,51 +37,53 @@ export function buildVariantSchema(
       transform: variantUi.transform,
       ...(variant.widget !== undefined ? { widget: variant.widget } : {}),
     },
-  };
+  }
 
   // 这些 UI 配置与当前 Variant 的 Widget/校验契约绑定，不能从旧 Variant 继承。
   const variantOnlyUiKeys = [
-    "widget",
-    "errorMessages",
-    "widgetProps",
-    "callbackProps",
-    "validators",
-  ] as const;
+    'widget',
+    'errorMessages',
+    'widgetProps',
+    'callbackProps',
+    'validators',
+  ] as const
   for (const key of variantOnlyUiKeys) {
-    if (key === "widget" && variant.widget !== undefined) continue;
+    if (key === 'widget' && variant.widget !== undefined) {
+      continue
+    }
     if (!(key in variantUi)) {
-      delete effective.ui?.[key];
+      delete effective.ui?.[key]
     }
   }
   // transform 与 validators 一样属于 Variant schema 的 UI 配置。
-  if (!("transform" in variantUi)) {
-    delete effective.ui?.transform;
+  if (!('transform' in variantUi)) {
+    delete effective.ui?.transform
   }
 
   // 这些 JSON Schema 规则会改变字段的数据契约，不能从其他 Variant 泄漏。
   const variantOnlyKeys = [
-    "format",
-    "pattern",
-    "enum",
-    "const",
-    "minimum",
-    "maximum",
-    "exclusiveMinimum",
-    "exclusiveMaximum",
-    "multipleOf",
-    "minLength",
-    "maxLength",
-    "required",
-    "properties",
-    "items",
-  ] as const;
+    'format',
+    'pattern',
+    'enum',
+    'const',
+    'minimum',
+    'maximum',
+    'exclusiveMinimum',
+    'exclusiveMaximum',
+    'multipleOf',
+    'minLength',
+    'maxLength',
+    'required',
+    'properties',
+    'items',
+  ] as const
   for (const key of variantOnlyKeys) {
     if (!(key in variantSchema)) {
-      delete effective[key];
+      delete effective[key]
     }
   }
 
-  return effective;
+  return effective
 }
 
 /**
@@ -99,33 +101,37 @@ export async function detectVariant({
   callbacks,
   helpers,
 }: {
-  variants?: FieldVariant[];
-  value: unknown;
-  formData: Record<string, unknown>;
-  context: VariantDetectContext;
-  callbacks: Record<string, (...args: any[]) => any>;
-  helpers: Record<string, any>;
+  variants?: FieldVariant[]
+  value: unknown
+  formData: Record<string, unknown>
+  context: VariantDetectContext
+  callbacks: Record<string, (...args: any[]) => any>
+  helpers: Record<string, any>
 }): Promise<FieldVariant | undefined> {
   for (const variant of variants || []) {
     // 顺序遍历保证多个检测规则重叠时结果可预测，并遵循配置列表的优先级。
-    const ref: CallbackPropRef | undefined = variant.detect?.callback;
-    if (!ref) continue;
+    const ref: CallbackPropRef | undefined = variant.detect?.callback
+    if (!ref) {
+      continue
+    }
     try {
       const result =
-        typeof ref === "string"
+        typeof ref === 'string'
           ? await callbacks[ref]?.({ value, formData, context, helpers })
           : await executeInlineScript({
               code: ref.code,
               params: { value, formData, context },
               helpers,
-            });
+            })
       // truthy 才代表匹配；允许检测器返回 Promise<boolean> 以支持异步业务判断。
-      if (result) return variant;
+      if (result) {
+        return variant
+      }
     } catch {
       /* 检测失败时尝试下一个 Variant。 */
     }
   }
-  return undefined;
+  return undefined
 }
 
 /**
@@ -144,35 +150,39 @@ export function detectVariantSync({
   callbacks,
   helpers,
 }: {
-  variants?: FieldVariant[];
-  value: unknown;
-  formData: Record<string, unknown>;
-  context: VariantDetectContext;
-  callbacks: Record<string, (...args: any[]) => any>;
-  helpers: Record<string, any>;
+  variants?: FieldVariant[]
+  value: unknown
+  formData: Record<string, unknown>
+  context: VariantDetectContext
+  callbacks: Record<string, (...args: any[]) => any>
+  helpers: Record<string, any>
 }): FieldVariant | undefined {
   for (const variant of variants || []) {
-    const ref = variant.detect?.callback;
-    if (!ref) continue;
+    const ref = variant.detect?.callback
+    if (!ref) {
+      continue
+    }
     try {
       const result =
-        typeof ref === "string"
+        typeof ref === 'string'
           ? callbacks[ref]?.({ value, formData, context, helpers })
           : (() => {
               const out = executeInlineScript({
                 code: ref.code,
                 params: { value, formData, context },
                 helpers,
-              });
+              })
               // 渲染阶段不能暂停等待 Promise；异步检测交给 resolver/校验流程处理。
-              return out instanceof Promise ? false : out;
-            })();
-      if (result) return variant;
+              return out instanceof Promise ? false : out
+            })()
+      if (result) {
+        return variant
+      }
     } catch {
       /* ignore invalid detector */
     }
   }
-  return undefined;
+  return undefined
 }
 
 /**
@@ -186,10 +196,12 @@ export function fallbackVariant(
   schema: ExtendedJSONSchema,
   value: unknown,
 ): FieldVariant | undefined {
-  const variants = schema.ui?.variants;
-  if (!variants?.length) return undefined;
+  const variants = schema.ui?.variants
+  if (!variants?.length) {
+    return undefined
+  }
   const type =
-    value === null ? "null" : Array.isArray(value) ? "array" : typeof value;
+    value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value
   return (
     // 先按实际值类型选择，避免无检测规则时总是强制使用 defaultVariant。
     variants.find((variant) => variant.type === type) ||
@@ -197,5 +209,5 @@ export function fallbackVariant(
     variants.find((variant) => variant.name === schema.ui?.defaultVariant) ||
     // 最后使用第一项作为容错兜底，避免把联合类型直接交给基础 Widget。
     variants[0]
-  );
+  )
 }

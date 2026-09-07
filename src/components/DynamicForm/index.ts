@@ -1,14 +1,18 @@
-export { DynamicForm } from "./DynamicForm";
+export { DynamicForm } from './DynamicForm'
 export type {
   DynamicFormProps,
   DynamicFormRef,
+  FieldChange,
+  FieldChangeAction,
+  FieldChangeSource,
+  FormChangeMeta,
   FieldWidgetProps,
   NestedFormWidgetProps,
   TextFieldFocusPayload,
-} from "./types";
-export { FieldRegistry } from "./core/FieldRegistry";
-export { SchemaParser } from "./core/SchemaParser";
-export type { ExtendedJSONSchema, FieldOption } from "./types/schema";
+} from './types'
+export { FieldRegistry } from './core/FieldRegistry'
+export { SchemaParser } from './core/SchemaParser'
+export type { ExtendedJSONSchema, FieldOption } from './types/schema'
 export type {
   LinkageConfig,
   LinkageFunction,
@@ -18,16 +22,16 @@ export type {
   LinkageEffect,
   LinkageType,
   InvalidValuePolicy,
-} from "./types/linkage";
+} from './types/linkage'
 
 // Widgets
-export { CodeEditorWidget } from "./widgets/CodeEditorWidget";
-export { ObjectEditorWidget } from "./widgets/ObjectEditorWidget";
+export { CodeEditorWidget } from './widgets/CodeEditorWidget'
+export { ObjectEditorWidget } from './widgets/ObjectEditorWidget'
 
 // Widget 预设系统
-export { blueprintPreset } from "./presets";
+export { blueprintPreset } from './presets'
 export type {
   WidgetPreset,
   PartialWidgetPreset,
   WidgetRegistry,
-} from "./presets";
+} from './presets'
