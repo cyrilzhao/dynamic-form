@@ -47,6 +47,9 @@ export interface SchemaBuilderProps {
    */
   hideTree?: boolean;
 
+  /** 可选的 UI 能力控制，未配置项默认显示且可编辑。 */
+  options?: SchemaBuilderOptions;
+
   /**
    * Control preview panel visibility
    * - 'both': Show both form and json tabs (default)
@@ -67,6 +70,29 @@ export interface SchemaBuilderProps {
   style?: React.CSSProperties;
 }
 
+export interface SchemaBuilderOptions {
+  rootType?: SchemaNodeType | 'null';
+  hidden?: {
+    tree?: boolean;
+    preview?: boolean;
+    importExport?: boolean;
+    propertyEditor?: boolean;
+    rootValidation?: boolean;
+    variantsTab?: boolean;
+  };
+  readonly?: {
+    all?: boolean;
+    tree?: boolean;
+    propertyEditor?: boolean;
+    schema?: boolean;
+    addFieldActions?: boolean;
+    deleteFieldActions?: boolean;
+    reorderFieldActions?: boolean;
+    editFieldKey?: boolean;
+    editFieldType?: boolean;
+  };
+}
+
 export type SchemaNodeType = 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array';
 
 export interface SchemaNode extends ExtendedJSONSchema {
@@ -75,6 +101,7 @@ export interface SchemaNode extends ExtendedJSONSchema {
 
 export interface SchemaBuilderContextType {
   schema: ExtendedJSONSchema;
+  options?: SchemaBuilderOptions;
   selectedPath: string[]; // Path to the currently selected node
   expandedPaths: Record<string, boolean>;
   onSelect: (path: string[]) => void;

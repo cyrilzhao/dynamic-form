@@ -20,8 +20,11 @@ export const Select: React.FC<SelectProps> = ({
   style,
   dropdownClassName,
   maxHeight,
+  minWidth,
   searchPlaceholder,
   onSearch,
+  renderValue,
+  renderTrigger,
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -143,7 +146,9 @@ export const Select: React.FC<SelectProps> = ({
 
   // 规范化选中的值为数组格式
   const selectedValues = useMemo(() => {
-    if (value === undefined || value === null) return []
+    if (value === undefined || value === null) {
+      return []
+    }
     return Array.isArray(value) ? value : [value]
   }, [value])
 
@@ -205,24 +210,44 @@ export const Select: React.FC<SelectProps> = ({
 
   return (
     <div ref={containerRef} className={`select ${className}`} style={style}>
-      <Trigger
-        ref={triggerRef}
-        selectedOptions={selectedOptions}
-        placeholder={placeholder}
-        isOpen={isOpen}
-        disabled={disabled}
-        clearable={clearable}
-        loading={loading || isSearchLoading}
-        onClick={handleToggle}
-        onClear={handleClear}
-        searchable={searchable}
-        multiple={multiple}
-        searchTerm={searchTerm}
-        onSearchChange={handleSearchChange}
-        onRemoveTag={handleRemoveTag}
-        searchInputRef={searchInputRef}
-        searchPlaceholder={searchPlaceholder}
-      />
+      {renderTrigger ? (
+        React.cloneElement(
+          renderTrigger({
+            isOpen,
+            selectedOptions,
+            placeholder,
+            disabled,
+            onClick: handleToggle,
+            ref: triggerRef,
+          }),
+          {
+            ref: triggerRef,
+            onClick: handleToggle,
+            'aria-expanded': isOpen,
+            'aria-disabled': disabled || loading,
+          }
+        )
+      ) : (
+        <Trigger
+          ref={triggerRef}
+          selectedOptions={selectedOptions}
+          placeholder={placeholder}
+          isOpen={isOpen}
+          disabled={disabled}
+          clearable={clearable}
+          loading={loading || isSearchLoading}
+          onClick={handleToggle}
+          onClear={handleClear}
+          searchable={searchable}
+          multiple={multiple}
+          searchTerm={searchTerm}
+          onSearchChange={handleSearchChange}
+          onRemoveTag={handleRemoveTag}
+          searchInputRef={searchInputRef}
+          searchPlaceholder={searchPlaceholder}
+          renderValue={renderValue}
+        />
+      )}
       <Dropdown
         isOpen={isOpen}
         options={filteredOptions}
@@ -232,6 +257,7 @@ export const Select: React.FC<SelectProps> = ({
         triggerRef={triggerRef}
         className={dropdownClassName}
         maxHeight={maxHeight}
+        minWidth={minWidth}
         loading={isSearchLoading}
       />
     </div>

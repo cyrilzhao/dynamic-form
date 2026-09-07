@@ -7,8 +7,8 @@ import React, {
   useRef,
   useImperativeHandle,
   forwardRef,
-} from "react";
-import { cloneDeep, get, set, unset } from "lodash";
+} from 'react'
+import { cloneDeep, get, set, unset } from 'lodash'
 import type {
   SchemaBuilderProps,
   SchemaBuilderContextType,
@@ -16,10 +16,10 @@ import type {
   SchemaNodeType,
   PreviewMode,
   SchemaBuilderRef,
-} from "./types";
-import type { ExtendedJSONSchema } from "../DynamicForm/types/schema";
-import { SchemaTree } from "./components/SchemaTree/SchemaTree";
-import { PropertyEditor } from "./components/PropertyEditor/PropertyEditor";
+} from './types'
+import type { ExtendedJSONSchema } from '../DynamicForm/types/schema'
+import { SchemaTree } from './components/SchemaTree/SchemaTree'
+import { PropertyEditor } from './components/PropertyEditor/PropertyEditor'
 import {
   Button,
   ButtonGroup,
@@ -30,34 +30,34 @@ import {
   DialogBody,
   DialogFooter,
   Callout,
-} from "@blueprintjs/core";
-import { DynamicForm } from "../DynamicForm";
-import { CodeMirrorView } from "../CodeEditor";
-import { isExtendedJSONSchema } from "./utils/validateExtendedJSONSchema";
+} from '@blueprintjs/core'
+import { DynamicForm } from '../DynamicForm'
+import { CodeMirrorView } from '../CodeEditor'
+import { isExtendedJSONSchema } from './utils/validateExtendedJSONSchema'
 import {
   defaultSchema,
   ensureHasFirstLevelNode,
   generateRandomKey,
   parseJsonPointer,
   validatePath,
-} from "./utils/schemaBuilderUtils";
-import "./SchemaBuilder.scss";
+} from './utils/schemaBuilderUtils'
+import './SchemaBuilder.scss'
 
-type BuilderViewMode = "edit" | "preview";
+type BuilderViewMode = 'edit' | 'preview'
 
 export const SchemaBuilderContext = createContext<
   SchemaBuilderContextType | undefined
->(undefined);
+>(undefined)
 
 export const useSchemaBuilder = () => {
-  const context = useContext(SchemaBuilderContext);
+  const context = useContext(SchemaBuilderContext)
   if (!context) {
     throw new Error(
-      "useSchemaBuilder must be used within a SchemaBuilderProvider",
-    );
+      'useSchemaBuilder must be used within a SchemaBuilderProvider'
+    )
   }
-  return context;
-};
+  return context
+}
 
 export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
   (
@@ -66,99 +66,110 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
       onChange,
       initialSelectedPath,
       hideTree = false,
-      previewMode = "both",
+      previewMode = 'both',
       className,
       style,
+      options,
     },
-    ref,
+    ref
   ) => {
+    const hidden = options?.hidden ?? {}
+    const readonly = options?.readonly ?? {}
+    const isReadonly = readonly.all === true || readonly.schema === true
     // 初始化时确保至少有一个一级节点
     const getInitialSchema = () => {
-      const initialSchema = defaultValue || defaultSchema;
-      return ensureHasFirstLevelNode(initialSchema);
-    };
+      const initialSchema = defaultValue || defaultSchema
+      if (options?.rootType) {
+        const nextSchema = { ...initialSchema, type: options.rootType }
+        if (options.rootType === 'array' && !nextSchema.items) {
+          nextSchema.items = { type: 'string', title: 'Item' }
+        }
+        return nextSchema
+      }
+      return ensureHasFirstLevelNode(initialSchema)
+    }
 
     // 获取第一个一级节点的路径
     const getFirstLevelNodePath = (schema: ExtendedJSONSchema): string[] => {
       if (schema.properties && Object.keys(schema.properties).length > 0) {
-        const firstKey = Object.keys(schema.properties)[0];
-        return ["properties", firstKey];
+        const firstKey = Object.keys(schema.properties)[0]
+        return ['properties', firstKey]
       }
-      return [];
-    };
+      return []
+    }
 
     // 获取初始选中路径
     const getInitialSelectedPath = (schema: ExtendedJSONSchema): string[] => {
       if (!initialSelectedPath) {
-        return getFirstLevelNodePath(schema);
+        return getFirstLevelNodePath(schema)
       }
 
       // 支持 JSON Pointer 格式
       const pathArray =
-        typeof initialSelectedPath === "string"
+        typeof initialSelectedPath === 'string'
           ? parseJsonPointer(initialSelectedPath)
-          : initialSelectedPath;
+          : initialSelectedPath
 
       // 验证路径是否有效
       if (pathArray.length > 0 && validatePath(schema, pathArray)) {
-        return pathArray;
+        return pathArray
       }
 
       // 如果路径无效，回退到第一个一级节点
-      console.warn("Invalid initialSelectedPath, falling back to first node");
-      return getFirstLevelNodePath(schema);
-    };
+      console.warn('Invalid initialSelectedPath, falling back to first node')
+      return getFirstLevelNodePath(schema)
+    }
 
-    const initialSchema = getInitialSchema();
-    const initialSchemaRef = useRef(initialSchema);
-    const [schema, setSchema] = useState<ExtendedJSONSchema>(initialSchema);
+    const initialSchema = getInitialSchema()
+    const initialSchemaRef = useRef(initialSchema)
+    const [schema, setSchema] = useState<ExtendedJSONSchema>(initialSchema)
     const [selectedPath, setSelectedPath] = useState<string[]>(
-      getInitialSelectedPath(initialSchema),
-    );
+      getInitialSelectedPath(initialSchema)
+    )
     const [expandedPaths, setExpandedPaths] = useState<Record<string, boolean>>(
-      { "": true },
-    );
-    const [previewData, setPreviewData] = useState({});
-    const [previewTab, setPreviewTab] = useState<"form" | "json">("form");
+      { '': true }
+    )
+    const [previewData, setPreviewData] = useState({})
+    const [previewTab, setPreviewTab] = useState<'form' | 'json'>('form')
     const [builderViewMode, setBuilderViewMode] =
-      useState<BuilderViewMode>("edit");
-    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-    const [importText, setImportText] = useState("");
-    const [importError, setImportError] = useState<string | null>(null);
+      useState<BuilderViewMode>('edit')
+    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+    const [importText, setImportText] = useState('')
+    const [importError, setImportError] = useState<string | null>(null)
 
     // Resizable sidebar state
-    const [leftPanelWidth, setLeftPanelWidth] = useState(300);
-    const isResizingRef = useRef(false);
+    const [leftPanelWidth, setLeftPanelWidth] = useState(300)
+    const isResizingRef = useRef(false)
     const activeViewMode: BuilderViewMode =
-      previewMode === "none" ? "edit" : builderViewMode;
+      previewMode === 'none' || hidden.preview ? 'edit' : builderViewMode
     const previewColumnsCount =
-      typeof schema.ui?.columnsCount === "number" && schema.ui.columnsCount > 1
+      typeof schema.ui?.columnsCount === 'number' && schema.ui.columnsCount > 1
         ? schema.ui.columnsCount
-        : undefined;
+        : undefined
 
     // 暴露 ref 方法
     useImperativeHandle(
       ref,
       () => ({
         setSchema: (newSchema: ExtendedJSONSchema) => {
-          const schemaToSet = ensureHasFirstLevelNode(newSchema);
-          setSchema(schemaToSet);
+          const schemaToSet = options?.rootType ? { ...newSchema, type: options.rootType } : ensureHasFirstLevelNode(newSchema)
+          setSchema(schemaToSet)
           // 保持当前选中路径，如果路径无效则选中第一个节点
           if (!validatePath(schemaToSet, selectedPath)) {
-            setSelectedPath(getFirstLevelNodePath(schemaToSet));
+            setSelectedPath(getFirstLevelNodePath(schemaToSet))
           }
         },
         getSchema: () => schema,
         reset: () => {
-          const schemaToSet = ensureHasFirstLevelNode(initialSchemaRef.current);
-          setSchema(schemaToSet);
-          setSelectedPath(getInitialSelectedPath(schemaToSet));
-          setExpandedPaths({ "": true });
-          setPreviewData({});
+          const schemaToSet = options?.rootType ? { ...initialSchemaRef.current, type: options.rootType } : ensureHasFirstLevelNode(initialSchemaRef.current)
+          setSchema(schemaToSet)
+          setSelectedPath(getInitialSelectedPath(schemaToSet))
+          setExpandedPaths({ '': true })
+          setPreviewData({})
         },
       }),
-      [schema, selectedPath],
-    );
+      [schema, selectedPath]
+    )
 
     // Resize handler
     useEffect(() => {
@@ -177,442 +188,467 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           // But we don't have ref to container easily here without adding more refs.
           // Let's assume standard behavior:
           // New Width = Current Width + Movement
-          const movementX = Number.isFinite(e.movementX) ? e.movementX : 0;
+          const movementX = Number.isFinite(e.movementX) ? e.movementX : 0
           setLeftPanelWidth((prev) =>
-            Math.max(200, Math.min(600, prev + movementX)),
-          );
+            Math.max(200, Math.min(600, prev + movementX))
+          )
         }
-      };
+      }
 
       const handleMouseUp = () => {
-        isResizingRef.current = false;
-        document.body.style.cursor = "default";
-        document.body.style.userSelect = "auto";
-      };
+        isResizingRef.current = false
+        document.body.style.cursor = 'default'
+        document.body.style.userSelect = 'auto'
+      }
 
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("mouseup", handleMouseUp);
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
 
       return () => {
-        document.removeEventListener("mousemove", handleMouseMove);
-        document.removeEventListener("mouseup", handleMouseUp);
-      };
-    }, []);
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+      }
+    }, [])
 
     const startResizing = (e: React.MouseEvent) => {
-      isResizingRef.current = true;
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none"; // Prevent text selection
-      e.preventDefault();
-    };
+      isResizingRef.current = true
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none' // Prevent text selection
+      e.preventDefault()
+    }
 
     const commitFocusedFieldBeforeViewChange = () => {
       if (document.activeElement instanceof HTMLElement) {
-        document.activeElement.blur();
+        document.activeElement.blur()
       }
-    };
+    }
 
     const handleViewModeChange = (nextViewMode: BuilderViewMode) => {
-      commitFocusedFieldBeforeViewChange();
-      setBuilderViewMode(nextViewMode);
-    };
+      commitFocusedFieldBeforeViewChange()
+      setBuilderViewMode(nextViewMode)
+    }
 
     const handleImportSchema = () => {
       try {
-        const parsed: unknown = JSON.parse(importText);
-        if (!isExtendedJSONSchema(parsed)) throw new Error("Invalid schema");
-        const schemaToSet = ensureHasFirstLevelNode(parsed);
-        setSchema(schemaToSet);
-        setSelectedPath(getFirstLevelNodePath(schemaToSet));
-        setExpandedPaths({ "": true });
-        onChange?.(schemaToSet);
-        setImportError(null);
-        setIsImportDialogOpen(false);
+        const parsed: unknown = JSON.parse(importText)
+        if (!isExtendedJSONSchema(parsed)) throw new Error('Invalid schema')
+        const schemaToSet = ensureHasFirstLevelNode(parsed)
+        setSchema(schemaToSet)
+        setSelectedPath(getFirstLevelNodePath(schemaToSet))
+        setExpandedPaths({ '': true })
+        onChange?.(schemaToSet)
+        setImportError(null)
+        setIsImportDialogOpen(false)
       } catch {
-        setImportError("Invalid ExtendedJSONSchema");
+        setImportError('Invalid ExtendedJSONSchema')
       }
-    };
+    }
 
     const handleToggleExpand = useCallback(
       (path: string[], expanded: boolean) => {
-        const pathStr = path.join(".");
-        setExpandedPaths((prev) => ({ ...prev, [pathStr]: expanded }));
+        const pathStr = path.join('.')
+        setExpandedPaths((prev) => ({ ...prev, [pathStr]: expanded }))
       },
-      [],
-    );
+      []
+    )
 
     const handleUpdate = useCallback(
       (path: string[], updates: Partial<SchemaNode>, newKey?: string) => {
+        if (isReadonly) return
         setSchema((prevSchema) => {
-          const nextSchema = cloneDeep(prevSchema);
-          const targetPath = path.length === 0 ? [] : path;
+          const nextSchema = cloneDeep(prevSchema)
+          const targetPath = path.length === 0 ? [] : path
 
           // Get the current node at the path
           const currentNode =
-            path.length === 0 ? nextSchema : get(nextSchema, targetPath);
+            path.length === 0 ? nextSchema : get(nextSchema, targetPath)
 
-          if (!currentNode) return prevSchema;
+          if (!currentNode) return prevSchema
 
           // Apply updates - 对于值为 undefined 的属性，需要删除而不是赋值
           Object.keys(updates).forEach((key) => {
-            const value = updates[key as keyof typeof updates];
+            const value = updates[key as keyof typeof updates]
             if (value === undefined) {
-              delete currentNode[key];
+              delete currentNode[key]
             } else {
-              currentNode[key] = value;
+              currentNode[key] = value
             }
-          });
+          })
 
           // 根据节点类型维护互斥的子结构，避免类型切换后残留无效子节点。
-          if (updates.type === "array") {
-            delete currentNode.properties;
-            delete currentNode.required;
+          if (updates.type === 'array') {
+            delete currentNode.properties
+            delete currentNode.required
 
             if (!currentNode.items) {
-              const newSubFieldKey = generateRandomKey({});
+              const newSubFieldKey = generateRandomKey({})
 
               currentNode.items = {
-                type: "object",
-                title: "Items",
+                type: 'object',
+                title: 'Items',
                 properties: {
                   [newSubFieldKey]: {
-                    type: "string",
-                    title: "New Field",
+                    type: 'string',
+                    title: 'New Field',
                   },
                 },
-              };
+              }
             }
-          } else if (updates.type === "object") {
-            delete currentNode.items;
+          } else if (updates.type === 'object') {
+            delete currentNode.items
 
             if (!currentNode.properties) {
-              const newSubFieldKey = generateRandomKey({});
+              const newSubFieldKey = generateRandomKey({})
 
               currentNode.properties = {
                 [newSubFieldKey]: {
-                  type: "string",
-                  title: "New Field",
+                  type: 'string',
+                  title: 'New Field',
                 },
-              };
+              }
             }
           } else if (updates.type) {
-            delete currentNode.items;
-            delete currentNode.properties;
-            delete currentNode.required;
+            delete currentNode.items
+            delete currentNode.properties
+            delete currentNode.required
           }
 
           // Auto-expand logic
-          if (updates.type === "array" || updates.type === "object") {
-            const pathStr = path.join(".");
+          if (updates.type === 'array' || updates.type === 'object') {
+            const pathStr = path.join('.')
             setExpandedPaths((prev) => {
-              const next = { ...prev, [pathStr]: true };
-              if (updates.type === "array") {
+              const next = { ...prev, [pathStr]: true }
+              if (updates.type === 'array') {
                 // Expand items as well if requested "expand new items child field"
                 // Path to items is path + ['items']
-                const itemsPathStr = [...path, "items"].join(".");
-                next[itemsPathStr] = true;
+                const itemsPathStr = [...path, 'items'].join('.')
+                next[itemsPathStr] = true
               }
-              return next;
-            });
+              return next
+            })
           }
 
           // Handle key renaming if newKey is provided and it's different from the last part of the path
           if (newKey && path.length > 0) {
-            const parentPath = path.slice(0, -1);
-            const oldKey = path[path.length - 1];
+            const parentPath = path.slice(0, -1)
+            const oldKey = path[path.length - 1]
 
             // Only rename if it's property of an object (inside properties)
             if (
-              parentPath[parentPath.length - 1] === "properties" &&
+              parentPath[parentPath.length - 1] === 'properties' &&
               oldKey !== newKey
             ) {
-              const parentNode = get(nextSchema, parentPath);
+              const parentNode = get(nextSchema, parentPath)
               if (parentNode) {
                 // Check if new key already exists to avoid overwrite
                 if (parentNode[newKey]) {
-                  console.warn(`Key "${newKey}" already exists.`);
-                  return prevSchema;
+                  console.warn(`Key "${newKey}" already exists.`)
+                  return prevSchema
                 }
 
                 // Rebuild properties object to maintain order
-                const keys = Object.keys(parentNode);
-                const newProperties: Record<string, any> = {};
+                const keys = Object.keys(parentNode)
+                const newProperties: Record<string, any> = {}
 
                 keys.forEach((key) => {
                   if (key === oldKey) {
-                    newProperties[newKey] = parentNode[oldKey];
+                    newProperties[newKey] = parentNode[oldKey]
                   } else {
-                    newProperties[key] = parentNode[key];
+                    newProperties[key] = parentNode[key]
                   }
-                });
+                })
 
                 // Replace all keys
-                Object.keys(parentNode).forEach(
-                  (key) => delete parentNode[key],
-                );
-                Object.assign(parentNode, newProperties);
+                Object.keys(parentNode).forEach((key) => delete parentNode[key])
+                Object.assign(parentNode, newProperties)
 
                 // Update selected path to reflect the new key
-                const newPath = [...parentPath, newKey];
-                setSelectedPath(newPath);
+                const newPath = [...parentPath, newKey]
+                setSelectedPath(newPath)
 
                 // Update expanded paths if needed (rename keys in expandedPaths map)
-                const oldPathPrefix = path.join(".") + ".";
-                const newPathPrefix = newPath.join(".") + ".";
+                const oldPathPrefix = path.join('.') + '.'
+                const newPathPrefix = newPath.join('.') + '.'
 
                 setExpandedPaths((prev) => {
-                  const next: Record<string, boolean> = {};
+                  const next: Record<string, boolean> = {}
                   Object.keys(prev).forEach((key) => {
-                    if (key === path.join(".")) {
-                      next[newPath.join(".")] = prev[key];
+                    if (key === path.join('.')) {
+                      next[newPath.join('.')] = prev[key]
                     } else if (key.startsWith(oldPathPrefix)) {
-                      const suffix = key.substring(oldPathPrefix.length);
-                      next[newPathPrefix + suffix] = prev[key];
+                      const suffix = key.substring(oldPathPrefix.length)
+                      next[newPathPrefix + suffix] = prev[key]
                     } else {
-                      next[key] = prev[key];
+                      next[key] = prev[key]
                     }
-                  });
-                  return next;
-                });
+                  })
+                  return next
+                })
               }
             }
           }
 
-          onChange?.(nextSchema);
-          return nextSchema;
-        });
+          onChange?.(nextSchema)
+          return nextSchema
+        })
       },
-      [onChange],
-    );
+      [isReadonly, onChange]
+    )
 
     const handleAddChild = useCallback(
       (path: string[], type: SchemaNodeType) => {
         setSchema((prevSchema) => {
-          const nextSchema = cloneDeep(prevSchema);
+          const nextSchema = cloneDeep(prevSchema)
           const targetNode =
-            path.length === 0 ? nextSchema : get(nextSchema, path);
+            path.length === 0 ? nextSchema : get(nextSchema, path)
 
-          if (!targetNode) return prevSchema;
+          if (!targetNode) return prevSchema
 
-          if (targetNode.type === "object") {
+          if (targetNode.type === 'object') {
             if (!targetNode.properties) {
-              targetNode.properties = {};
+              targetNode.properties = {}
             }
 
-            const newKey = generateRandomKey(targetNode.properties);
+            const newKey = generateRandomKey(targetNode.properties)
 
             let newNode: any = {
               type: type,
               title: `New Field`,
-            };
-
-            // If explicitly adding object/array (though UI defaults to string), set defaults
-            if (type === "object") {
-              newNode.properties = {};
-            } else if (type === "array") {
-              newNode.items = {
-                type: "string",
-                title: "Item",
-              };
             }
 
-            targetNode.properties[newKey] = newNode;
+            // If explicitly adding object/array (though UI defaults to string), set defaults
+            if (type === 'object') {
+              newNode.properties = {}
+            } else if (type === 'array') {
+              newNode.items = {
+                type: 'string',
+                title: 'Item',
+              }
+            }
+
+            targetNode.properties[newKey] = newNode
 
             // Auto expand parent to show new child
-            const pathStr = path.join(".");
-            setExpandedPaths((prev) => ({ ...prev, [pathStr]: true }));
-          } else if (targetNode.type === "array") {
+            const pathStr = path.join('.')
+            setExpandedPaths((prev) => ({ ...prev, [pathStr]: true }))
+          } else if (targetNode.type === 'array') {
             // Ensure items exists
             if (!targetNode.items) {
               targetNode.items = {
                 type: type,
-                title: "Item",
-              };
+                title: 'Item',
+              }
             }
             // Expand array
-            const pathStr = path.join(".");
-            setExpandedPaths((prev) => ({ ...prev, [pathStr]: true }));
+            const pathStr = path.join('.')
+            setExpandedPaths((prev) => ({ ...prev, [pathStr]: true }))
           }
 
-          onChange?.(nextSchema);
-          return nextSchema;
-        });
+          onChange?.(nextSchema)
+          return nextSchema
+        })
       },
-      [onChange],
-    );
+      [onChange]
+    )
 
     const handleAddSibling = useCallback(
       (path: string[], type: SchemaNodeType) => {
-        if (path.length === 0) return;
+        if (path.length === 0) return
 
         setSchema((prevSchema) => {
-          const nextSchema = cloneDeep(prevSchema);
+          const nextSchema = cloneDeep(prevSchema)
 
-          if (path.length >= 2 && path[path.length - 2] === "properties") {
-            const propertiesPath = path.slice(0, -1);
-            const propertiesNode = get(nextSchema, propertiesPath);
-            const currentKey = path[path.length - 1];
+          if (path.length >= 2 && path[path.length - 2] === 'properties') {
+            const propertiesPath = path.slice(0, -1)
+            const propertiesNode = get(nextSchema, propertiesPath)
+            const currentKey = path[path.length - 1]
 
             if (propertiesNode) {
-              const newKey = generateRandomKey(propertiesNode);
+              const newKey = generateRandomKey(propertiesNode)
               let newNode: any = {
                 type: type,
                 title: `New Field`,
-              };
+              }
 
-              if (type === "object") {
-                newNode.properties = {};
-              } else if (type === "array") {
-                newNode.items = { type: "string", title: "Item" };
+              if (type === 'object') {
+                newNode.properties = {}
+              } else if (type === 'array') {
+                newNode.items = { type: 'string', title: 'Item' }
               }
 
               // 在当前节点后插入
-              const keys = Object.keys(propertiesNode);
-              const currentIndex = keys.indexOf(currentKey);
-              const newProperties: Record<string, any> = {};
+              const keys = Object.keys(propertiesNode)
+              const currentIndex = keys.indexOf(currentKey)
+              const newProperties: Record<string, any> = {}
 
               keys.forEach((key, index) => {
-                newProperties[key] = propertiesNode[key];
+                newProperties[key] = propertiesNode[key]
                 if (index === currentIndex) {
-                  newProperties[newKey] = newNode;
+                  newProperties[newKey] = newNode
                 }
-              });
+              })
 
               // 替换整个 properties 对象以保持顺序
               Object.keys(propertiesNode).forEach(
-                (key) => delete propertiesNode[key],
-              );
-              Object.assign(propertiesNode, newProperties);
+                (key) => delete propertiesNode[key]
+              )
+              Object.assign(propertiesNode, newProperties)
             }
           }
 
-          onChange?.(nextSchema);
-          return nextSchema;
-        });
+          onChange?.(nextSchema)
+          return nextSchema
+        })
       },
-      [onChange],
-    );
+      [onChange]
+    )
 
     const handleDelete = useCallback(
       (path: string[]) => {
-        if (path.length === 0) return;
+        if (path.length === 0) return
 
         setSchema((prevSchema) => {
-          const nextSchema = cloneDeep(prevSchema);
-          const parentPath = path.slice(0, -1);
-          const keyToDelete = path[path.length - 1];
+          const nextSchema = cloneDeep(prevSchema)
+          const parentPath = path.slice(0, -1)
+          const keyToDelete = path[path.length - 1]
 
           const parentNode =
-            path.length === 1 ? nextSchema : get(nextSchema, parentPath);
+            path.length === 1 ? nextSchema : get(nextSchema, parentPath)
 
           if (parentNode) {
             if (Array.isArray(parentNode)) {
               // Should not happen in standard schema structure for properties
             } else {
-              if (parentPath[parentPath.length - 1] === "properties") {
-                delete parentNode[keyToDelete];
-              } else if (keyToDelete === "items") {
-                delete parentNode.items;
+              if (parentPath[parentPath.length - 1] === 'properties') {
+                delete parentNode[keyToDelete]
+              } else if (keyToDelete === 'items') {
+                delete parentNode.items
               }
             }
           }
 
-          onChange?.(nextSchema);
-          return nextSchema;
-        });
+          onChange?.(nextSchema)
+          return nextSchema
+        })
 
         setTimeout(() => {
           setSchema((currentSchema) => {
-            const newPath = getFirstLevelNodePath(currentSchema);
-            setSelectedPath(newPath);
-            return currentSchema;
-          });
-        }, 0);
+            const newPath = getFirstLevelNodePath(currentSchema)
+            setSelectedPath(newPath)
+            return currentSchema
+          })
+        }, 0)
       },
-      [onChange],
-    );
+      [onChange]
+    )
 
     const handleMoveUp = useCallback(
       (path: string[]) => {
-        if (path.length < 2 || path[path.length - 2] !== "properties") return;
+        if (path.length < 2 || path[path.length - 2] !== 'properties') return
 
         setSchema((prevSchema) => {
-          const nextSchema = cloneDeep(prevSchema);
-          const propertiesPath = path.slice(0, -1);
-          const propertiesNode = get(nextSchema, propertiesPath);
-          const currentKey = path[path.length - 1];
+          const nextSchema = cloneDeep(prevSchema)
+          const propertiesPath = path.slice(0, -1)
+          const propertiesNode = get(nextSchema, propertiesPath)
+          const currentKey = path[path.length - 1]
 
           if (propertiesNode) {
-            const keys = Object.keys(propertiesNode);
-            const currentIndex = keys.indexOf(currentKey);
+            const keys = Object.keys(propertiesNode)
+            const currentIndex = keys.indexOf(currentKey)
 
             if (currentIndex > 0) {
-              const newProperties: Record<string, any> = {};
+              const newProperties: Record<string, any> = {}
               keys.forEach((key, index) => {
                 if (index === currentIndex - 1) {
-                  newProperties[currentKey] = propertiesNode[currentKey];
-                  newProperties[key] = propertiesNode[key];
+                  newProperties[currentKey] = propertiesNode[currentKey]
+                  newProperties[key] = propertiesNode[key]
                 } else if (index !== currentIndex) {
-                  newProperties[key] = propertiesNode[key];
+                  newProperties[key] = propertiesNode[key]
                 }
-              });
+              })
 
               Object.keys(propertiesNode).forEach(
-                (key) => delete propertiesNode[key],
-              );
-              Object.assign(propertiesNode, newProperties);
+                (key) => delete propertiesNode[key]
+              )
+              Object.assign(propertiesNode, newProperties)
             }
           }
 
-          onChange?.(nextSchema);
-          return nextSchema;
-        });
+          onChange?.(nextSchema)
+          return nextSchema
+        })
       },
-      [onChange],
-    );
+      [onChange]
+    )
 
     const handleMoveDown = useCallback(
       (path: string[]) => {
-        if (path.length < 2 || path[path.length - 2] !== "properties") return;
+        if (path.length < 2 || path[path.length - 2] !== 'properties') return
 
         setSchema((prevSchema) => {
-          const nextSchema = cloneDeep(prevSchema);
-          const propertiesPath = path.slice(0, -1);
-          const propertiesNode = get(nextSchema, propertiesPath);
-          const currentKey = path[path.length - 1];
+          const nextSchema = cloneDeep(prevSchema)
+          const propertiesPath = path.slice(0, -1)
+          const propertiesNode = get(nextSchema, propertiesPath)
+          const currentKey = path[path.length - 1]
 
           if (propertiesNode) {
-            const keys = Object.keys(propertiesNode);
-            const currentIndex = keys.indexOf(currentKey);
+            const keys = Object.keys(propertiesNode)
+            const currentIndex = keys.indexOf(currentKey)
 
             if (currentIndex < keys.length - 1) {
-              const newProperties: Record<string, any> = {};
+              const newProperties: Record<string, any> = {}
               keys.forEach((key, index) => {
                 if (index === currentIndex) {
                   newProperties[keys[currentIndex + 1]] =
-                    propertiesNode[keys[currentIndex + 1]];
-                  newProperties[currentKey] = propertiesNode[currentKey];
+                    propertiesNode[keys[currentIndex + 1]]
+                  newProperties[currentKey] = propertiesNode[currentKey]
                 } else if (index !== currentIndex + 1) {
-                  newProperties[key] = propertiesNode[key];
+                  newProperties[key] = propertiesNode[key]
                 }
-              });
+              })
 
               Object.keys(propertiesNode).forEach(
-                (key) => delete propertiesNode[key],
-              );
-              Object.assign(propertiesNode, newProperties);
+                (key) => delete propertiesNode[key]
+              )
+              Object.assign(propertiesNode, newProperties)
             }
           }
 
-          onChange?.(nextSchema);
-          return nextSchema;
-        });
+          onChange?.(nextSchema)
+          return nextSchema
+        })
       },
-      [onChange],
-    );
+      [onChange]
+    )
+
+    const handleAddChildWithAccess = (
+      ...args: Parameters<typeof handleAddChild>
+    ) => {
+      if (!isReadonly && !readonly.addFieldActions) handleAddChild(...args)
+    }
+    const handleAddSiblingWithAccess = (
+      ...args: Parameters<typeof handleAddSibling>
+    ) => {
+      if (!isReadonly && !readonly.addFieldActions) handleAddSibling(...args)
+    }
+    const handleDeleteWithAccess = (
+      ...args: Parameters<typeof handleDelete>
+    ) => {
+      if (!isReadonly && !readonly.deleteFieldActions) handleDelete(...args)
+    }
+    const handleMoveUpWithAccess = (
+      ...args: Parameters<typeof handleMoveUp>
+    ) => {
+      if (!isReadonly && !readonly.reorderFieldActions) handleMoveUp(...args)
+    }
+    const handleMoveDownWithAccess = (
+      ...args: Parameters<typeof handleMoveDown>
+    ) => {
+      if (!isReadonly && !readonly.reorderFieldActions) handleMoveDown(...args)
+    }
 
     const renderPreviewPanel = () => {
-      if (previewMode === "both") {
+      if (previewMode === 'both') {
         return (
           <Tabs
             id="preview-tabs"
@@ -647,10 +683,10 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
               }
             />
           </Tabs>
-        );
+        )
       }
 
-      if (previewMode === "form") {
+      if (previewMode === 'form') {
         return (
           <div className="preview-content">
             <DynamicForm
@@ -664,34 +700,35 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
               <pre>{JSON.stringify(previewData, null, 2)}</pre>
             </div>
           </div>
-        );
+        )
       }
 
       return (
         <div className="preview-content">
           <pre>{JSON.stringify(schema, null, 2)}</pre>
         </div>
-      );
-    };
+      )
+    }
 
     return (
       <SchemaBuilderContext.Provider
         value={{
           schema,
+          options,
           selectedPath,
           expandedPaths,
           onSelect: setSelectedPath,
           onUpdate: handleUpdate,
-          onAddChild: handleAddChild,
-          onAddSibling: handleAddSibling,
-          onDelete: handleDelete,
+          onAddChild: handleAddChildWithAccess,
+          onAddSibling: handleAddSiblingWithAccess,
+          onDelete: handleDeleteWithAccess,
           onToggleExpand: handleToggleExpand,
-          onMoveUp: handleMoveUp,
-          onMoveDown: handleMoveDown,
+          onMoveUp: handleMoveUpWithAccess,
+          onMoveDown: handleMoveDownWithAccess,
         }}
       >
-        <div className={`schema-builder ${className || ""}`} style={style}>
-          {activeViewMode === "edit" && !hideTree && (
+        <div className={`schema-builder ${className || ''}`} style={style}>
+          {activeViewMode === 'edit' && !hideTree && !hidden.tree && (
             <>
               <div
                 className="schema-builder-left"
@@ -706,42 +743,52 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
             </>
           )}
           <div className="schema-builder-main">
-            <div className="schema-builder-toolbar">
-              <Button
-                text="Import JSON"
-                onClick={() => {
-                  setImportText(JSON.stringify(schema, null, 2));
-                  setImportError(null);
-                  setIsImportDialogOpen(true);
-                }}
-              />
-              <ButtonGroup>
-                <Button
-                  text="Edit"
-                  active={activeViewMode === "edit"}
-                  intent={activeViewMode === "edit" ? "primary" : "none"}
-                  onClick={() => handleViewModeChange("edit")}
-                />
-                {previewMode !== "none" && (
+            {!hidden.importExport || !hidden.preview ? (
+              <div className="schema-builder-toolbar">
+                {!hidden.importExport && (
                   <Button
-                    text="Preview"
-                    active={activeViewMode === "preview"}
-                    intent={activeViewMode === "preview" ? "primary" : "none"}
-                    onClick={() => handleViewModeChange("preview")}
+                    text="Import JSON"
+                    disabled={isReadonly}
+                    onClick={() => {
+                      setImportText(JSON.stringify(schema, null, 2))
+                      setImportError(null)
+                      setIsImportDialogOpen(true)
+                    }}
                   />
                 )}
-              </ButtonGroup>
-            </div>
+                {!hidden.preview ? (
+                  <ButtonGroup>
+                    <Button
+                      text="Edit"
+                      active={activeViewMode === 'edit'}
+                      intent={activeViewMode === 'edit' ? 'primary' : 'none'}
+                      onClick={() => handleViewModeChange('edit')}
+                    />
+                    {previewMode !== 'none' && (
+                      <Button
+                        text="Preview"
+                        active={activeViewMode === 'preview'}
+                        intent={
+                          activeViewMode === 'preview' ? 'primary' : 'none'
+                        }
+                        onClick={() => handleViewModeChange('preview')}
+                      />
+                    )}
+                  </ButtonGroup>
+                ) : null}
+              </div>
+            ) : null}
+
             <div
               className={
-                activeViewMode === "preview"
-                  ? "schema-builder-preview"
-                  : "schema-builder-middle"
+                activeViewMode === 'preview'
+                  ? 'schema-builder-preview'
+                  : 'schema-builder-middle'
               }
             >
-              {activeViewMode === "preview" ? (
+              {activeViewMode === 'preview' ? (
                 renderPreviewPanel()
-              ) : (
+              ) : hidden.propertyEditor ? null : (
                 <PropertyEditor />
               )}
             </div>
@@ -776,6 +823,6 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           />
         </Dialog>
       </SchemaBuilderContext.Provider>
-    );
-  },
-);
+    )
+  }
+)

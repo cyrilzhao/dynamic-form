@@ -15,6 +15,7 @@ interface DropdownProps {
   className?: string;
   maxHeight?: number;
   loading?: boolean;
+  minWidth?: number | string;
 }
 
 export const Dropdown: React.FC<DropdownProps> = ({
@@ -27,6 +28,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
   className = "",
   maxHeight = 300,
   loading = false,
+  minWidth = 180,
 }) => {
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -132,6 +134,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
         top: position.top,
         left: position.left,
         width: position.width,
+        minWidth,
         maxHeight,
         zIndex: 9999,
       }}

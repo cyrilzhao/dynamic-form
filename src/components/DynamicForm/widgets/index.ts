@@ -14,4 +14,5 @@ export { KeyValueArrayWidget } from "./KeyValueArrayWidget";
 export { TableArrayWidget } from "./TableArrayWidget";
 export { CodeEditorWidget } from "./CodeEditorWidget";
 export { ObjectEditorWidget } from "./ObjectEditorWidget";
+export { VariantWidget } from "./VariantWidget";
 export { SchemaBuilderWidget } from "./SchemaBuilderWidget";

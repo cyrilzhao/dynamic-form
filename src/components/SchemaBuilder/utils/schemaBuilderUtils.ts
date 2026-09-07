@@ -72,8 +72,7 @@ export const validatePath = (
   schema: ExtendedJSONSchema,
   path: string[],
 ): boolean => {
-  if (path.length === 0 || path[path.length - 1] === "items")
-    return path.length === 0;
+  if (path.length === 0) return true;
   try {
     return get(schema, path) !== undefined;
   } catch {

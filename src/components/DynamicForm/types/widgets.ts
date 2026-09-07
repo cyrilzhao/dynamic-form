@@ -22,6 +22,9 @@ export interface WidgetPreset {
   array: ComponentType<FieldWidgetProps>;
   "key-value-array": ComponentType<FieldWidgetProps>;
   "table-array": ComponentType<FieldWidgetProps>;
+  variant: ComponentType<FieldWidgetProps>;
+  "code-editor": ComponentType<FieldWidgetProps>;
+  "object-editor": ComponentType<FieldWidgetProps>;
 }
 
 /**

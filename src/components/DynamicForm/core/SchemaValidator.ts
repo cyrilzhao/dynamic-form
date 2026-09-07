@@ -1,5 +1,6 @@
 import type { ExtendedJSONSchema } from '../types/schema'
 
+/** 按实例注入的格式校验器，避免全局状态污染不同表单。 */
 type CustomFormats = Record<string, (value: string) => boolean>
 
 /**
@@ -59,6 +60,7 @@ export class SchemaValidator {
   }
 
   private isTypeValid(value: unknown, type: string | string[]): boolean {
+    // 显式检查 JSON Schema 类型，避免 JavaScript 隐式转换让错误类型通过。
     if (Array.isArray(type)) return type.some((item) => this.isTypeValid(value, item))
     switch (type) {
       case 'string': return typeof value === 'string'
@@ -73,6 +75,7 @@ export class SchemaValidator {
   }
 
   private stableValue(value: unknown): unknown {
+    // 排序对象 key 后再序列化，确保结构相同但插入顺序不同的值可正确比较。
     if (Array.isArray(value)) return value.map((item) => this.stableValue(item))
     if (value && typeof value === 'object') {
       return Object.keys(value as Record<string, unknown>).sort().reduce<Record<string, unknown>>(
@@ -84,6 +87,7 @@ export class SchemaValidator {
   }
 
   private deepEqual(left: unknown, right: unknown): boolean {
+    // const、enum 和 uniqueItems 比较的是值结构，而不是对象引用。
     return JSON.stringify(this.stableValue(left)) === JSON.stringify(this.stableValue(right))
   }
 
@@ -499,6 +503,7 @@ export class SchemaValidator {
       return errors
     }
 
+    // 先做类型检查，再执行 const/enum 及具体类型约束，避免产生误导性的后续错误。
     // 验证 const（常量值）
     if (schema.type && !this.isTypeValid(value, schema.type)) {
       errors[fieldName] = schema.type === 'integer'
@@ -663,7 +668,7 @@ export class SchemaValidator {
     parentSchema?: ExtendedJSONSchema
   }): void {
     const messages = schema.ui?.errorMessages || {}
-    // integer 类型不允许小数
+    // JSON Schema 的 integer 只接受数学整数，JavaScript number 中的小数必须拒绝。
     if (schema.type === 'integer' && !Number.isInteger(value)) {
       errors[fieldName] =
         `${this.getFieldTitle(fieldName, parentSchema)} must be an integer`
@@ -704,7 +709,7 @@ export class SchemaValidator {
         `${this.getFieldTitle(fieldName, parentSchema)} must be less than ${schema.exclusiveMaximum}`
     }
 
-    // 验证倍数
+    // 使用浮点容差判断倍数，避免二进制浮点运算导致合法值因精度误差被拒绝。
     if (
       schema.multipleOf !== undefined &&
       Math.abs(value / schema.multipleOf - Math.round(value / schema.multipleOf)) > 1e-10
@@ -748,7 +753,7 @@ export class SchemaValidator {
         `${this.getFieldTitle(fieldName, parentSchema)} allows at most ${schema.maxItems} items`
     }
 
-    // 验证唯一性
+    // 稳定序列化可识别结构相同但引用不同的数组元素。
     if (schema.uniqueItems) {
       const uniqueValues = new Set(value.map((v) => JSON.stringify(this.stableValue(v))))
       if (uniqueValues.size !== value.length) {
@@ -917,6 +922,7 @@ export class SchemaValidator {
     parentSchema?: ExtendedJSONSchema
     errorMessage?: string
   }): string | null {
+    // format 校验器沿 resolver 显式注入，确保提交时使用当前表单的配置。
     const customValidator = this.customFormats[format]
     if (customValidator && !customValidator(value)) {
       return (

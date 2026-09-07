@@ -5,6 +5,7 @@
 ## 专题指南
 
 - [字段路径指南](./field-path.md)：路径格式选择、数组路径、转换工具、完整示例和排障。
+- [SchemaBuilder 使用指南](./schema-builder.md)：可视化编辑 Schema、预览、导入导出和受限配置。
 
 ## Widget 指南
 

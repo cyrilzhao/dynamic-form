@@ -28,7 +28,13 @@ export const SchemaTree: React.FC = () => {
     onToggleExpand,
     onMoveUp,
     onMoveDown,
+    options,
   } = useSchemaBuilder()
+  const readonly = options?.readonly ?? {}
+  const hideTreeActions = readonly.all || readonly.schema || readonly.tree
+  const hideAdd = hideTreeActions || readonly.addFieldActions
+  const hideDelete = hideTreeActions || readonly.deleteFieldActions
+  const hideReorder = hideTreeActions || readonly.reorderFieldActions
 
   const handleNodeClick = (node: TreeNodeInfo<string[]>) => {
     const path = node.nodeData as string[]
@@ -76,14 +82,14 @@ export const SchemaTree: React.FC = () => {
 
       return (
         <Menu>
-          {canAddChild && (
+          {canAddChild && !hideAdd && (
             <MenuItem
               text="Add Child Node"
               icon="plus"
               onClick={() => onAddChild(path, 'string')}
             />
           )}
-          {canAddSibling && (
+          {canAddSibling && !hideAdd && (
             <MenuItem
               text="Add Sibling Node"
               icon="new-object"
@@ -93,7 +99,7 @@ export const SchemaTree: React.FC = () => {
 
           {(canAddChild || canAddSibling || canMove) && <MenuDivider />}
 
-          {canMove && (
+          {canMove && !hideReorder && (
             <>
               <MenuItem
                 text="Move Up"
@@ -110,7 +116,7 @@ export const SchemaTree: React.FC = () => {
 
           {canMove && canDelete && <MenuDivider />}
 
-          {canDelete && (
+          {canDelete && !hideDelete && (
             <MenuItem
               text="Delete Node"
               icon="trash"
