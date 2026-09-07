@@ -245,10 +245,15 @@ export const PropertyEditor: React.FC = () => {
   // Determine if it's an array items node
   const parentPath = selectedPath.slice(0, -1)
   const parentNode = getNode(schema, parentPath)
-  const isArrayItems =
+  const isItemsSchemaNode =
     selectedPath.length > 0 &&
     selectedPath[selectedPath.length - 1] === 'items' &&
     parentNode?.type === 'array'
+
+  // `items` 是数组元素本身的 schema，而不是只读的结构占位符。元素的
+  // 标题、约束和 UI 配置都会被 DynamicForm 用来渲染每一个数组成员，因
+  // 此不能再把整个 items 节点锁定；数组容器级配置仍然只在外层 array
+  // 节点展示，避免把“添加/删除/排序”误应用到单个元素。
 
   // Determine if it's a schema-level node (only root)
   // 只有根节点应该只显示条件验证配置
@@ -328,7 +333,6 @@ export const PropertyEditor: React.FC = () => {
       return (
         <Switch
           checked={!!field.value}
-          disabled={isArrayItems}
           onChange={(e) => {
             field.onChange(e.currentTarget.checked)
             handleFieldChange('default', e.currentTarget.checked)
@@ -344,7 +348,6 @@ export const PropertyEditor: React.FC = () => {
           className="bp6-input"
           style={{ width: '100%' }}
           defaultValue={field.value ?? ''}
-          disabled={isArrayItems}
           onKeyDown={(e) => {
             if (
               ![
@@ -377,7 +380,6 @@ export const PropertyEditor: React.FC = () => {
           className="bp6-input"
           style={{ width: '100%' }}
           defaultValue={field.value ?? ''}
-          disabled={isArrayItems}
           onKeyDown={(e) => {
             if (e.key === '.' && e.currentTarget.value.includes('.')) {
               e.preventDefault()
@@ -411,7 +413,6 @@ export const PropertyEditor: React.FC = () => {
       <InputGroup
         {...field}
         value={field.value || ''}
-        disabled={isArrayItems}
         onChange={(e) => {
           field.onChange(e)
           handleFieldChange('default', e.target.value)
@@ -454,7 +455,24 @@ export const PropertyEditor: React.FC = () => {
       value: widget,
     }),
   )
-  const showWidgetConfig = currentWidgetOptions.length > 0
+  // 保存当前 schema 中已经配置的 widget 名称，用于回显自定义 widget，
+  // 即使它不在 SchemaBuilder 的内置 widget 列表中也不能丢失。
+  const configuredWidget = currentNode.ui?.widget
+  // 数组 items 允许调用方使用注册在 DynamicForm.widgets 中的任意名称，
+  // 因此即使元素类型没有内置候选项，也必须显示 widget 编辑入口。
+  const hasConfiguredCustomWidget =
+    !!configuredWidget &&
+    !currentWidgetOptions.some((option) => option.value === configuredWidget)
+  const widgetOptionsWithConfiguredValue = hasConfiguredCustomWidget
+    ? [
+        {
+          label: `Custom (${configuredWidget})`,
+          value: configuredWidget,
+        },
+        ...currentWidgetOptions,
+      ]
+    : currentWidgetOptions
+  const showWidgetConfig = currentWidgetOptions.length > 0 || isItemsSchemaNode
   const defaultWidget = getDefaultWidget(currentNode)
   const editorReadonly =
     options?.readonly?.all ||
@@ -608,7 +626,6 @@ export const PropertyEditor: React.FC = () => {
                     render={({ field }) => (
                       <InputGroup
                         {...field}
-                        // disabled={isArrayItems}
                         onChange={(e) => {
                           field.onChange(e)
                           handleFieldChange('title', e.target.value)
@@ -627,7 +644,6 @@ export const PropertyEditor: React.FC = () => {
                         <TextArea
                           {...field}
                           fill
-                          disabled={isArrayItems}
                           onChange={(e) => {
                             field.onChange(e)
                             handleFieldChange('description', e.target.value)
@@ -680,7 +696,6 @@ export const PropertyEditor: React.FC = () => {
                           : get(schema, parentPath)
                       return parentNode?.required?.includes(currentKey) || false
                     })()}
-                    disabled={isArrayItems}
                     onChange={(e) => {
                       const isRequired = e.currentTarget.checked
                       const parentPath = selectedPath.slice(0, -2)
@@ -807,7 +822,6 @@ export const PropertyEditor: React.FC = () => {
                                 <div style={{ flex: 1 }}>
                                   <InputGroup
                                     value={String(value)}
-                                    disabled={isArrayItems}
                                     onChange={(e) =>
                                       handleUpdateValue(index, e.target.value)
                                     }
@@ -818,7 +832,6 @@ export const PropertyEditor: React.FC = () => {
                                   <InputGroup
                                     placeholder="Display text"
                                     value={enumNames[index] || ''}
-                                    disabled={isArrayItems}
                                     onChange={(e) =>
                                       handleUpdateLabel(index, e.target.value)
                                     }
@@ -829,7 +842,6 @@ export const PropertyEditor: React.FC = () => {
                                   icon="cross"
                                   minimal
                                   small
-                                  disabled={isArrayItems}
                                   onClick={() => handleRemoveOption(index)}
                                 />
                               </div>
@@ -838,7 +850,6 @@ export const PropertyEditor: React.FC = () => {
                               icon="add"
                               text="Add Option"
                               minimal
-                              disabled={isArrayItems}
                               onClick={handleAddOption}
                             />
                           </div>
@@ -1187,7 +1198,6 @@ export const PropertyEditor: React.FC = () => {
                               onValueChange={(v) =>
                                 handleFieldChange('minProperties', v)
                               }
-                              disabled={isArrayItems}
                             />
                           )}
                         />
@@ -1203,7 +1213,6 @@ export const PropertyEditor: React.FC = () => {
                               onValueChange={(v) =>
                                 handleFieldChange('maxProperties', v)
                               }
-                              disabled={isArrayItems}
                             />
                           )}
                         />
@@ -1237,7 +1246,6 @@ export const PropertyEditor: React.FC = () => {
                               {...field}
                               value={field.value ?? ''}
                               placeholder="This field is required"
-                              disabled={isArrayItems}
                               onChange={(e) => {
                                 field.onChange(e)
                                 handleUIChange('errorMessages', {
@@ -1260,7 +1268,6 @@ export const PropertyEditor: React.FC = () => {
                       onChange={(validators) =>
                         handleUIChange('validators', validators)
                       }
-                      disabled={isArrayItems}
                     />
                   </ConfigSection>
                 </div>
@@ -1306,12 +1313,21 @@ export const PropertyEditor: React.FC = () => {
                                   label: `Default (${defaultWidget})`,
                                   value: '',
                                 },
-                                ...currentWidgetOptions,
+                                ...widgetOptionsWithConfiguredValue,
                               ]}
-                              disabled={isArrayItems}
                             />
                           )}
                         />
+                        {isItemsSchemaNode && (
+                          <InputGroup
+                            placeholder="Custom widget name"
+                            value={configuredWidget ?? ''}
+                            onChange={(event) =>
+                              handleUIChange('widget', event.target.value)
+                            }
+                            style={{ marginTop: 8 }}
+                          />
+                        )}
                       </FormGroup>
                     )}
 
@@ -1332,7 +1348,6 @@ export const PropertyEditor: React.FC = () => {
                         <ObjectEditor
                           value={currentNode.ui?.widgetProps}
                           onChange={(val) => handleUIChange('widgetProps', val)}
-                          disabled={isArrayItems}
                         />
                       </FormGroup>
                     )}
@@ -1364,7 +1379,6 @@ export const PropertyEditor: React.FC = () => {
                           onChange={(val) =>
                             handleUIChange('callbackProps', val)
                           }
-                          disabled={isArrayItems}
                         />
                       </FormGroup>
                     )}
@@ -1391,7 +1405,6 @@ export const PropertyEditor: React.FC = () => {
                             onChange={(e) =>
                               handleUIChange('placeholder', e.target.value)
                             }
-                            disabled={isArrayItems}
                           />
                         )}
                       />
@@ -1414,7 +1427,6 @@ export const PropertyEditor: React.FC = () => {
                           helperText="Configure display labels for boolean values (used with radio/checkbox widget)"
                         >
                           {(() => {
-                            const enumValues = currentNode.enum || []
                             const enumNames = currentNode.enumNames || []
                             const displayEnum = [true, false]
 
@@ -1497,7 +1509,6 @@ export const PropertyEditor: React.FC = () => {
                                         <InputGroup
                                           placeholder={value ? 'Yes' : 'No'}
                                           value={enumNames[index] || ''}
-                                          disabled={isArrayItems}
                                           onChange={(e) =>
                                             handleUpdateLabel(
                                               index,
@@ -1542,7 +1553,6 @@ export const PropertyEditor: React.FC = () => {
                           onChange={(e) =>
                             handleUIChange('hidden', e.currentTarget.checked)
                           }
-                          disabled={isArrayItems}
                         />
                       )}
                     />
@@ -1567,7 +1577,6 @@ export const PropertyEditor: React.FC = () => {
                           onChange={(e) =>
                             handleUIChange('disabled', e.currentTarget.checked)
                           }
-                          disabled={isArrayItems}
                         />
                       )}
                     />
@@ -1592,7 +1601,6 @@ export const PropertyEditor: React.FC = () => {
                           onChange={(e) =>
                             handleUIChange('readonly', e.currentTarget.checked)
                           }
-                          disabled={isArrayItems}
                         />
                       )}
                     />
@@ -1630,7 +1638,6 @@ export const PropertyEditor: React.FC = () => {
                               { label: 'horizontal', value: 'horizontal' },
                               { label: 'inline', value: 'inline' },
                             ]}
-                            disabled={isArrayItems}
                           />
                         )}
                       />
@@ -1658,7 +1665,6 @@ export const PropertyEditor: React.FC = () => {
                             onChange={(e) =>
                               handleUIChange('labelWidth', e.target.value)
                             }
-                            disabled={isArrayItems}
                           />
                         )}
                       />
@@ -1689,7 +1695,6 @@ export const PropertyEditor: React.FC = () => {
                             }
                             min={1}
                             max={12}
-                            disabled={isArrayItems}
                             fill
                           />
                         )}
@@ -1725,7 +1730,6 @@ export const PropertyEditor: React.FC = () => {
                                 e.currentTarget.checked,
                               )
                             }
-                            disabled={isArrayItems}
                           />
                         )}
                       />
@@ -1753,14 +1757,13 @@ export const PropertyEditor: React.FC = () => {
                                 e.currentTarget.checked,
                               )
                             }
-                            disabled={isArrayItems}
                           />
                         )}
                       />
                     </ConfigSection>
                   )}
 
-                  {currentType === 'array' && (
+                  {currentType === 'array' && !isItemsSchemaNode && (
                     <ConfigSection
                       title="Array Behavior"
                       description="Choose how repeated values are edited and how add actions are labeled."
@@ -2037,7 +2040,6 @@ export const PropertyEditor: React.FC = () => {
                         onChange={(transform) =>
                           handleUIChange('transform', transform)
                         }
-                        disabled={isArrayItems}
                       />
                     </FormGroup>
                   </ConfigSection>
@@ -2057,13 +2059,12 @@ export const PropertyEditor: React.FC = () => {
                   onChange={(linkages) => handleUIChange('linkages', linkages)}
                   currentFieldPath={currentFieldPath}
                   schema={schema}
-                  disabled={isArrayItems}
                 />
               </div>
             }
           />
 
-          {!options?.hidden?.variantsTab && !isArrayItems && (
+          {!options?.hidden?.variantsTab && (
             <Tab
               id="variants"
               title="Variants"
@@ -2093,7 +2094,6 @@ export const PropertyEditor: React.FC = () => {
                           },
                         })
                       }}
-                      disabled={isArrayItems}
                     />
                   </ConfigSection>
                 </div>
