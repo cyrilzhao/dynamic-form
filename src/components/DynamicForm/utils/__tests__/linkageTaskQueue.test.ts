@@ -29,6 +29,18 @@ describe("LinkageTaskQueue", () => {
       const status = queue.getStatus();
       expect(status.queueLength).toBe(2);
     });
+
+    it("合并任务时返回被替换的旧任务", () => {
+      const firstBatch = { batchId: 1, runId: 11 };
+      const secondBatch = { batchId: 2, runId: 22 };
+
+      queue.enqueue("field1", ["field2"], undefined, firstBatch);
+      const replaced = queue.enqueue("field1", ["field3"], undefined, secondBatch);
+
+      expect(replaced?.changeBatchId).toBe(1);
+      expect(replaced?.changeBatchRunId).toBe(11);
+      expect(queue.dequeue()?.changeBatchId).toBe(2);
+    });
   });
 
   describe("dequeue", () => {

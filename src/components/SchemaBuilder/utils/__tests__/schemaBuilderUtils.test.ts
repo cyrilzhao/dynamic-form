@@ -4,6 +4,7 @@ import {
   generateRandomKey,
   parseJsonPointer,
   validatePath,
+  normalizeSchemaNumericValues,
 } from "../schemaBuilderUtils";
 
 describe("schemaBuilderUtils", () => {
@@ -36,5 +37,47 @@ describe("schemaBuilderUtils", () => {
 
   it("生成不重复的字段 key", () => {
     expect(generateRandomKey({})).toMatch(/^field_[a-z]{4}$/);
+  });
+
+  it("将所有 JSON Schema 数字关键字规范化为 number", () => {
+    const schema = normalizeSchemaNumericValues({
+      type: "object",
+      minLength: "2",
+      maxLength: "10",
+      minimum: "0.5",
+      maximum: "9",
+      exclusiveMinimum: "1",
+      exclusiveMaximum: "8",
+      multipleOf: "0.5",
+      minItems: "1",
+      maxItems: "5",
+      minProperties: "2",
+      maxProperties: "6",
+      minContains: "1",
+      maxContains: "4",
+      properties: {
+        nested: { type: "string", minLength: "3" },
+      },
+      if: { properties: { age: { minimum: "18" } } },
+    } as any);
+
+    expect(schema).toMatchObject({
+      minLength: 2,
+      maxLength: 10,
+      minimum: 0.5,
+      maximum: 9,
+      exclusiveMinimum: 1,
+      exclusiveMaximum: 8,
+      multipleOf: 0.5,
+      minItems: 1,
+      maxItems: 5,
+      minProperties: 2,
+      maxProperties: 6,
+      minContains: 1,
+      maxContains: 4,
+      properties: { nested: { minLength: 3 } },
+      if: { properties: { age: { minimum: 18 } } },
+    });
+    expect(typeof schema.minimum).toBe("number");
   });
 });

@@ -5,8 +5,8 @@ import React, {
   useRef,
   useEffect,
   useCallback,
-} from "react";
-import { useFormContext, useFieldArray, Controller } from "react-hook-form";
+} from 'react'
+import { useFormContext, useFieldArray, Controller } from 'react-hook-form'
 import {
   Button,
   Card,
@@ -14,43 +14,44 @@ import {
   Checkbox,
   Popover,
   PopoverInteractionKind,
-} from "@blueprintjs/core";
-import { Virtuoso } from "react-virtuoso";
-import type { FieldWidgetProps } from "../types";
-import type { ExtendedJSONSchema } from "../types/schema";
-import { FieldRegistry } from "../core/FieldRegistry";
-import { SchemaParser } from "../core/SchemaParser";
+} from '@blueprintjs/core'
+import { Virtuoso } from 'react-virtuoso'
+import type { FieldWidgetProps } from '../types'
+import type { ExtendedJSONSchema } from '../types/schema'
+import { FieldRegistry } from '../core/FieldRegistry'
+import { SchemaParser } from '../core/SchemaParser'
+import { recordArrayAction } from '../utils/arrayActionRegistry'
 
 export interface ArrayFieldWidgetProps extends FieldWidgetProps {
   schema: ExtendedJSONSchema & {
-    type: "array";
-    items: ExtendedJSONSchema;
-    minItems?: number;
-    maxItems?: number;
-    uniqueItems?: boolean;
-  };
-  value?: any[];
-  onChange?: (value: any[]) => void;
-  disabled?: boolean;
-  readonly?: boolean;
-  layout?: "vertical" | "horizontal" | "inline";
-  labelWidth?: number | string;
+    type: 'array'
+    items: ExtendedJSONSchema
+    minItems?: number
+    maxItems?: number
+    uniqueItems?: boolean
+  }
+  value?: any[]
+  onChange?: (value: any[]) => void
+  disabled?: boolean
+  readonly?: boolean
+  layout?: 'vertical' | 'horizontal' | 'inline'
+  labelWidth?: number | string
   /**
    * 是否启用虚拟滚动
    * 当数组项数量较多时（建议 > 20），启用虚拟滚动可以显著提升性能
    */
-  enableVirtualScroll?: boolean;
+  enableVirtualScroll?: boolean
   /**
    * 虚拟滚动容器高度（像素）
    * 默认值：600
    */
-  virtualScrollHeight?: number;
+  virtualScrollHeight?: number
   /** 是否允许新增数组元素，默认 true */
-  canAdd?: boolean;
+  canAdd?: boolean
   /** 是否允许删除数组元素，默认 true */
-  canRemove?: boolean;
+  canRemove?: boolean
   /** 是否允许调整数组元素顺序，默认 true */
-  canReorder?: boolean;
+  canReorder?: boolean
 }
 
 /**
@@ -59,106 +60,106 @@ export interface ArrayFieldWidgetProps extends FieldWidgetProps {
 function determineItemWidget(itemsSchema: ExtendedJSONSchema): string {
   // 优先级 1: 显式指定了 widget
   if (itemsSchema.ui?.widget) {
-    return itemsSchema.ui.widget;
+    return itemsSchema.ui.widget
   }
 
   // 优先级 2: 对象类型 → 嵌套表单
-  if (itemsSchema.type === "object") {
-    return "nested-form";
+  if (itemsSchema.type === 'object') {
+    return 'nested-form'
   }
 
   // 优先级 3: 基本类型 → 对应的基础 widget
   switch (itemsSchema.type) {
-    case "string":
+    case 'string':
       // 根据 format 进一步判断
-      if (itemsSchema.format === "email") {
-        return "email";
+      if (itemsSchema.format === 'email') {
+        return 'email'
       }
-      if (itemsSchema.format === "uri") {
-        return "url";
+      if (itemsSchema.format === 'uri') {
+        return 'url'
       }
-      if (itemsSchema.format === "date") {
-        return "date";
+      if (itemsSchema.format === 'date') {
+        return 'date'
       }
-      if (itemsSchema.format === "date-time") {
-        return "datetime";
+      if (itemsSchema.format === 'date-time') {
+        return 'datetime'
       }
-      if (itemsSchema.format === "time") {
-        return "time";
+      if (itemsSchema.format === 'time') {
+        return 'time'
       }
-      return "text";
+      return 'text'
 
-    case "number":
-    case "integer":
-      return "number";
+    case 'number':
+    case 'integer':
+      return 'number'
 
-    case "boolean":
-      return "checkbox";
+    case 'boolean':
+      return 'checkbox'
 
     default:
-      return "text";
+      return 'text'
   }
 }
 
 /**
  * 判断应该使用哪种渲染模式
  */
-function determineArrayMode(schema: ExtendedJSONSchema): "static" | "dynamic" {
+function determineArrayMode(schema: ExtendedJSONSchema): 'static' | 'dynamic' {
   // 1. 显式指定了 arrayMode
   if (schema.ui?.arrayMode) {
-    return schema.ui.arrayMode;
+    return schema.ui.arrayMode
   }
 
   // 2. 如果 items 有 enum，默认使用 static 模式（多选框组，不可增删）
-  if (schema.items && typeof schema.items === "object") {
-    const items = schema.items as ExtendedJSONSchema;
+  if (schema.items && typeof schema.items === 'object') {
+    const items = schema.items as ExtendedJSONSchema
     if (items.enum && items.enum.length > 0) {
-      return "static";
+      return 'static'
     }
   }
 
   // 3. 默认使用 dynamic 模式（可增删的列表）
-  return "dynamic";
+  return 'dynamic'
 }
 
 /**
  * 判断是否为基本类型（需要包装的类型）
  */
 function isPrimitiveType(schema: ExtendedJSONSchema): boolean {
-  const type = schema.type;
+  const type = schema.type
   return (
-    type === "string" ||
-    type === "number" ||
-    type === "integer" ||
-    type === "boolean"
-  );
+    type === 'string' ||
+    type === 'number' ||
+    type === 'integer' ||
+    type === 'boolean'
+  )
 }
 
 /**
  * 获取基本类型的默认值
  */
 function generateUUID(): string {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = (Math.random() * 16) | 0,
-      v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
+      v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
 }
 
 function getDefaultPrimitiveValue(schema: ExtendedJSONSchema): any {
-  if (schema.ui?.autogenerate === "uuid") {
-    return generateUUID();
+  if (schema.ui?.autogenerate === 'uuid') {
+    return generateUUID()
   }
   switch (schema.type) {
-    case "string":
-      return "";
-    case "number":
-    case "integer":
-      return 0;
-    case "boolean":
-      return false;
+    case 'string':
+      return ''
+    case 'number':
+    case 'integer':
+      return 0
+    case 'boolean':
+      return false
     default:
-      return null;
+      return null
   }
 }
 
@@ -172,47 +173,47 @@ function getDefaultValue(itemsSchema: ExtendedJSONSchema): any {
     const defaultVal =
       itemsSchema.default !== undefined
         ? itemsSchema.default
-        : getDefaultPrimitiveValue(itemsSchema);
-    return { value: defaultVal };
+        : getDefaultPrimitiveValue(itemsSchema)
+    return { value: defaultVal }
   }
 
   // 对象类型，正常处理
   if (itemsSchema.default !== undefined) {
-    return itemsSchema.default;
+    return itemsSchema.default
   }
 
-  if (itemsSchema.type === "object") {
+  if (itemsSchema.type === 'object') {
     // 为对象类型生成默认值
     if (itemsSchema.properties) {
-      const defaultObj: any = {};
+      const defaultObj: any = {}
       Object.entries(itemsSchema.properties).forEach(([key, propSchema]) => {
-        const prop = propSchema as ExtendedJSONSchema;
-        if (prop.ui?.autogenerate === "uuid") {
-          defaultObj[key] = generateUUID();
+        const prop = propSchema as ExtendedJSONSchema
+        if (prop.ui?.autogenerate === 'uuid') {
+          defaultObj[key] = generateUUID()
         } else if (prop.default !== undefined) {
-          defaultObj[key] = prop.default;
-        } else if (prop.type === "string") {
-          defaultObj[key] = "";
-        } else if (prop.type === "number" || prop.type === "integer") {
-          defaultObj[key] = 0;
-        } else if (prop.type === "boolean") {
-          defaultObj[key] = false;
-        } else if (prop.type === "array") {
-          defaultObj[key] = [];
-        } else if (prop.type === "object") {
-          defaultObj[key] = {};
+          defaultObj[key] = prop.default
+        } else if (prop.type === 'string') {
+          defaultObj[key] = ''
+        } else if (prop.type === 'number' || prop.type === 'integer') {
+          defaultObj[key] = 0
+        } else if (prop.type === 'boolean') {
+          defaultObj[key] = false
+        } else if (prop.type === 'array') {
+          defaultObj[key] = []
+        } else if (prop.type === 'object') {
+          defaultObj[key] = {}
         }
-      });
-      return defaultObj;
+      })
+      return defaultObj
     }
-    return {};
+    return {}
   }
 
-  if (itemsSchema.type === "array") {
-    return [];
+  if (itemsSchema.type === 'array') {
+    return []
   }
 
-  return null;
+  return null
 }
 
 export const ArrayFieldWidget = forwardRef<
@@ -235,57 +236,57 @@ export const ArrayFieldWidget = forwardRef<
     },
     ref,
   ) => {
-    const { control, formState, unregister } = useFormContext();
+    const { control, formState, unregister, getValues } = useFormContext()
 
     // 获取数组项的 schema，用 boolean flag 记录有效性，避免在 hooks 之前 return
-    const itemSchema = schema.items as ExtendedJSONSchema;
-    const isValidItemSchema = !!itemSchema && typeof itemSchema === "object";
+    const itemSchema = schema.items as ExtendedJSONSchema
+    const isValidItemSchema = !!itemSchema && typeof itemSchema === 'object'
 
     // 判断渲染模式
-    const arrayMode = useMemo(() => determineArrayMode(schema), [schema]);
+    const arrayMode = useMemo(() => determineArrayMode(schema), [schema])
 
     // 所有 hooks 必须在任何条件 return 之前调用
     const { fields, append, remove, move } = useFieldArray({
       control,
       name,
-    });
+    })
 
     // 当切换到 static 模式时，取消 useFieldArray 的注册
     useEffect(() => {
       if (!isValidItemSchema) {
-        return;
+        return
       }
-      if (arrayMode === "static" && itemSchema.enum) {
+      if (arrayMode === 'static' && itemSchema.enum) {
         // 取消 useFieldArray 注册的字段
-        unregister(name);
+        unregister(name)
       }
-    }, [isValidItemSchema, arrayMode, itemSchema, name, unregister]);
+    }, [isValidItemSchema, arrayMode, itemSchema, name, unregister])
 
     // Virtuoso ref，用于控制滚动
-    const virtuosoRef = useRef<any>(null);
+    const virtuosoRef = useRef<any>(null)
 
     // 显式订阅 formState 的属性，确保能追踪到变化
-    const { errors, isValidating, isValid } = formState;
+    const { errors, isValidating, isValid } = formState
 
     // 监听表单错误，自动滚动到第一个错误的数组项
     // 使用 isValidating 和 isValid 作为触发器，确保在验证完成后触发滚动
     useEffect(() => {
       // 只在验证完成后（isValidating 为 false）且验证失败（isValid 为 false）时触发
       if (isValidating || isValid) {
-        return;
+        return
       }
 
       if (!errors) {
-        return;
+        return
       }
 
       // 查找第一个有错误的数组项索引
-      const arrayErrors = errors[name] as any;
+      const arrayErrors = errors[name] as any
 
       if (arrayErrors && Array.isArray(arrayErrors)) {
         const firstErrorIndex = arrayErrors.findIndex(
           (error: any) => error !== undefined,
-        );
+        )
 
         if (firstErrorIndex !== -1) {
           // 使用 setTimeout 确保 DOM 已更新
@@ -294,75 +295,142 @@ export const ArrayFieldWidget = forwardRef<
               // 虚拟滚动模式：使用 Virtuoso 的 scrollToIndex
               virtuosoRef.current.scrollToIndex({
                 index: firstErrorIndex,
-                align: "center",
-                behavior: "smooth",
-              });
+                align: 'center',
+                behavior: 'smooth',
+              })
             } else {
               // 普通渲染模式：使用 DOM 元素的 scrollIntoView
               const errorElement = document.querySelector(
                 `[data-array-item-name="${name}.${firstErrorIndex}"]`,
-              );
+              )
               if (errorElement) {
                 errorElement.scrollIntoView({
-                  behavior: "smooth",
-                  block: "center",
-                });
+                  behavior: 'smooth',
+                  block: 'center',
+                })
               }
             }
-          }, 100);
+          }, 100)
         }
       }
-    }, [isValidating, isValid, errors, name, enableVirtualScroll]);
+    }, [isValidating, isValid, errors, name, enableVirtualScroll])
 
     // 从 schema.ui 中获取配置
-    const addButtonText = schema.ui?.addButtonText || "Add";
-    const emptyText = schema.ui?.emptyText;
-    const minItems = schema.minItems || 0;
-    const maxItems = schema.maxItems;
+    const addButtonText = schema.ui?.addButtonText || 'Add'
+    const emptyText = schema.ui?.emptyText
+    const minItems = schema.minItems || 0
+    const maxItems = schema.maxItems
 
     // 动态数组的操作权限：disabled、readonly 和 static 模式始终优先禁止操作。
-    const canModifyItems = !disabled && !readonly && arrayMode === "dynamic";
-    const canAppendItems = canModifyItems && canAdd;
-    const canDeleteItems = canModifyItems && canRemove;
-    const canMoveItems = canModifyItems && canReorder;
+    const canModifyItems = !disabled && !readonly && arrayMode === 'dynamic'
+    const canAppendItems = canModifyItems && canAdd
+    const canDeleteItems = canModifyItems && canRemove
+    const canMoveItems = canModifyItems && canReorder
+
+    // 基本类型数组在 RHF 内部以 { value } 包装元素，以便 Controller 注册叶子路径；
+    // arrayAction 属于公共事件元数据，必须回到外部存储域，不能把内部包装对象暴露给消费者。
+    const getArrayActionValue = useCallback((item: unknown): unknown => {
+      if (
+        item &&
+        typeof item === 'object' &&
+        !Array.isArray(item) &&
+        'value' in item
+      ) {
+        return (item as { value: unknown }).value
+      }
+      return item
+    }, [])
 
     // ✅ 使用 useCallback 缓存回调函数，避免每次渲染都创建新函数
     // 添加新项
     const handleAdd = useCallback(() => {
-      const defaultValue = getDefaultValue(itemSchema);
-      append(defaultValue);
-    }, [itemSchema, append]);
+      const defaultValue = getDefaultValue(itemSchema)
+      const currentItems = getValues(name)
+      const insertIndex = Array.isArray(currentItems)
+        ? currentItems.length
+        : fields.length
+      recordArrayAction(control, name, {
+        action: 'insert',
+        index: insertIndex,
+        value:
+          defaultValue &&
+          typeof defaultValue === 'object' &&
+          'value' in defaultValue
+            ? defaultValue.value
+            : defaultValue,
+      })
+      append(defaultValue)
+    }, [itemSchema, append, control, name, fields.length, getValues])
 
     // 删除项
     const handleRemove = useCallback(
       (index: number) => {
         // 删除项时不触发验证
-        remove(index);
+        recordArrayAction(control, name, {
+          action: 'remove',
+          index,
+          value: getArrayActionValue(
+            Array.isArray(getValues(name))
+              ? getValues(name)[index]
+              : fields[index],
+          ),
+        })
+        remove(index)
       },
-      [remove],
-    );
+      [remove, control, name, fields, getValues],
+    )
 
     // 上移
     const handleMoveUp = useCallback(
       (index: number) => {
         if (index > 0) {
-          // 移动项时不触发验证
-          move(index, index - 1);
+          // 先记录操作前索引和值，再执行 move；registry 会用这两个位置校验 RHF
+          // 后续快照，防止连续移动或延迟通知误消费上一条动作。
+          recordArrayAction(control, name, {
+            action: 'move',
+            fromIndex: index,
+            toIndex: index - 1,
+            value: getArrayActionValue(
+              Array.isArray(getValues(name))
+                ? getValues(name)[index]
+                : fields[index],
+            ),
+          })
+          move(index, index - 1)
         }
       },
-      [move],
-    );
+      [move, control, name, fields, getValues, getArrayActionValue],
+    )
 
     // 下移
     const handleMoveDown = useCallback(
       (index: number) => {
         if (index < fields.length - 1) {
-          // 移动项时不触发验证
-          move(index, index + 1);
+          // 先记录操作前索引和值，再执行 move；value 已通过 getArrayActionValue
+          // 解包为外部值域，避免基本类型数组的内部 { value } 结构泄露到公共 meta。
+          recordArrayAction(control, name, {
+            action: 'move',
+            fromIndex: index,
+            toIndex: index + 1,
+            value: getArrayActionValue(
+              Array.isArray(getValues(name))
+                ? getValues(name)[index]
+                : fields[index],
+            ),
+          })
+          move(index, index + 1)
         }
       },
-      [move, fields.length],
-    );
+      [
+        move,
+        fields.length,
+        control,
+        name,
+        fields,
+        getValues,
+        getArrayActionValue,
+      ],
+    )
 
     // ✅ 使用 useMemo 缓存所有 statusMap，避免每次渲染都创建新对象
     const statusMaps = useMemo(() => {
@@ -370,8 +438,8 @@ export const ArrayFieldWidget = forwardRef<
         isAtMinLimit: fields.length <= minItems,
         isFirstItem: index === 0,
         isLastItem: index === fields.length - 1,
-      }));
-    }, [fields, minItems]);
+      }))
+    }, [fields, minItems])
 
     // ✅ 使用 useCallback 缓存虚拟滚动的 itemContent 回调
     const renderItem = useCallback(
@@ -405,18 +473,18 @@ export const ArrayFieldWidget = forwardRef<
         layout,
         labelWidth,
       ],
-    );
+    )
 
     // 所有 hooks 调用完毕，现在可以安全地进行条件 return
     if (!isValidItemSchema) {
       console.warn(
         `ArrayFieldWidget: schema.items is required for array field "${name}"`,
-      );
-      return null;
+      )
+      return null
     }
 
     // 如果是 static 模式（枚举数组），渲染为多选框组
-    if (arrayMode === "static") {
+    if (arrayMode === 'static') {
       // 如果没有配置 enum，显示提示信息
       if (!itemSchema.enum || itemSchema.enum.length === 0) {
         return (
@@ -425,12 +493,12 @@ export const ArrayFieldWidget = forwardRef<
             className="array-field-widget array-field-widget--static"
           >
             <div
-              style={{ padding: "10px", color: "#999", fontStyle: "italic" }}
+              style={{ padding: '10px', color: '#999', fontStyle: 'italic' }}
             >
               No options configured. Please add options in the schema editor.
             </div>
           </div>
-        );
+        )
       }
 
       return (
@@ -443,23 +511,21 @@ export const ArrayFieldWidget = forwardRef<
             control={control}
             defaultValue={[]}
             render={({ field }) => {
-              const currentValue = Array.isArray(field.value)
-                ? field.value
-                : [];
-              const enumValues = itemSchema.enum || [];
-              const enumNames = itemSchema.enumNames || enumValues;
+              const currentValue = Array.isArray(field.value) ? field.value : []
+              const enumValues = itemSchema.enum || []
+              const enumNames = itemSchema.enumNames || enumValues
 
               return (
                 <div className="checkbox-group">
                   {enumValues.map((enumValue, index) => {
                     // 处理对象包装格式 { value: xxx }
                     const isChecked = currentValue.some((item: any) => {
-                      if (item && typeof item === "object" && "value" in item) {
-                        return item.value === enumValue;
+                      if (item && typeof item === 'object' && 'value' in item) {
+                        return item.value === enumValue
                       }
-                      return item === enumValue;
-                    });
-                    const label = String(enumNames[index] || enumValue);
+                      return item === enumValue
+                    })
+                    const label = String(enumNames[index] || enumValue)
 
                     return (
                       <Checkbox
@@ -468,32 +534,32 @@ export const ArrayFieldWidget = forwardRef<
                         checked={isChecked}
                         disabled={disabled || readonly}
                         onChange={(e) => {
-                          const checked = e.currentTarget.checked;
-                          let newValue: any[];
+                          const checked = e.currentTarget.checked
+                          let newValue: any[]
 
                           if (checked) {
                             // 添加选项
-                            newValue = [...currentValue, enumValue];
+                            newValue = [...currentValue, enumValue]
                           } else {
                             // 移除选项
                             newValue = currentValue.filter(
                               (v: any) => v !== enumValue,
-                            );
+                            )
                           }
 
                           // 直接设置数组值
-                          field.onChange(newValue);
+                          field.onChange(newValue)
                         }}
-                        style={{ marginBottom: "8px" }}
+                        style={{ marginBottom: '8px' }}
                       />
-                    );
+                    )
                   })}
                 </div>
-              );
+              )
             }}
           />
         </div>
-      );
+      )
     }
 
     // dynamic 模式：可增删的列表
@@ -532,7 +598,7 @@ export const ArrayFieldWidget = forwardRef<
         {fields.length === 0 && emptyText && (
           <div
             className="array-empty-text"
-            style={{ color: "#999", padding: "10px", textAlign: "center" }}
+            style={{ color: '#999', padding: '10px', textAlign: 'center' }}
           >
             {emptyText}
           </div>
@@ -544,7 +610,7 @@ export const ArrayFieldWidget = forwardRef<
             content={
               maxItems && fields.length >= maxItems
                 ? `Maximum of ${maxItems} items allowed`
-                : ""
+                : ''
             }
             disabled={!maxItems || fields.length < maxItems}
           >
@@ -553,26 +619,26 @@ export const ArrayFieldWidget = forwardRef<
               intent="primary"
               onClick={handleAdd}
               disabled={maxItems !== undefined && fields.length >= maxItems}
-              style={{ marginTop: fields.length > 0 ? "10px" : "0" }}
+              style={{ marginTop: fields.length > 0 ? '10px' : '0' }}
             >
               {addButtonText}
             </Button>
           </Tooltip>
         )}
       </div>
-    );
+    )
   },
-);
+)
 
-ArrayFieldWidget.displayName = "ArrayFieldWidget";
+ArrayFieldWidget.displayName = 'ArrayFieldWidget'
 
 /**
  * 删除确认 Popover 内容组件
  */
 interface DeleteConfirmPopoverProps {
-  onConfirm: () => void;
-  onCancel: () => void;
-  itemIndex: number;
+  onConfirm: () => void
+  onCancel: () => void
+  itemIndex: number
 }
 
 const DeleteConfirmPopover: React.FC<DeleteConfirmPopoverProps> = ({
@@ -581,11 +647,11 @@ const DeleteConfirmPopover: React.FC<DeleteConfirmPopoverProps> = ({
   itemIndex,
 }) => {
   return (
-    <div style={{ padding: "10px", maxWidth: "250px" }}>
-      <div style={{ marginBottom: "10px", fontSize: "14px" }}>
+    <div style={{ padding: '10px', maxWidth: '250px' }}>
+      <div style={{ marginBottom: '10px', fontSize: '14px' }}>
         Delete item {itemIndex + 1}?
       </div>
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
         <Button small onClick={onCancel}>
           Cancel
         </Button>
@@ -594,33 +660,33 @@ const DeleteConfirmPopover: React.FC<DeleteConfirmPopoverProps> = ({
         </Button>
       </div>
     </div>
-  );
-};
+  )
+}
 
 /**
  * ArrayItem 状态映射
  */
 interface ArrayItemStatusMap {
-  isAtMinLimit?: boolean; // 是否达到最小数量限制
-  isFirstItem?: boolean; // 是否是第一项
-  isLastItem?: boolean; // 是否是最后一项
+  isAtMinLimit?: boolean // 是否达到最小数量限制
+  isFirstItem?: boolean // 是否是第一项
+  isLastItem?: boolean // 是否是最后一项
 }
 
 /**
  * ArrayItem 子组件
  */
 interface ArrayItemProps {
-  name: string;
-  index: number;
-  schema: ExtendedJSONSchema;
-  onRemove?: (index: number) => void;
-  onMoveUp?: (index: number) => void;
-  onMoveDown?: (index: number) => void;
-  statusMap?: ArrayItemStatusMap;
-  disabled?: boolean;
-  readonly?: boolean;
-  layout?: "vertical" | "horizontal" | "inline";
-  labelWidth?: number | string;
+  name: string
+  index: number
+  schema: ExtendedJSONSchema
+  onRemove?: (index: number) => void
+  onMoveUp?: (index: number) => void
+  onMoveDown?: (index: number) => void
+  statusMap?: ArrayItemStatusMap
+  disabled?: boolean
+  readonly?: boolean
+  layout?: 'vertical' | 'horizontal' | 'inline'
+  labelWidth?: number | string
 }
 
 /**
@@ -641,60 +707,60 @@ const ArrayItem = React.memo<ArrayItemProps>(
     layout,
     labelWidth,
   }) => {
-    const { control } = useFormContext();
+    const { control } = useFormContext()
 
     // 删除确认 Popover 的状态
-    const [isDeletePopoverOpen, setIsDeletePopoverOpen] = useState(false);
+    const [isDeletePopoverOpen, setIsDeletePopoverOpen] = useState(false)
 
     // 处理删除确认
     const handleConfirmDelete = () => {
-      setIsDeletePopoverOpen(false);
-      onRemove?.(index);
-    };
+      setIsDeletePopoverOpen(false)
+      onRemove?.(index)
+    }
 
     // 处理取消删除
     const handleCancelDelete = () => {
-      setIsDeletePopoverOpen(false);
-    };
+      setIsDeletePopoverOpen(false)
+    }
 
     // 根据 schema 获取对应的 Widget
-    const itemWidget = useMemo(() => determineItemWidget(schema), [schema]);
-    const WidgetComponent = FieldRegistry.getWidget(itemWidget);
+    const itemWidget = useMemo(() => determineItemWidget(schema), [schema])
+    const WidgetComponent = FieldRegistry.getWidget(itemWidget)
 
     if (!WidgetComponent) {
-      console.error(`Widget "${itemWidget}" not found in registry`);
-      return null;
+      console.error(`Widget "${itemWidget}" not found in registry`)
+      return null
     }
 
     // 如果是对象类型，使用特殊渲染
-    if (schema.type === "object") {
+    if (schema.type === 'object') {
       return (
         <Card
           className="array-item array-item-object"
           elevation={1}
-          style={{ marginBottom: "15px", padding: "15px" }}
+          style={{ marginBottom: '15px', padding: '15px' }}
           data-array-item-name={name}
         >
           <div
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "10px",
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '10px',
             }}
           >
-            <span style={{ fontWeight: "bold" }}>
-              {schema.title || "Item"} {index + 1}
+            <span style={{ fontWeight: 'bold' }}>
+              {schema.title || 'Item'} {index + 1}
             </span>
             {(onMoveUp || onMoveDown || onRemove) && (
               <div
                 className="array-item-actions"
-                style={{ display: "flex", gap: "5px" }}
+                style={{ display: 'flex', gap: '5px' }}
               >
                 {onMoveUp && (
                   <Tooltip
                     content={
-                      statusMap?.isFirstItem ? "Already at the first item" : ""
+                      statusMap?.isFirstItem ? 'Already at the first item' : ''
                     }
                     disabled={!statusMap?.isFirstItem}
                   >
@@ -711,7 +777,7 @@ const ArrayItem = React.memo<ArrayItemProps>(
                 {onMoveDown && (
                   <Tooltip
                     content={
-                      statusMap?.isLastItem ? "Already at the last item" : ""
+                      statusMap?.isLastItem ? 'Already at the last item' : ''
                     }
                     disabled={!statusMap?.isLastItem}
                   >
@@ -738,9 +804,9 @@ const ArrayItem = React.memo<ArrayItemProps>(
                     onInteraction={(nextOpenState) => {
                       // 如果按钮被禁用，不允许打开 Popover
                       if (disabled || statusMap?.isAtMinLimit) {
-                        return;
+                        return
                       }
-                      setIsDeletePopoverOpen(nextOpenState);
+                      setIsDeletePopoverOpen(nextOpenState)
                     }}
                     interactionKind={PopoverInteractionKind.CLICK}
                     placement="top"
@@ -748,8 +814,8 @@ const ArrayItem = React.memo<ArrayItemProps>(
                     <Tooltip
                       content={
                         statusMap?.isAtMinLimit
-                          ? "At least one item is required"
-                          : ""
+                          ? 'At least one item is required'
+                          : ''
                       }
                       disabled={!statusMap?.isAtMinLimit}
                     >
@@ -782,33 +848,33 @@ const ArrayItem = React.memo<ArrayItemProps>(
             {...(schema.ui?.widgetProps || {})}
           />
         </Card>
-      );
+      )
     }
 
     // 基本类型：渲染为简单的输入框 + 操作按钮
 
     // 为基础类型生成校验规则
     const validationRules = useMemo(() => {
-      const rules = SchemaParser.getValidationRules(schema, false);
+      const rules = SchemaParser.getValidationRules(schema, false)
 
-      return rules;
-    }, [schema]);
+      return rules
+    }, [schema])
 
     return (
       <div
         className="array-item array-item-simple"
         style={{
-          display: "flex",
-          alignItems: "flex-start",
-          gap: "10px",
-          marginBottom: "10px",
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '10px',
+          marginBottom: '10px',
         }}
         data-array-item-name={name}
       >
         {/* 索引标签 */}
         <div
           className="array-item-index"
-          style={{ minWidth: "30px", color: "#999" }}
+          style={{ minWidth: '30px', color: '#999' }}
         >
           #{index + 1}
         </div>
@@ -827,14 +893,14 @@ const ArrayItem = React.memo<ArrayItemProps>(
                     if (validationRules.validate) {
                       // validate 是对象形式的验证规则，执行所有验证
                       for (const key in validationRules.validate) {
-                        const validateFn = validationRules.validate[key];
-                        const result = validateFn(value);
+                        const validateFn = validationRules.validate[key]
+                        const result = validateFn(value)
                         if (result !== true) {
-                          return result;
+                          return result
                         }
                       }
                     }
-                    return true;
+                    return true
                   }
                 : undefined,
             }}
@@ -846,7 +912,7 @@ const ArrayItem = React.memo<ArrayItemProps>(
                     schema={schema}
                     value={controllerField.value}
                     onChange={(newValue: any) => {
-                      controllerField.onChange(newValue);
+                      controllerField.onChange(newValue)
                     }}
                     disabled={disabled}
                     readonly={readonly}
@@ -855,16 +921,16 @@ const ArrayItem = React.memo<ArrayItemProps>(
                   {fieldState.error && (
                     <div
                       style={{
-                        color: "#DB3737",
-                        fontSize: "12px",
-                        marginTop: "5px",
+                        color: '#DB3737',
+                        fontSize: '12px',
+                        marginTop: '5px',
                       }}
                     >
                       {fieldState.error.message}
                     </div>
                   )}
                 </>
-              );
+              )
             }}
           />
         </div>
@@ -874,16 +940,16 @@ const ArrayItem = React.memo<ArrayItemProps>(
           <div
             className="array-item-actions"
             style={{
-              display: "flex",
-              height: "30px",
-              gap: "5px",
-              alignItems: "center",
+              display: 'flex',
+              height: '30px',
+              gap: '5px',
+              alignItems: 'center',
             }}
           >
             {onMoveUp && (
               <Tooltip
                 content={
-                  statusMap?.isFirstItem ? "Already at the first item" : ""
+                  statusMap?.isFirstItem ? 'Already at the first item' : ''
                 }
                 disabled={!statusMap?.isFirstItem}
               >
@@ -900,7 +966,7 @@ const ArrayItem = React.memo<ArrayItemProps>(
             {onMoveDown && (
               <Tooltip
                 content={
-                  statusMap?.isLastItem ? "Already at the last item" : ""
+                  statusMap?.isLastItem ? 'Already at the last item' : ''
                 }
                 disabled={!statusMap?.isLastItem}
               >
@@ -927,9 +993,9 @@ const ArrayItem = React.memo<ArrayItemProps>(
                 onInteraction={(nextOpenState) => {
                   // 如果按钮被禁用，不允许打开 Popover
                   if (disabled || statusMap?.isAtMinLimit) {
-                    return;
+                    return
                   }
-                  setIsDeletePopoverOpen(nextOpenState);
+                  setIsDeletePopoverOpen(nextOpenState)
                 }}
                 interactionKind={PopoverInteractionKind.CLICK}
                 placement="top"
@@ -937,8 +1003,8 @@ const ArrayItem = React.memo<ArrayItemProps>(
                 <Tooltip
                   content={
                     statusMap?.isAtMinLimit
-                      ? "At least one item is required"
-                      : ""
+                      ? 'At least one item is required'
+                      : ''
                   }
                   disabled={!statusMap?.isAtMinLimit}
                 >
@@ -956,7 +1022,7 @@ const ArrayItem = React.memo<ArrayItemProps>(
           </div>
         )}
       </div>
-    );
+    )
   },
   // ✅ 自定义比较函数：只在关键 props 变化时重渲染
   (prevProps, nextProps) => {
@@ -966,7 +1032,7 @@ const ArrayItem = React.memo<ArrayItemProps>(
       (prevProps.statusMap?.isAtMinLimit ===
         nextProps.statusMap?.isAtMinLimit &&
         prevProps.statusMap?.isFirstItem === nextProps.statusMap?.isFirstItem &&
-        prevProps.statusMap?.isLastItem === nextProps.statusMap?.isLastItem);
+        prevProps.statusMap?.isLastItem === nextProps.statusMap?.isLastItem)
 
     return (
       prevProps.name === nextProps.name &&
@@ -980,6 +1046,6 @@ const ArrayItem = React.memo<ArrayItemProps>(
       prevProps.readonly === nextProps.readonly &&
       prevProps.layout === nextProps.layout &&
       prevProps.labelWidth === nextProps.labelWidth
-    );
+    )
   },
-);
+)

@@ -5,16 +5,30 @@ import { Card } from '@blueprintjs/core'
 import { CodeEditorWidget } from '@/components/DynamicForm'
 import { ObjectEditorWidget } from '@/components/DynamicForm'
 import { SchemaBuilderWidget } from '@/components/DynamicForm/widgets/SchemaBuilderWidget'
-import type {
-  CallbackFunction,
-  FormChangeMeta,
-} from '@/components/DynamicForm/types'
+import type { CallbackFunction } from '@/components/DynamicForm/types'
 
 export const BasicFormPanel: React.FC = () => {
   const formRef = useRef<DynamicFormRef>(null)
+  // 保存延迟初始化写入的定时器，确保 StrictMode 开发检查和组件卸载时都能取消旧任务，
+  // React 18 StrictMode 会在开发环境重复执行一次 effect；若不清理，setValues 会执行两次，
+  // 第二次写入因值已相同而被正确去重，从而让示例看起来像“setValues 没有触发 onChange”。
+  const initialValuesTimerRef = useRef<number | null>(null)
 
-  // @ts-ignore
-  window.__formRef = formRef
+  useEffect(() => {
+    // 将示例表单引用暴露给浏览器调试工具，但必须在 effect 中修改 window，
+    // 避免渲染阶段产生副作用并触发 React Compiler 的不可变性检查。
+    const debugWindow = window as Window & {
+      __formRef?: typeof formRef
+    }
+    debugWindow.__formRef = formRef
+
+    return () => {
+      // 仅清理仍指向当前组件的引用，避免 StrictMode 重挂载时误删新实例引用。
+      if (debugWindow.__formRef === formRef) {
+        delete debugWindow.__formRef
+      }
+    }
+  }, [])
 
   // const schema: ExtendedJSONSchema = {
   //   type: 'object',
@@ -397,7 +411,7 @@ export const BasicFormPanel: React.FC = () => {
                     fulfill: {
                       function: {
                         type: 'script',
-                        code: "/**\n * Generate dynamic options\n * @param {object} params - Parameters object\n * @param {object} params.formData - Current form values\n * @param {object} params.context - Linkage context\n * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)\n * @returns {Array<{label: string, value: any}>} - Options array\n */\nasync function({ formData, context, helpers }) {\n  // Example: fetch from API or calculate based on other fields\n  console.info('cyril formData.users: ', formData.users)\n  return formData.users.map((user) => {\n    return {\n      label: user.value,\n      value: user.value,\n    }\n  })\n}",
+                        code: "/**\n * Generate dynamic options\n * @param {object} params - Parameters object\n * @param {object} params.formData - Current form values\n * @param {object} params.context - Linkage context\n * @param {object} params.helpers - Helper utilities (ofetch, lodash, zod, etc.)\n * @returns {Array<{label: string, value: any}>} - Options array\n */\nasync function({ formData, context, helpers }) {\n  // Example: fetch from API or calculate based on other fields\n  console.info('formData.users: ', formData.users)\n  return formData.users.map((user) => {\n    return {\n      label: user.value,\n      value: user.value,\n    }\n  })\n}",
                       },
                     },
                   },
@@ -441,18 +455,13 @@ export const BasicFormPanel: React.FC = () => {
     alert('提交成功！请查看控制台输出')
   }
 
-  const handleChange = (data: any, meta: FormChangeMeta) => {
-    console.log('handleChange data:', data)
-    console.log('handleChange meta:', meta)
-  }
-
   // 自定义格式验证器
   const customFormats = {
     phone: (value: string) => /^1[3-9]\d{9}$/.test(value),
   }
 
   useEffect(() => {
-    setTimeout(() => {
+    initialValuesTimerRef.current = window.setTimeout(() => {
       // formRef.current?.setValue('rate', 0.6)
       // formRef.current?.setValues({
       //   rate: 0.7,
@@ -482,6 +491,13 @@ export const BasicFormPanel: React.FC = () => {
         ],
       })
     }, 3000)
+
+    return () => {
+      if (initialValuesTimerRef.current !== null) {
+        window.clearTimeout(initialValuesTimerRef.current)
+        initialValuesTimerRef.current = null
+      }
+    }
   }, [])
 
   return (
@@ -494,7 +510,10 @@ export const BasicFormPanel: React.FC = () => {
         ref={formRef}
         schema={schema}
         onSubmit={handleSubmit}
-        onChange={handleChange}
+        onChange={(data: any, meta) => {
+          console.info('cyril data: ', data)
+          console.info('cyril meta: ', JSON.stringify(meta, null, 4))
+        }}
         customFormats={customFormats}
         callbacks={{
           percentToDecimal: (({ value }: { value: number }) =>

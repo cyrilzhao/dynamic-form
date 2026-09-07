@@ -14,6 +14,8 @@ export interface LinkageTask {
    * token 让 processQueue 能在计算前识别过期任务，并让 applyLinkageResults 在提交前做最终拦截。
    */
   token?: LinkageRunToken;
+  changeBatchId?: number;
+  changeBatchRunId?: number;
 }
 
 /**
@@ -39,24 +41,38 @@ export class LinkageTaskQueue {
     fieldName: string,
     affectedFields: string[],
     token?: LinkageRunToken,
-  ): void {
-    const timestamp = Date.now();
+    changeBatch?: { batchId: number; runId: number },
+  ): LinkageTask | undefined {
+    const previousTimestamp = this.latestTaskMap.get(fieldName) ?? 0;
+    const timestamp = Math.max(Date.now(), previousTimestamp + 1);
+    let replacedTask: LinkageTask | undefined;
     const existingIndex = this.queue.findIndex(
       (t) => t.fieldName === fieldName,
     );
 
     if (existingIndex >= 0) {
+      replacedTask = { ...this.queue[existingIndex] };
       // 队列中已有该字段的任务，更新 timestamp 和 affectedFields
       this.queue[existingIndex].timestamp = timestamp;
       this.queue[existingIndex].affectedFields = affectedFields;
       this.queue[existingIndex].token = token;
+      this.queue[existingIndex].changeBatchId = changeBatch?.batchId;
+      this.queue[existingIndex].changeBatchRunId = changeBatch?.runId;
     } else {
       // 队列中没有该字段的任务，添加新任务
-      this.queue.push({ fieldName, timestamp, affectedFields, token });
+      this.queue.push({
+        fieldName,
+        timestamp,
+        affectedFields,
+        token,
+        changeBatchId: changeBatch?.batchId,
+        changeBatchRunId: changeBatch?.runId,
+      });
     }
 
     // 记录该字段的最新 timestamp
     this.latestTaskMap.set(fieldName, timestamp);
+    return replacedTask;
   }
 
   /**

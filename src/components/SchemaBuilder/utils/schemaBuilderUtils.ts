@@ -1,10 +1,62 @@
 import { cloneDeep, get } from "lodash";
 import type { ExtendedJSONSchema } from "../../DynamicForm/types/schema";
 
+const NUMERIC_SCHEMA_KEYWORDS = new Set([
+  "multipleOf",
+  "maximum",
+  "exclusiveMaximum",
+  "minimum",
+  "exclusiveMinimum",
+  "maxLength",
+  "minLength",
+  "maxItems",
+  "minItems",
+  "maxProperties",
+  "minProperties",
+  "maxContains",
+  "minContains",
+]);
+
 export const defaultSchema: ExtendedJSONSchema = {
   type: "object",
   title: "Root",
   properties: {},
+};
+
+/**
+ * 递归将 JSON Schema 数字关键字转换为 number，避免表单输入或导入值以字符串保存。
+ */
+export const normalizeSchemaNumericValues = (
+  schema: ExtendedJSONSchema,
+): ExtendedJSONSchema => {
+  const normalized = cloneDeep(schema) as unknown;
+
+  const visit = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+
+    const record = value as Record<string, unknown>;
+    Object.keys(record).forEach((key) => {
+      const child = record[key];
+      if (NUMERIC_SCHEMA_KEYWORDS.has(key) && typeof child === "string") {
+        const trimmed = child.trim();
+        const parsed = trimmed === "" ? Number.NaN : Number(trimmed);
+        if (Number.isFinite(parsed)) {
+          record[key] = parsed;
+        } else {
+          delete record[key];
+        }
+        return;
+      }
+      visit(child);
+    });
+  };
+
+  visit(normalized);
+  return normalized as ExtendedJSONSchema;
 };
 
 export const generateRandomKey = (

@@ -28,6 +28,7 @@
 - [大规模数据性能优化](./large-scale-data-optimization.md)（提案/未实现）：数千数组项场景的候选优化方案。
 - [自定义 Widget 管理](./custom-widget.md)（部分实现）：当前前端 Mock 管理能力和未来服务端方案。
 - [Widget 输出 Schema 自动生成](./widget-schema-presets.md)（提案/未实现）：结构化 Widget 的值契约、SchemaBuilder 自动补全和冲突处理。
+- [文件选择与 multipart 提交](./file-upload-and-multipart.md)（提案/未实现）：文件 Widget、File 值契约和 multipart FormData 适配。
 
 ## SchemaBuilder 设计
 

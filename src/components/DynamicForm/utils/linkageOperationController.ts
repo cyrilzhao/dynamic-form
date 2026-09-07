@@ -3,11 +3,11 @@
  * 捕获一次联动计算开始时的版本快照，用于提交前判断结果是否过期。
  */
 export interface LinkageRunToken {
-  scopeId: string;
-  runId: number;
-  formMutationVersion: number;
-  linkagesVersion: number;
-  linkageFunctionsVersion: number;
+  scopeId: string
+  runId: number
+  formMutationVersion: number
+  linkagesVersion: number
+  linkageFunctionsVersion: number
 }
 
 /**
@@ -15,21 +15,39 @@ export interface LinkageRunToken {
  * 负责标记表单/联动配置/联动函数变化，并判断异步联动结果是否仍可提交。
  */
 export class LinkageOperationController {
+  private mutationSource:
+    | 'user'
+    | 'setValue'
+    | 'setValues'
+    | 'reset'
+    | 'linkage' = 'user'
+
+  setMutationSource(
+    source: 'user' | 'setValue' | 'setValues' | 'reset' | 'linkage',
+  ): 'user' | 'setValue' | 'setValues' | 'reset' | 'linkage' {
+    const previous = this.mutationSource
+    this.mutationSource = source
+    return previous
+  }
+
+  getMutationSource(): 'user' | 'setValue' | 'setValues' | 'reset' | 'linkage' {
+    return this.mutationSource
+  }
   // 全表单共享版本：任何用户输入、外部 ref API 写入、reset 或批量写入都会递增。
   // 它用于让“基于旧表单快照启动的异步联动”在提交前自动失效。
-  private formMutationVersion = 0;
+  private formMutationVersion = 0
 
   // runId/linkages/linkageFunctions 按 scope 隔离。
   // 一个 DynamicForm 页面中可能同时存在根表单和多个数组元素嵌套表单；
   // 它们需要共享表单 mutation 版本，但不能让某个子表单的联动配置变化误杀其他 scope 的计算。
-  private runIds = new Map<string, number>();
-  private linkagesVersions = new Map<string, number>();
-  private linkageFunctionsVersions = new Map<string, number>();
+  private runIds = new Map<string, number>()
+  private linkagesVersions = new Map<string, number>()
+  private linkageFunctionsVersions = new Map<string, number>()
 
   // batchDepth/pendingLinkage 用于把 setValues 递归触发的多次 watch 合并为一次最终快照联动。
   // 这样联动不会基于批量写值的中间态计算，也不会提交中间态结果。
-  private batchDepth = 0;
-  private pendingLinkage = false;
+  private batchDepth = 0
+  private pendingLinkage = false
 
   /**
    * 标记表单快照发生变化。
@@ -38,7 +56,7 @@ export class LinkageOperationController {
    * 因此必须在所有外部写入和真实用户输入入口递增该版本。
    */
   markFormMutation(): void {
-    this.formMutationVersion += 1;
+    this.formMutationVersion += 1
   }
 
   /**
@@ -51,7 +69,7 @@ export class LinkageOperationController {
     this.linkagesVersions.set(
       scopeId,
       (this.linkagesVersions.get(scopeId) ?? 0) + 1,
-    );
+    )
   }
 
   /**
@@ -64,7 +82,7 @@ export class LinkageOperationController {
     this.linkageFunctionsVersions.set(
       scopeId,
       (this.linkageFunctionsVersions.get(scopeId) ?? 0) + 1,
-    );
+    )
   }
 
   /**
@@ -74,7 +92,7 @@ export class LinkageOperationController {
    * 调用方会在 endBatch 后根据 pendingLinkage 决定是否只刷新一次最终快照。
    */
   beginBatch(): void {
-    this.batchDepth += 1;
+    this.batchDepth += 1
   }
 
   /**
@@ -83,12 +101,12 @@ export class LinkageOperationController {
    * @returns 是否需要基于批量写入后的最终快照刷新联动。
    */
   endBatch(): boolean {
-    this.batchDepth = Math.max(0, this.batchDepth - 1);
+    this.batchDepth = Math.max(0, this.batchDepth - 1)
     if (this.batchDepth > 0 || !this.pendingLinkage) {
-      return false;
+      return false
     }
-    this.pendingLinkage = false;
-    return true;
+    this.pendingLinkage = false
+    return true
   }
 
   /**
@@ -97,14 +115,14 @@ export class LinkageOperationController {
    * watch 回调使用该状态决定是立即 enqueue，还是只记录“批量结束后需要刷新”。
    */
   isBatching(): boolean {
-    return this.batchDepth > 0;
+    return this.batchDepth > 0
   }
 
   /**
    * 记录批量写入期间发生过会影响联动的字段变化。
    */
   markPendingLinkage(): void {
-    this.pendingLinkage = true;
+    this.pendingLinkage = true
   }
 
   /**
@@ -114,15 +132,15 @@ export class LinkageOperationController {
    * 后续异步计算即使晚返回，也必须拿这个 token 通过 canCommit 才能写回。
    */
   createRun(scopeId: string): LinkageRunToken {
-    const runId = (this.runIds.get(scopeId) ?? 0) + 1;
-    this.runIds.set(scopeId, runId);
+    const runId = (this.runIds.get(scopeId) ?? 0) + 1
+    this.runIds.set(scopeId, runId)
     return {
       scopeId,
       runId,
       formMutationVersion: this.formMutationVersion,
       linkagesVersion: this.linkagesVersions.get(scopeId) ?? 0,
       linkageFunctionsVersion: this.linkageFunctionsVersions.get(scopeId) ?? 0,
-    };
+    }
   }
 
   /**
@@ -139,6 +157,6 @@ export class LinkageOperationController {
         (this.linkagesVersions.get(token.scopeId) ?? 0) &&
       token.linkageFunctionsVersion ===
         (this.linkageFunctionsVersions.get(token.scopeId) ?? 0)
-    );
+    )
   }
 }
