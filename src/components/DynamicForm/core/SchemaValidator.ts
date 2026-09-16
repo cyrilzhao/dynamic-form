@@ -1,4 +1,9 @@
 import type { ExtendedJSONSchema } from '../types/schema'
+import {
+  isBinaryFileValue,
+  isFileArraySchema,
+  isFileSchema,
+} from '../utils/fileValue'
 
 /** 按实例注入的格式校验器，避免全局状态污染不同表单。 */
 type CustomFormats = Record<string, (value: string) => boolean>
@@ -61,16 +66,27 @@ export class SchemaValidator {
 
   private isTypeValid(value: unknown, type: string | string[]): boolean {
     // 显式检查 JSON Schema 类型，避免 JavaScript 隐式转换让错误类型通过。
-    if (Array.isArray(type)) return type.some((item) => this.isTypeValid(value, item))
+    if (Array.isArray(type))
+      return type.some((item) => this.isTypeValid(value, item))
     switch (type) {
-      case 'string': return typeof value === 'string'
-      case 'number': return typeof value === 'number' && Number.isFinite(value)
-      case 'integer': return typeof value === 'number' && Number.isInteger(value)
-      case 'boolean': return typeof value === 'boolean'
-      case 'array': return Array.isArray(value)
-      case 'object': return typeof value === 'object' && value !== null && !Array.isArray(value)
-      case 'null': return value === null
-      default: return true
+      case 'string':
+        return typeof value === 'string'
+      case 'number':
+        return typeof value === 'number' && Number.isFinite(value)
+      case 'integer':
+        return typeof value === 'number' && Number.isInteger(value)
+      case 'boolean':
+        return typeof value === 'boolean'
+      case 'array':
+        return Array.isArray(value)
+      case 'object':
+        return (
+          typeof value === 'object' && value !== null && !Array.isArray(value)
+        )
+      case 'null':
+        return value === null
+      default:
+        return true
     }
   }
 
@@ -78,17 +94,25 @@ export class SchemaValidator {
     // 排序对象 key 后再序列化，确保结构相同但插入顺序不同的值可正确比较。
     if (Array.isArray(value)) return value.map((item) => this.stableValue(item))
     if (value && typeof value === 'object') {
-      return Object.keys(value as Record<string, unknown>).sort().reduce<Record<string, unknown>>(
-        (result, key) => ({ ...result, [key]: this.stableValue((value as Record<string, unknown>)[key]) }),
-        {},
-      )
+      return Object.keys(value as Record<string, unknown>)
+        .sort()
+        .reduce<Record<string, unknown>>(
+          (result, key) => ({
+            ...result,
+            [key]: this.stableValue((value as Record<string, unknown>)[key]),
+          }),
+          {},
+        )
     }
     return value
   }
 
   private deepEqual(left: unknown, right: unknown): boolean {
     // const、enum 和 uniqueItems 比较的是值结构，而不是对象引用。
-    return JSON.stringify(this.stableValue(left)) === JSON.stringify(this.stableValue(right))
+    return (
+      JSON.stringify(this.stableValue(left)) ===
+      JSON.stringify(this.stableValue(right))
+    )
   }
 
   /**
@@ -101,7 +125,7 @@ export class SchemaValidator {
    */
   private getFieldTitle(
     fieldName: string,
-    schema?: ExtendedJSONSchema
+    schema?: ExtendedJSONSchema,
   ): string {
     // 优先从根 schema 查找（包含所有字段的 title）
     const title = this.findFieldTitle(fieldName, this.rootSchema)
@@ -130,7 +154,7 @@ export class SchemaValidator {
    */
   private findFieldTitle(
     fieldName: string,
-    schema: ExtendedJSONSchema
+    schema: ExtendedJSONSchema,
   ): string | null {
     if (!schema.properties) {
       return null
@@ -174,7 +198,7 @@ export class SchemaValidator {
    */
   private matchesSchema(
     formData: Record<string, any>,
-    schema: ExtendedJSONSchema
+    schema: ExtendedJSONSchema,
   ): boolean {
     const errors = this.validateAgainstSchema(formData, schema)
     return Object.keys(errors).length === 0
@@ -190,7 +214,7 @@ export class SchemaValidator {
    */
   private validateDependencies(
     formData: Record<string, any>,
-    errors: Record<string, string>
+    errors: Record<string, string>,
   ): void {
     const dependencies = this.schema.dependencies
     if (!dependencies) {
@@ -198,7 +222,7 @@ export class SchemaValidator {
     }
 
     for (const [triggerField, dependentFields] of Object.entries(
-      dependencies
+      dependencies,
     )) {
       // 如果触发字段有值
       if (this.hasValue(formData[triggerField])) {
@@ -215,7 +239,7 @@ export class SchemaValidator {
           // Schema 依赖：验证整个表单数据是否满足依赖 schema
           const dependencyErrors = this.validateAgainstSchema(
             formData,
-            dependentFields as ExtendedJSONSchema
+            dependentFields as ExtendedJSONSchema,
           )
           Object.assign(errors, dependencyErrors)
         }
@@ -231,7 +255,7 @@ export class SchemaValidator {
    */
   private validateConditional(
     formData: Record<string, any>,
-    errors: Record<string, string>
+    errors: Record<string, string>,
   ): void {
     const { if: ifSchema, then: thenSchema, else: elseSchema } = this.schema
 
@@ -242,7 +266,7 @@ export class SchemaValidator {
     // 检查 if 条件是否满足
     const ifMatches = this.matchesSchema(
       formData,
-      ifSchema as ExtendedJSONSchema
+      ifSchema as ExtendedJSONSchema,
     )
 
     // 根据条件选择对应的 schema
@@ -252,7 +276,7 @@ export class SchemaValidator {
       // 验证表单数据是否满足目标 schema
       const conditionalErrors = this.validateAgainstSchema(
         formData,
-        targetSchema as ExtendedJSONSchema
+        targetSchema as ExtendedJSONSchema,
       )
       Object.assign(errors, conditionalErrors)
     }
@@ -266,7 +290,7 @@ export class SchemaValidator {
    */
   private validateAllOf(
     formData: Record<string, any>,
-    errors: Record<string, string>
+    errors: Record<string, string>,
   ): void {
     const allOf = this.schema.allOf
     if (!allOf || !Array.isArray(allOf)) {
@@ -277,7 +301,7 @@ export class SchemaValidator {
     for (const subSchema of allOf) {
       const subErrors = this.validateAgainstSchema(
         formData,
-        subSchema as ExtendedJSONSchema
+        subSchema as ExtendedJSONSchema,
       )
       Object.assign(errors, subErrors)
     }
@@ -292,7 +316,7 @@ export class SchemaValidator {
    */
   private validateAnyOf(
     formData: Record<string, any>,
-    errors: Record<string, string>
+    errors: Record<string, string>,
   ): void {
     const anyOf = this.schema.anyOf
     if (!anyOf || !Array.isArray(anyOf)) {
@@ -306,7 +330,7 @@ export class SchemaValidator {
     for (const subSchema of anyOf) {
       const subErrors = this.validateAgainstSchema(
         formData,
-        subSchema as ExtendedJSONSchema
+        subSchema as ExtendedJSONSchema,
       )
       if (Object.keys(subErrors).length === 0) {
         hasMatch = true
@@ -346,7 +370,7 @@ export class SchemaValidator {
    */
   private validateOneOf(
     formData: Record<string, any>,
-    errors: Record<string, string>
+    errors: Record<string, string>,
   ): void {
     const oneOf = this.schema.oneOf
     if (!oneOf || !Array.isArray(oneOf)) {
@@ -361,7 +385,7 @@ export class SchemaValidator {
     for (const subSchema of oneOf) {
       const subErrors = this.validateAgainstSchema(
         formData,
-        subSchema as ExtendedJSONSchema
+        subSchema as ExtendedJSONSchema,
       )
       const errorCount = Object.keys(subErrors).length
 
@@ -396,7 +420,7 @@ export class SchemaValidator {
    */
   private validateAgainstSchema(
     formData: Record<string, any>,
-    schema: ExtendedJSONSchema
+    schema: ExtendedJSONSchema,
   ): Record<string, string> {
     const errors: Record<string, string> = {}
 
@@ -424,7 +448,7 @@ export class SchemaValidator {
     // 2. 验证 properties 中的约束
     if (schema.properties) {
       for (const [fieldName, fieldSchema] of Object.entries(
-        schema.properties
+        schema.properties,
       )) {
         if (typeof fieldSchema === 'boolean') {
           continue
@@ -503,12 +527,37 @@ export class SchemaValidator {
       return errors
     }
 
+    if (isFileSchema(schema)) {
+      if (value !== null && !isBinaryFileValue(value)) {
+        errors[fieldName] =
+          `${this.getFieldTitle(fieldName, parentSchema)} must be a file`
+      }
+      return errors
+    }
+
+    if (isFileArraySchema(schema)) {
+      if (
+        !Array.isArray(value) ||
+        value.some(
+          (item) =>
+            !isBinaryFileValue(item) && !(item && typeof item === 'object'),
+        )
+      ) {
+        errors[fieldName] =
+          `${this.getFieldTitle(fieldName, parentSchema)} must be an array of files`
+        return errors
+      }
+      this.validateArray({ value, schema, fieldName, errors, parentSchema })
+      return errors
+    }
+
     // 先做类型检查，再执行 const/enum 及具体类型约束，避免产生误导性的后续错误。
     // 验证 const（常量值）
     if (schema.type && !this.isTypeValid(value, schema.type)) {
-      errors[fieldName] = schema.type === 'integer'
-        ? `${this.getFieldTitle(fieldName, parentSchema)} must be an integer`
-        : `${this.getFieldTitle(fieldName, parentSchema)} must be of type ${schema.type}`
+      errors[fieldName] =
+        schema.type === 'integer'
+          ? `${this.getFieldTitle(fieldName, parentSchema)} must be an integer`
+          : `${this.getFieldTitle(fieldName, parentSchema)} must be of type ${schema.type}`
       return errors
     }
 
@@ -519,7 +568,10 @@ export class SchemaValidator {
     }
 
     // 验证 enum（枚举值）
-    if (schema.enum && !schema.enum.some((item) => this.deepEqual(item, value))) {
+    if (
+      schema.enum &&
+      !schema.enum.some((item) => this.deepEqual(item, value))
+    ) {
       errors[fieldName] =
         `${this.getFieldTitle(fieldName, parentSchema)} must be one of: ${schema.enum.join(', ')}`
       return errors
@@ -627,7 +679,9 @@ export class SchemaValidator {
     if (schema.pattern) {
       const regex = new RegExp(schema.pattern)
       if (!regex.test(value)) {
-        errors[fieldName] = messages.pattern || `${this.getFieldTitle(fieldName, parentSchema)} invalid format`
+        errors[fieldName] =
+          messages.pattern ||
+          `${this.getFieldTitle(fieldName, parentSchema)} invalid format`
       }
     }
 
@@ -712,7 +766,9 @@ export class SchemaValidator {
     // 使用浮点容差判断倍数，避免二进制浮点运算导致合法值因精度误差被拒绝。
     if (
       schema.multipleOf !== undefined &&
-      Math.abs(value / schema.multipleOf - Math.round(value / schema.multipleOf)) > 1e-10
+      Math.abs(
+        value / schema.multipleOf - Math.round(value / schema.multipleOf),
+      ) > 1e-10
     ) {
       errors[fieldName] =
         messages.multipleOf ||
@@ -755,7 +811,9 @@ export class SchemaValidator {
 
     // 稳定序列化可识别结构相同但引用不同的数组元素。
     if (schema.uniqueItems) {
-      const uniqueValues = new Set(value.map((v) => JSON.stringify(this.stableValue(v))))
+      const uniqueValues = new Set(
+        value.map((v) => JSON.stringify(this.stableValue(v))),
+      )
       if (uniqueValues.size !== value.length) {
         errors[fieldName] =
           `${this.getFieldTitle(fieldName, parentSchema)} must not contain duplicate items`
@@ -800,7 +858,7 @@ export class SchemaValidator {
           // 递归验证 properties
           if (itemsSchema.properties) {
             for (const [propName, propSchema] of Object.entries(
-              itemsSchema.properties
+              itemsSchema.properties,
             )) {
               if (typeof propSchema === 'boolean') {
                 continue

@@ -50,6 +50,7 @@ import {
   wrapPrimitiveArrays,
   unwrapPrimitiveArrays,
 } from './utils/arrayTransformer'
+import { isFileSchema, isBinaryFileValue } from './utils/fileValue'
 import {
   extractSchemaDefaults,
   mergeDefaults,
@@ -296,6 +297,8 @@ function buildEmptyValues(schema: ExtendedJSONSchema): Record<string, any> {
       result[key] = []
     } else if (typedSchema.type === 'object' && typedSchema.properties) {
       result[key] = buildEmptyValues(typedSchema)
+    } else if (isFileSchema(typedSchema)) {
+      result[key] = null
     } else if (typedSchema.type === 'string') {
       result[key] = ''
     } else {
@@ -506,13 +509,16 @@ function applyFieldTransforms(
   variantStore?: ReturnType<typeof createFieldVariantStore>,
   path = '',
 ): any {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+  if (isFileSchema(schema) || isBinaryFileValue(data) || !data || typeof data !== 'object' || Array.isArray(data)) {
     return data
   }
   const result: Record<string, any> = { ...data }
   const properties = schema.properties || {}
   for (const [key, fieldSchema] of Object.entries(properties)) {
     if (!(key in result)) {
+      continue
+    }
+    if (isFileSchema(fieldSchema) || isBinaryFileValue(result[key])) {
       continue
     }
     const cb = fieldSchema.ui?.transform?.callback
@@ -611,13 +617,16 @@ function reverseFieldTransforms(
   variantStore?: ReturnType<typeof createFieldVariantStore>,
   path = '',
 ): any {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+  if (isFileSchema(schema) || isBinaryFileValue(data) || !data || typeof data !== 'object' || Array.isArray(data)) {
     return data
   }
   const result: Record<string, any> = { ...data }
   const properties = schema.properties || {}
   for (const [key, fieldSchema] of Object.entries(properties)) {
     if (!(key in result)) {
+      continue
+    }
+    if (isFileSchema(fieldSchema) || isBinaryFileValue(result[key])) {
       continue
     }
     const cb = fieldSchema.ui?.transform?.reverseCallback
