@@ -15,6 +15,13 @@ export type {
 } from './types'
 export { FieldRegistry } from './core/FieldRegistry'
 export { SchemaParser } from './core/SchemaParser'
+export {
+  createMultipartFormData,
+} from './utils/createMultipartFormData'
+export type {
+  MultipartFileReference,
+  MultipartFormDataOptions,
+} from './utils/createMultipartFormData'
 export type { ExtendedJSONSchema, FieldOption } from './types/schema'
 export type {
   LinkageConfig,
@@ -30,6 +37,8 @@ export type {
 // Widgets
 export { CodeEditorWidget } from './widgets/CodeEditorWidget'
 export { ObjectEditorWidget } from './widgets/ObjectEditorWidget'
+export { FileWidget } from './widgets/FileWidget'
+export type { FileWidgetProps } from './widgets/FileWidget'
 
 // Widget 预设系统
 export { blueprintPreset } from './presets'

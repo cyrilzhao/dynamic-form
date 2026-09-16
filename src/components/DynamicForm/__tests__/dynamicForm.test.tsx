@@ -15,6 +15,38 @@ import {
 beforeAll(setupDynamicFormTest)
 
 describe('DynamicForm', () => {
+  it('动态文件数组选择后可以正常提交', async () => {
+    const onSubmit = jest.fn()
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        title: { type: 'string', title: 'Title' },
+        attachments: {
+          type: 'array',
+          title: 'Attachments',
+          items: {
+            type: 'string',
+            title: 'Attachment',
+            ui: { widget: 'file' },
+          },
+        },
+      },
+      required: ['title'],
+    }
+    const { container, formRef } = renderDynamicForm({
+      props: { schema, onSubmit },
+    })
+    await waitForFormReady({ formRef })
+    const title = getInputByName({ container, name: 'title' })!
+    fireEvent.change(title, { target: { value: 'Report' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    const fileInput = container.querySelector('input[type="file"]')!
+    fireEvent.change(fileInput, {
+      target: { files: [new File(['x'], 'report.pdf')] },
+    })
+    fireEvent.submit(container.querySelector('form')!)
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+  })
   it('应该初始化 object default 中的嵌套对象和数组，并补齐缺失子字段默认值', async () => {
     const schema: ExtendedJSONSchema = {
       type: 'object',

@@ -17,6 +17,7 @@ import type { LinkageResult } from '../types/linkage'
 import { ConditionEvaluator } from '../utils/conditionEvaluator'
 import { DependencyGraph } from '../utils/dependencyGraph'
 import { PathResolver } from '../utils/pathResolver'
+import { isBinaryFileValue } from '../utils/fileValue'
 import { LinkageTaskQueue } from '../utils/linkageTaskQueue'
 import { LinkageResultCache } from '../utils/linkageResultCache'
 import { generateCacheKey } from '../utils/generateCacheKey'
@@ -145,6 +146,18 @@ function isSameValue(prev: unknown, next: unknown): boolean {
   }
 
   if (prev && next && typeof prev === 'object' && typeof next === 'object') {
+    if (isBinaryFileValue(prev) || isBinaryFileValue(next)) {
+      if (!isBinaryFileValue(prev) || !isBinaryFileValue(next)) return false
+      return (
+        prev === next ||
+        (prev.size === next.size &&
+          prev.type === next.type &&
+          ('name' in prev ? prev.name : '') ===
+            ('name' in next ? next.name : '') &&
+          ('lastModified' in prev ? prev.lastModified : 0) ===
+            ('lastModified' in next ? next.lastModified : 0))
+      )
+    }
     try {
       return JSON.stringify(prev) === JSON.stringify(next)
     } catch {
@@ -163,11 +176,20 @@ function isSameValue(prev: unknown, next: unknown): boolean {
  * 导致 previousValue 和 nextValue 总是相同，进而漏掉 contacts.0.type 这类数组内字段变化。
  */
 function cloneFormData(data: Record<string, any>): Record<string, any> {
-  if (typeof structuredClone === 'function') {
-    return structuredClone(data)
+  const clone = (value: unknown): unknown => {
+    if (isBinaryFileValue(value)) return value
+    if (Array.isArray(value)) return value.map(clone)
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+          key,
+          clone(item),
+        ]),
+      )
+    }
+    return value
   }
-
-  return JSON.parse(JSON.stringify(data))
+  return clone(data) as Record<string, any>
 }
 
 interface LinkageManagerOptions {
@@ -315,9 +337,18 @@ export function useLinkageManager({
       taskQueue.setUpdatingForm(true)
       const previousMutationSource = controller.setMutationSource('linkage')
 
-      const setLinkageValue = ({ fieldName, value }: { fieldName: string; value: unknown }) => {
+      const setLinkageValue = ({
+        fieldName,
+        value,
+      }: {
+        fieldName: string
+        value: unknown
+      }) => {
         const mutationToken = mutationContext
-          ? registerMutationContext?.({ context: mutationContext, path: fieldName })
+          ? registerMutationContext?.({
+              context: mutationContext,
+              path: fieldName,
+            })
           : undefined
         try {
           setValue(fieldName, value, {
@@ -466,8 +497,8 @@ export function useLinkageManager({
       taskQueue,
       setLinkageStates,
       controller,
-    registerMutationContext,
-    cancelMutationContext,
+      registerMutationContext,
+      cancelMutationContext,
     ],
   )
 
@@ -535,7 +566,10 @@ export function useLinkageManager({
         // 检查任务是否仍然有效（可能已被更新的任务替代）
         /* istanbul ignore if -- 竞态条件边缘情况，难以在测试中稳定触发 */
         if (!taskQueue.isTaskValid(task.fieldName, task.timestamp)) {
-          if (task.changeBatchId !== undefined && task.changeBatchRunId !== undefined) {
+          if (
+            task.changeBatchId !== undefined &&
+            task.changeBatchRunId !== undefined
+          ) {
             completeChangeBatchRun?.(task.changeBatchId, task.changeBatchRunId)
           }
           continue
@@ -543,68 +577,71 @@ export function useLinkageManager({
 
         let taskToken = task.token
         try {
-        if (taskToken && !controller.canCommit(taskToken)) {
-          // 任务还没有开始计算时，如果 token 已经过期，不直接丢弃任务。
-          // 典型场景是初始化阶段连续 setValue：第一个依赖字段创建了任务，
-          // 后续字段写入提升了 formMutationVersion，但后续字段本身未必是依赖源。
-          // 此时重新签发 token，表示“用最新快照执行这个尚未消费的必要任务”；
-          // 已经开始计算的旧异步结果仍会在 applyLinkageResults 被提交校验拦截。
-          taskToken = controller.createRun(scopeId)
-        }
+          if (taskToken && !controller.canCommit(taskToken)) {
+            // 任务还没有开始计算时，如果 token 已经过期，不直接丢弃任务。
+            // 典型场景是初始化阶段连续 setValue：第一个依赖字段创建了任务，
+            // 后续字段写入提升了 formMutationVersion，但后续字段本身未必是依赖源。
+            // 此时重新签发 token，表示“用最新快照执行这个尚未消费的必要任务”；
+            // 已经开始计算的旧异步结果仍会在 applyLinkageResults 被提交校验拦截。
+            taskToken = controller.createRun(scopeId)
+          }
 
-        // 使用最新的表单数据（优先使用 latestFormDataRef，解决 setValues 批量更新时的时序问题）
-        // ✅ 从 runtimeRef 读取最新运行时依赖，避免闭包陈旧
-        const {
-          linkages: currentLinkages,
-          linkageFunctions: currentLinkageFunctions,
-          dependencyGraph: currentDependencyGraph,
-          getValues: currentGetValues,
-          applyLinkageResults: currentApplyLinkageResults,
-          linkageContext: currentLinkageContext,
-          helpers: currentHelpers,
-        } = runtimeRef.current
-
-        const formData =
-          Object.keys(latestFormDataRef.current).length > 0
-            ? cloneFormData(latestFormDataRef.current)
-            : cloneFormData(currentGetValues())
-
-        // ✅ 优化：直接使用任务中的 affectedFields，避免重复调用 getAffectedFields
-        const affectedFields = task.affectedFields
-
-        // 使用拓扑层级并行计算受影响的字段
-        const { states: newStates, updatedFormData } =
-          await evaluateLinkagesByLayers({
-            fields: affectedFields,
+          // 使用最新的表单数据（优先使用 latestFormDataRef，解决 setValues 批量更新时的时序问题）
+          // ✅ 从 runtimeRef 读取最新运行时依赖，避免闭包陈旧
+          const {
             linkages: currentLinkages,
-            formData,
             linkageFunctions: currentLinkageFunctions,
-            linkageContext: currentLinkageContext,
-            asyncSequenceManager,
             dependencyGraph: currentDependencyGraph,
-            cache,
+            getValues: currentGetValues,
+            applyLinkageResults: currentApplyLinkageResults,
+            linkageContext: currentLinkageContext,
             helpers: currentHelpers,
-            _caller: `processQueue(trigger=${task.fieldName})`,
-          })
+          } = runtimeRef.current
 
-        // ✅ 使用公共函数应用联动结果
-        await currentApplyLinkageResults({
-          fields: affectedFields,
-          states: newStates,
-          updatedFormData,
-          preMarkFields: true, // processQueue 需要预先标记，防止级联触发
-          token: taskToken,
-          mutationContext:
-            task.changeBatchId !== undefined
-              ? {
-                  batchId: task.changeBatchId,
-                  source: 'linkage',
-                  isLinkageWrite: true,
-                }
-              : undefined,
-        })
+          const formData =
+            Object.keys(latestFormDataRef.current).length > 0
+              ? cloneFormData(latestFormDataRef.current)
+              : cloneFormData(currentGetValues())
+
+          // ✅ 优化：直接使用任务中的 affectedFields，避免重复调用 getAffectedFields
+          const affectedFields = task.affectedFields
+
+          // 使用拓扑层级并行计算受影响的字段
+          const { states: newStates, updatedFormData } =
+            await evaluateLinkagesByLayers({
+              fields: affectedFields,
+              linkages: currentLinkages,
+              formData,
+              linkageFunctions: currentLinkageFunctions,
+              linkageContext: currentLinkageContext,
+              asyncSequenceManager,
+              dependencyGraph: currentDependencyGraph,
+              cache,
+              helpers: currentHelpers,
+              _caller: `processQueue(trigger=${task.fieldName})`,
+            })
+
+          // ✅ 使用公共函数应用联动结果
+          await currentApplyLinkageResults({
+            fields: affectedFields,
+            states: newStates,
+            updatedFormData,
+            preMarkFields: true, // processQueue 需要预先标记，防止级联触发
+            token: taskToken,
+            mutationContext:
+              task.changeBatchId !== undefined
+                ? {
+                    batchId: task.changeBatchId,
+                    source: 'linkage',
+                    isLinkageWrite: true,
+                  }
+                : undefined,
+          })
         } finally {
-          if (task.changeBatchId !== undefined && task.changeBatchRunId !== undefined) {
+          if (
+            task.changeBatchId !== undefined &&
+            task.changeBatchRunId !== undefined
+          ) {
             completeChangeBatchRun?.(task.changeBatchId, task.changeBatchRunId)
           }
         }
@@ -766,7 +803,8 @@ export function useLinkageManager({
    */
   const refreshLinkage = useCallback(async () => {
     const batchId = ensureChangeBatch?.('linkage')
-    const runId = batchId === undefined ? undefined : trackChangeBatchRun?.(batchId)
+    const runId =
+      batchId === undefined ? undefined : trackChangeBatchRun?.(batchId)
     try {
       // 等待 processQueue 完成（避免并发）
       while (taskQueue.getProcessing()) {
@@ -936,7 +974,13 @@ export function useLinkageManager({
       // 会在没有实际值变化时抑制空事件。
       void refreshLinkage()
     }
-  }, [linkageContext, linkageFunctions, linkageSchemaVersion, linkages, refreshLinkage])
+  }, [
+    linkageContext,
+    linkageFunctions,
+    linkageSchemaVersion,
+    linkages,
+    refreshLinkage,
+  ])
 
   return { linkageStates, refreshLinkage, setValueWithoutLinkage }
 }

@@ -346,6 +346,84 @@ describe('PropertyEditor', () => {
     })
   })
 
+  describe('数组 items 节点', () => {
+    it('应该允许配置元素 widget 和基础 schema 约束', () => {
+      const onUpdate = jest.fn()
+      const contextValue = {
+        ...defaultContextValue,
+        schema: {
+          type: 'object',
+          properties: {
+            tags: {
+              type: 'array',
+              items: {
+                type: 'string',
+                minLength: 2,
+                ui: { widget: 'custom-tag-input' },
+              },
+            },
+          },
+        },
+        selectedPath: ['properties', 'tags', 'items'],
+        onUpdate,
+      }
+
+      render(<PropertyEditor />, { wrapper: createWrapper(contextValue) })
+
+      fireEvent.click(screen.getByText('UI Config'))
+
+      const widgetInput = screen.getByPlaceholderText('Custom widget name')
+      expect(widgetInput).not.toBeDisabled()
+      fireEvent.change(widgetInput, { target: { value: 'custom-file-input' } })
+
+      expect(onUpdate).toHaveBeenCalledWith(['properties', 'tags', 'items'], {
+        ui: { widget: 'custom-file-input' },
+      })
+
+      fireEvent.click(screen.getByText('Validation'))
+      const minLengthInput = getFormGroupInput('Min Length')
+      expect(minLengthInput).not.toBeDisabled()
+      fireEvent.change(minLengthInput, { target: { value: '4' } })
+      fireEvent.blur(minLengthInput)
+
+      expect(onUpdate).toHaveBeenCalledWith(['properties', 'tags', 'items'], {
+        minLength: 4,
+      })
+    })
+
+    it('嵌套数组 items 应该允许编辑数组约束但隐藏数组容器行为', () => {
+      const onUpdate = jest.fn()
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema: {
+            type: 'object',
+            properties: {
+              matrix: {
+                type: 'array',
+                items: { type: 'array', minItems: 1 },
+              },
+            },
+          },
+          selectedPath: ['properties', 'matrix', 'items'],
+          onUpdate,
+        }),
+      })
+
+      fireEvent.click(screen.getByText('Validation'))
+      const minItemsInput = getFormGroupInput('Min Items')
+      expect(minItemsInput).not.toBeDisabled()
+      fireEvent.change(minItemsInput, { target: { value: '2' } })
+      fireEvent.blur(minItemsInput)
+      expect(onUpdate).toHaveBeenCalledWith(['properties', 'matrix', 'items'], {
+        minItems: 2,
+      })
+
+      fireEvent.click(screen.getByText('UI Config'))
+      expect(screen.queryByText('Array Mode')).not.toBeInTheDocument()
+    })
+  })
+
   describe('根节点', () => {
     it('应该显示 Schema-Level Configuration', () => {
       render(<PropertyEditor />, {
@@ -424,7 +502,8 @@ describe('PropertyEditor', () => {
       })
     })
 
-    it('string 类型的数组 items 应该禁用 Options 编辑控件', () => {
+    it('string 类型的数组 items 应该允许编辑 Options', () => {
+      const onUpdate = jest.fn()
       const arraySchema = {
         type: 'object',
         title: 'Test',
@@ -447,6 +526,7 @@ describe('PropertyEditor', () => {
           ...defaultContextValue,
           schema: arraySchema,
           selectedPath: ['properties', 'tags', 'items'],
+          onUpdate,
         }),
       })
 
@@ -458,8 +538,12 @@ describe('PropertyEditor', () => {
 
       expect(inputs).toHaveLength(2)
       expect(buttons).toHaveLength(2)
-      Array.from(inputs).forEach((input) => expect(input).toBeDisabled())
-      Array.from(buttons).forEach((button) => expect(button).toBeDisabled())
+      Array.from(inputs).forEach((input) => expect(input).not.toBeDisabled())
+      Array.from(buttons).forEach((button) => expect(button).not.toBeDisabled())
+      fireEvent.change(inputs[0], { target: { value: 'typescript' } })
+      expect(onUpdate).toHaveBeenCalledWith(['properties', 'tags', 'items'], {
+        enum: ['typescript'],
+      })
     })
 
     it('普通 string 字段应该保持 Options 编辑控件可用', () => {
