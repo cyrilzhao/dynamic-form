@@ -20,6 +20,7 @@ interface DropdownProps {
     option: SelectOption,
     props: OptionRenderProps,
   ) => React.ReactNode
+  renderEmpty?: () => React.ReactNode
 }
 
 export const Dropdown: React.FC<DropdownProps> = ({
@@ -34,6 +35,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
   loading = false,
   minWidth = 180,
   renderOption,
+  renderEmpty,
 }) => {
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0 })
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -146,6 +148,10 @@ export const Dropdown: React.FC<DropdownProps> = ({
     >
       {loading ? (
         <div className="select-dropdown__loading">Loading...</div>
+      ) : options.length === 0 ? (
+        <div className="select-dropdown__empty">
+          {renderEmpty ? renderEmpty() : 'No Data'}
+        </div>
       ) : (
         <>
           {/* 渲染未分组的选项 */}

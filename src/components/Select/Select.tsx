@@ -6,10 +6,12 @@ import { useSearch } from './hooks/useSearch'
 import { useKeyboardNav } from './hooks/useKeyboardNav'
 import type { SelectProps, SelectOption } from './types'
 
+const EMPTY_OPTIONS: SelectOption[] = []
+
 export const Select: React.FC<SelectProps> = ({
   value,
   onChange,
-  options,
+  options = EMPTY_OPTIONS,
   placeholder,
   disabled = false,
   multiple = false,
@@ -26,6 +28,7 @@ export const Select: React.FC<SelectProps> = ({
   renderValue,
   renderTrigger,
   renderOption,
+  renderEmpty,
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -261,6 +264,7 @@ export const Select: React.FC<SelectProps> = ({
         minWidth={minWidth}
         loading={isSearchLoading}
         renderOption={renderOption}
+        renderEmpty={renderEmpty}
       />
     </div>
   )

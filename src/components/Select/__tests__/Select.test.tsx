@@ -21,6 +21,13 @@ describe('Select', () => {
     expect(screen.getByText('选择水果')).toBeInTheDocument()
   })
 
+  it('未传 options 时应该显示默认空状态', () => {
+    render(<Select />)
+    fireEvent.click(screen.getByRole('button'))
+
+    expect(screen.getByText('No Data')).toBeInTheDocument()
+  })
+
   it('点击 Trigger 应该打开下拉菜单', () => {
     render(<Select options={mockOptions} />)
     fireEvent.click(screen.getByRole('button'))
