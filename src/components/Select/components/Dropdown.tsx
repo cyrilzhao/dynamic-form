@@ -16,6 +16,7 @@ interface DropdownProps {
   maxHeight?: number
   loading?: boolean
   minWidth?: number | string
+  positionUpdateKey?: string | number
   renderOption?: (
     option: SelectOption,
     props: OptionRenderProps,
@@ -34,6 +35,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
   maxHeight = 300,
   loading = false,
   minWidth = 180,
+  positionUpdateKey,
   renderOption,
   renderEmpty,
 }) => {
@@ -107,7 +109,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
         window.cancelAnimationFrame(animationFrameId)
       }
     }
-  }, [isOpen, maxHeight, triggerRef])
+  }, [isOpen, maxHeight, positionUpdateKey, triggerRef])
 
   // 分组选项
   const groupedOptions = useMemo(() => {
@@ -149,7 +151,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
       {loading ? (
         <div className="select-dropdown__loading">Loading...</div>
       ) : options.length === 0 ? (
-        <div className="select-dropdown__empty">
+        <div className="select-dropdown__empty" style={{ padding: '12px' }}>
           {renderEmpty ? renderEmpty() : 'No Data'}
         </div>
       ) : (

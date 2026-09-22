@@ -91,6 +91,8 @@ export interface SelectProps {
   maxHeight?: number
   /** 下拉菜单最小宽度，默认 180px */
   minWidth?: number | string
+  /** 外部布局变化时用于触发下拉菜单重新定位的标识 */
+  positionUpdateKey?: string | number
   /** 搜索框占位符 */
   searchPlaceholder?: string
   /** 自定义空状态渲染函数 */

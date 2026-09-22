@@ -23,6 +23,7 @@ export const Select: React.FC<SelectProps> = ({
   dropdownClassName,
   maxHeight,
   minWidth,
+  positionUpdateKey,
   searchPlaceholder,
   onSearch,
   renderValue,
@@ -262,6 +263,7 @@ export const Select: React.FC<SelectProps> = ({
         className={dropdownClassName}
         maxHeight={maxHeight}
         minWidth={minWidth}
+        positionUpdateKey={positionUpdateKey}
         loading={isSearchLoading}
         renderOption={renderOption}
         renderEmpty={renderEmpty}

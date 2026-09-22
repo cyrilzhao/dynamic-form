@@ -164,6 +164,48 @@ describe('Dropdown', () => {
     })
   })
 
+  it('positionUpdateKey 变化时应该重新对齐下拉菜单', () => {
+    const { rerender } = render(
+      <Dropdown
+        isOpen={true}
+        options={mockOptions}
+        selectedValues={[]}
+        onSelect={() => {}}
+        triggerRef={mockTriggerRef}
+        positionUpdateKey={0}
+      />,
+    )
+
+    mockTriggerRef.current.getBoundingClientRect = jest.fn(() => ({
+      bottom: 80,
+      left: 40,
+      width: 160,
+      top: 50,
+      right: 200,
+      height: 30,
+      x: 40,
+      y: 50,
+      toJSON: () => {},
+    }))
+
+    rerender(
+      <Dropdown
+        isOpen={true}
+        options={mockOptions}
+        selectedValues={[]}
+        onSelect={() => {}}
+        triggerRef={mockTriggerRef}
+        positionUpdateKey={1}
+      />,
+    )
+
+    expect(document.querySelector('.select-dropdown')).toHaveStyle({
+      top: '384px',
+      left: '60px',
+      width: '160px',
+    })
+  })
+
   it('点击选项时应该调用 onSelect', () => {
     const handleSelect = jest.fn()
     render(
