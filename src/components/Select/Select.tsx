@@ -25,6 +25,7 @@ export const Select: React.FC<SelectProps> = ({
   onSearch,
   renderValue,
   renderTrigger,
+  renderOption,
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -131,7 +132,7 @@ export const Select: React.FC<SelectProps> = ({
         }
       }
     },
-    [onSearch]
+    [onSearch],
   )
 
   // 本地过滤（无 onSearch 时生效）
@@ -155,7 +156,7 @@ export const Select: React.FC<SelectProps> = ({
   // 获取选中的选项对象，从 knownOptions 推导以支持异步选项
   const selectedOptions = useMemo(() => {
     return knownOptions.filter((opt) =>
-      selectedValues.some((v) => v == opt.value)
+      selectedValues.some((v) => v == opt.value),
     )
   }, [knownOptions, selectedValues])
   selectedOptionsRef.current = selectedOptions
@@ -173,7 +174,7 @@ export const Select: React.FC<SelectProps> = ({
         setIsOpen(false) // isOpen effect 会自动重置 searchTerm 和 asyncOptions
       }
     },
-    [multiple, selectedValues, onChange]
+    [multiple, selectedValues, onChange],
   )
 
   // 键盘导航
@@ -205,7 +206,7 @@ export const Select: React.FC<SelectProps> = ({
       const newValues = selectedValues.filter((v) => v != tagValue)
       onChange?.(newValues)
     },
-    [selectedValues, onChange]
+    [selectedValues, onChange],
   )
 
   return (
@@ -225,7 +226,7 @@ export const Select: React.FC<SelectProps> = ({
             onClick: handleToggle,
             'aria-expanded': isOpen,
             'aria-disabled': disabled || loading,
-          }
+          },
         )
       ) : (
         <Trigger
@@ -259,6 +260,7 @@ export const Select: React.FC<SelectProps> = ({
         maxHeight={maxHeight}
         minWidth={minWidth}
         loading={isSearchLoading}
+        renderOption={renderOption}
       />
     </div>
   )

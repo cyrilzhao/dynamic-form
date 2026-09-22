@@ -1,11 +1,15 @@
-import React from 'react';
-import type { SelectOption } from '../types';
+import React from 'react'
+import type { OptionRenderProps, SelectOption } from '../types'
 
 interface OptionProps {
-  option: SelectOption;
-  isSelected?: boolean;
-  isFocused?: boolean;
-  onClick: () => void;
+  option: SelectOption
+  isSelected?: boolean
+  isFocused?: boolean
+  onClick: () => void
+  renderOption?: (
+    option: SelectOption,
+    props: OptionRenderProps,
+  ) => React.ReactNode
 }
 
 export const Option: React.FC<OptionProps> = ({
@@ -13,13 +17,20 @@ export const Option: React.FC<OptionProps> = ({
   isSelected = false,
   isFocused = false,
   onClick,
+  renderOption,
 }) => {
   const handleClick = () => {
-    console.log('[Option handleClick]', { option, disabled: option.disabled });
     if (!option.disabled) {
-      onClick();
+      onClick()
     }
-  };
+  }
+
+  const renderProps: OptionRenderProps = {
+    isSelected,
+    isFocused,
+    isDisabled: Boolean(option.disabled),
+    onClick: handleClick,
+  }
 
   return (
     <div
@@ -31,7 +42,7 @@ export const Option: React.FC<OptionProps> = ({
       aria-selected={isSelected}
       aria-disabled={option.disabled}
     >
-      {option.label}
+      {renderOption ? renderOption(option, renderProps) : option.label}
     </div>
-  );
-};
+  )
+}
