@@ -14,6 +14,9 @@ import {
   Tag,
   Tooltip,
   Icon,
+  Dialog,
+  DialogBody,
+  DialogFooter,
 } from '@blueprintjs/core'
 import { Select } from '../../../Select'
 import { get } from 'lodash'
@@ -27,7 +30,17 @@ import { CallbackPropsEditor } from './components/CallbackPropsEditor'
 import { ObjectEditor } from '../../../ObjectEditor'
 import { VariantsEditor } from './components/VariantsEditor'
 import JsonView from '../../../JsonView'
+import { DynamicForm } from '../../../DynamicForm'
 import type { ExtendedJSONSchema } from '@/components/DynamicForm'
+import {
+  checkWidgetCompatibility,
+  getSchemaDefaults,
+  mergeWidgetValueSchema,
+  resolveWidgetTypeConflict,
+  getWidgetContractSchemaAtPath,
+  isWidgetArrayItemsContractPath,
+  isWidgetValueSchemaDescendantPath,
+} from '../../utils/widgetSchema'
 
 // Helper to get node from path
 const getNode = (schema: any, path: string[]) => {
@@ -221,7 +234,13 @@ const getDefaultWidget = (schema: any): string => {
 }
 
 export const PropertyEditor: React.FC = () => {
-  const { schema, selectedPath, onUpdate, options } = useSchemaBuilder()
+  const {
+    schema,
+    selectedPath,
+    onUpdate,
+    options,
+    widgetDefinitions = [],
+  } = useSchemaBuilder()
   const currentNode = getNode(schema, selectedPath)
 
   // 将 selectedPath 数组转换为 JSON Pointer 格式
@@ -250,10 +269,8 @@ export const PropertyEditor: React.FC = () => {
     selectedPath[selectedPath.length - 1] === 'items' &&
     parentNode?.type === 'array'
 
-  // `items` 是数组元素本身的 schema，而不是只读的结构占位符。元素的
-  // 标题、约束和 UI 配置都会被 DynamicForm 用来渲染每一个数组成员，因
-  // 此不能再把整个 items 节点锁定；数组容器级配置仍然只在外层 array
-  // 节点展示，避免把“添加/删除/排序”误应用到单个元素。
+  // 普通数组的 `items` 是数组元素本身的 Schema，可以配置元素标题、约束
+  // 和 UI；如果它属于 Widget 的 valueSchema 契约，则由下方契约只读分支接管。
 
   // Determine if it's a schema-level node (only root)
   // 只有根节点应该只显示条件验证配置
@@ -265,6 +282,8 @@ export const PropertyEditor: React.FC = () => {
   )
   const [keyInput, setKeyInput] = useState(currentKey || '')
   const [keyError, setKeyError] = useState('')
+  const [pendingType, setPendingType] = useState<SchemaNodeType | null>(null)
+  const [isTypeConflictOpen, setIsTypeConflictOpen] = useState(false)
 
   const { control, reset, watch, setValue } = useForm({
     defaultValues: createEditorFormDefaults({ currentKey, currentNode }),
@@ -455,6 +474,10 @@ export const PropertyEditor: React.FC = () => {
       value: widget,
     }),
   )
+  const customWidgetOptions = widgetDefinitions.map((definition) => ({
+    label: `${definition.name}${definition.valueSchema?.type ? ` · ${definition.valueSchema.type}` : ''}`,
+    value: definition.name,
+  }))
   // 保存当前 schema 中已经配置的 widget 名称，用于回显自定义 widget，
   // 即使它不在 SchemaBuilder 的内置 widget 列表中也不能丢失。
   const configuredWidget = currentNode.ui?.widget
@@ -472,14 +495,115 @@ export const PropertyEditor: React.FC = () => {
         ...currentWidgetOptions,
       ]
     : currentWidgetOptions
-  const showWidgetConfig = currentWidgetOptions.length > 0 || isItemsSchemaNode
+  const allWidgetOptions = [
+    ...widgetOptionsWithConfiguredValue,
+    ...customWidgetOptions.filter(
+      (option) =>
+        !widgetOptionsWithConfiguredValue.some(
+          (currentOption) => currentOption.value === option.value,
+        ),
+    ),
+  ]
+  const showWidgetConfig =
+    currentWidgetOptions.length > 0 ||
+    customWidgetOptions.length > 0 ||
+    isItemsSchemaNode
   const defaultWidget = getDefaultWidget(currentNode)
   const editorReadonly =
     options?.readonly?.all ||
     options?.readonly?.schema ||
     options?.readonly?.propertyEditor
 
-  if (editorReadonly) {
+  const selectedWidgetDefinition = widgetDefinitions.find(
+    (definition) => definition.name === configuredWidget,
+  )
+  const widgetContractSchema = getWidgetContractSchemaAtPath({
+    schema,
+    path: selectedPath,
+    widgetDefinitions,
+  })
+  const isWidgetContractField = widgetContractSchema !== undefined
+  const isWidgetArrayItemsContract = isWidgetArrayItemsContractPath({
+    schema,
+    path: selectedPath,
+    widgetDefinitions,
+  })
+  const isWidgetValueSchemaDescendant = isWidgetValueSchemaDescendantPath({
+    schema,
+    path: selectedPath,
+    widgetDefinitions,
+  })
+
+  const applySchemaReplacement = (replacement: ExtendedJSONSchema) => {
+    onUpdate(selectedPath, {
+      type: replacement.type,
+      properties: replacement.properties,
+      items: replacement.items,
+      required: replacement.required,
+      ui: replacement.ui,
+    })
+  }
+
+  const handleTypeChange = (nextType: SchemaNodeType) => {
+    if (selectedWidgetDefinition) {
+      const compatibility = checkWidgetCompatibility({
+        fieldSchema: { ...currentNode, type: nextType },
+        widgetDefinition: selectedWidgetDefinition,
+      })
+      if (!compatibility.compatible) {
+        setPendingType(nextType)
+        setIsTypeConflictOpen(true)
+        return
+      }
+    }
+
+    setValue('type', nextType)
+    handleFieldChange('type', nextType)
+    setValue('default', undefined)
+    handleFieldChange('default', undefined)
+  }
+
+  const handleUseWidgetType = () => {
+    if (!selectedWidgetDefinition) {
+      return
+    }
+    const resolved = resolveWidgetTypeConflict({
+      action: 'use-widget-type',
+      currentSchema: currentNode,
+      widgetDefinition: selectedWidgetDefinition,
+    })
+    applySchemaReplacement(resolved.schema)
+    setValue('type', resolved.schema.type)
+    setPendingType(null)
+    setIsTypeConflictOpen(false)
+  }
+
+  const handleRemoveWidget = () => {
+    const resolved = selectedWidgetDefinition
+      ? resolveWidgetTypeConflict({
+          action: 'remove-widget',
+          currentSchema: {
+            ...currentNode,
+            type: pendingType ?? currentNode.type,
+          },
+          widgetDefinition: selectedWidgetDefinition,
+        })
+      : {
+          schema: { ...currentNode, type: pendingType ?? currentNode.type },
+          removeWidget: true,
+        }
+    applySchemaReplacement(resolved.schema)
+    setValue('type', resolved.schema.type)
+    setValue('ui.widget', '')
+    setPendingType(null)
+    setIsTypeConflictOpen(false)
+  }
+
+  if (
+    editorReadonly ||
+    isWidgetArrayItemsContract ||
+    isWidgetValueSchemaDescendant
+  ) {
     return (
       <div className="property-editor">
         <JsonView title="Schema (Read Only)" data={currentNode} />
@@ -611,7 +735,9 @@ export const PropertyEditor: React.FC = () => {
                   >
                     <InputGroup
                       value={keyInput}
-                      disabled={options?.readonly?.editFieldKey}
+                      disabled={
+                        options?.readonly?.editFieldKey || isWidgetContractField
+                      }
                       intent={keyError ? 'danger' : 'none'}
                       onChange={(e) => setKeyInput(e.target.value)}
                       onBlur={handleKeyChange}
@@ -662,13 +788,14 @@ export const PropertyEditor: React.FC = () => {
                       <Select
                         value={field.value ?? ''}
                         onChange={(value) => {
-                          field.onChange(value)
-                          handleFieldChange('type', value)
-                          setValue('default', undefined)
-                          handleFieldChange('default', undefined)
+                          handleTypeChange(value as SchemaNodeType)
                         }}
                         options={typeOptions}
-                        disabled={isRoot || options?.readonly?.editFieldType}
+                        disabled={
+                          isRoot ||
+                          options?.readonly?.editFieldType ||
+                          isWidgetContractField
+                        }
                       />
                     )}
                   />
@@ -1306,14 +1433,34 @@ export const PropertyEditor: React.FC = () => {
                               value={field.value ?? ''}
                               onChange={(value) => {
                                 field.onChange(value)
-                                handleUIChange('widget', value)
+                                const definition = widgetDefinitions.find(
+                                  (item) => item.name === value,
+                                )
+                                if (definition?.valueSchema) {
+                                  const merged = mergeWidgetValueSchema({
+                                    currentSchema: currentNode,
+                                    widgetSchema: definition.valueSchema,
+                                  })
+                                  onUpdate(selectedPath, {
+                                    type: merged.schema.type,
+                                    properties: merged.schema.properties,
+                                    items: merged.schema.items,
+                                    required: merged.schema.required,
+                                    ui: {
+                                      ...merged.schema.ui,
+                                      widget: String(value),
+                                    },
+                                  })
+                                } else {
+                                  handleUIChange('widget', value)
+                                }
                               }}
                               options={[
                                 {
                                   label: `Default (${defaultWidget})`,
                                   value: '',
                                 },
-                                ...widgetOptionsWithConfiguredValue,
+                                ...allWidgetOptions,
                               ]}
                             />
                           )}
@@ -1343,12 +1490,35 @@ export const PropertyEditor: React.FC = () => {
                             'Keeping these values in schema lets the same widget serve multiple business scenarios without custom code per field.',
                           ],
                         })}
-                        helperText="Additional props passed directly to the widget (JSON object)"
+                        helperText={
+                          selectedWidgetDefinition?.propsSchema
+                            ? 'Configure widget props with the widget schema.'
+                            : 'Additional props passed directly to the widget (JSON object)'
+                        }
                       >
-                        <ObjectEditor
-                          value={currentNode.ui?.widgetProps}
-                          onChange={(val) => handleUIChange('widgetProps', val)}
-                        />
+                        {selectedWidgetDefinition?.propsSchema ? (
+                          <DynamicForm
+                            schema={selectedWidgetDefinition.propsSchema}
+                            defaultValues={{
+                              ...getSchemaDefaults(
+                                selectedWidgetDefinition.propsSchema,
+                              ),
+                              ...(currentNode.ui?.widgetProps || {}),
+                            }}
+                            onSubmit={(values) =>
+                              handleUIChange('widgetProps', values)
+                            }
+                            showSubmitButton
+                            renderAsForm
+                          />
+                        ) : (
+                          <ObjectEditor
+                            value={currentNode.ui?.widgetProps}
+                            onChange={(val) =>
+                              handleUIChange('widgetProps', val)
+                            }
+                          />
+                        )}
                       </FormGroup>
                     )}
 
@@ -2102,6 +2272,36 @@ export const PropertyEditor: React.FC = () => {
           )}
         </Tabs>
       )}
+      <Dialog
+        isOpen={isTypeConflictOpen}
+        onClose={() => undefined}
+        title="Widget and field type conflict"
+        canEscapeKeyClose={false}
+        canOutsideClickClose={false}
+      >
+        <DialogBody>
+          <Callout intent="warning">
+            The selected Widget requires type "
+            {selectedWidgetDefinition &&
+              (selectedWidgetDefinition.valueSchema?.type ??
+                selectedWidgetDefinition.valueType)}
+            ", but the field type is "{pendingType}".
+          </Callout>
+          <p style={{ marginTop: 12 }}>
+            Choose how to resolve the conflict before continuing.
+          </p>
+        </DialogBody>
+        <DialogFooter
+          actions={
+            <>
+              <Button intent="primary" onClick={handleUseWidgetType}>
+                Use object
+              </Button>
+              <Button onClick={handleRemoveWidget}>Remove widget</Button>
+            </>
+          }
+        />
+      </Dialog>
     </div>
   )
 }

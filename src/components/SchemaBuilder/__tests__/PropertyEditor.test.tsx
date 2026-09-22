@@ -424,6 +424,48 @@ describe('PropertyEditor', () => {
     })
   })
 
+  describe('Widget valueSchema 契约字段', () => {
+    it('upload-input 的子字段应完全以 valueSchema 为准并只读展示', () => {
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema: {
+            type: 'object',
+            properties: {
+              upload: {
+                type: 'object',
+                ui: { widget: 'upload-input' },
+                properties: {
+                  fileId: { type: 'string', title: 'File ID' },
+                  fileName: { type: 'string', title: 'File Name' },
+                },
+              },
+            },
+          },
+          selectedPath: ['properties', 'upload', 'properties', 'fileId'],
+          widgetDefinitions: [
+            {
+              name: 'upload-input',
+              component: (() => null) as React.ComponentType<any>,
+              valueSchema: {
+                type: 'object',
+                properties: {
+                  fileId: { type: 'string', title: 'File ID' },
+                  fileName: { type: 'string', title: 'File Name' },
+                },
+              },
+            },
+          ],
+        }),
+      })
+
+      expect(screen.getByText('Schema (Read Only)')).toBeInTheDocument()
+      expect(screen.queryByText('Basic')).not.toBeInTheDocument()
+      expect(screen.queryByText('Validation')).not.toBeInTheDocument()
+      expect(screen.queryByText('UI Config')).not.toBeInTheDocument()
+    })
+  })
+
   describe('根节点', () => {
     it('应该显示 Schema-Level Configuration', () => {
       render(<PropertyEditor />, {

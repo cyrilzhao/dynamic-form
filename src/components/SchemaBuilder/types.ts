@@ -1,4 +1,5 @@
 import type { ExtendedJSONSchema } from '../DynamicForm/types/schema'
+import type { WidgetDefinition } from '../DynamicForm/types/widgets'
 
 export type PreviewMode = 'both' | 'form' | 'json' | 'none'
 
@@ -50,6 +51,9 @@ export interface SchemaBuilderProps {
 
   /** 可选的 UI 能力控制，未配置项默认显示且可编辑。 */
   options?: SchemaBuilderOptions
+
+  /** Widget 元数据，用于 custom widget 选择、值 Schema 合并和 Props 参数表单。 */
+  widgetDefinitions?: WidgetDefinition[]
 
   /**
    * Control preview panel visibility
@@ -109,6 +113,7 @@ export interface SchemaNode extends ExtendedJSONSchema {
 export interface SchemaBuilderContextType {
   schema: ExtendedJSONSchema
   options?: SchemaBuilderOptions
+  widgetDefinitions: WidgetDefinition[]
   selectedPath: string[] // Path to the currently selected node
   expandedPaths: Record<string, boolean>
   onSelect: (path: string[]) => void
