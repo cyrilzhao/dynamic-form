@@ -1,6 +1,6 @@
 # Widget Schema 与参数表单设计
 
-> **状态：提案/未实现。** 本文设计用于解决结构化 Widget（例如 `upload-input`）与 SchemaBuilder 之间的值结构配置问题，并定义 Widget Props 的 Schema 驱动编辑方式。当前代码尚未实现 Widget 元数据驱动的 Schema 自动生成。
+> **状态：已实现并持续演进。** 本文同时约定结构化 Widget 与内置选择类 Widget 的 SchemaBuilder 配置方式。
 
 ## 1. 背景与问题
 
@@ -78,7 +78,7 @@ interface WidgetDefinition {
 
 `valueSchema` 是 Widget 输出值的完整契约，优先级高于单独的 `valueType`。`valueType` 适用于只需要声明标量类型的 Widget。二者都不存在时，Widget 保持当前行为，不自动生成字段。
 
-`propsSchema` 描述 Widget 的静态、可序列化参数，包括类型、校验、说明和默认值。默认 Props 的唯一来源是 `propsSchema.properties.*.default`，不再额外提供 `defaultProps`，避免出现两套默认值冲突。已保存的 `ui.widgetProps` 优先于 `propsSchema` 中的默认值；缺失的 Props 使用 Schema 默认值补齐。函数 Props 不进入 `propsSchema`，继续通过 `callbackProps` 单独配置。
+`propsSchema` 描述 Widget 的静态、可序列化参数，包括类型、校验、说明和默认值。默认 Props 的唯一来源是 `propsSchema.properties.*.default`，不再额外提供 `defaultProps`，避免出现两套默认值冲突。已保存的 `ui.widgetProps` 优先于 `propsSchema` 中的默认值；缺失的 Props 使用 Schema 默认值补齐。函数 Props 不进入 `propsSchema`，继续通过 `callbackProps` 单独配置。内置 `select`、`radio`、`checkbox-group` 与 custom widget 一样可以声明 `propsSchema`，其中选择类 Widget 的 `options`、`multiple` 等参数通过 Props 表单配置。
 
 ### 4.1 upload-input 示例
 
@@ -129,11 +129,23 @@ const uploadInputDefinition: WidgetDefinition = {
 }
 ```
 
-SchemaBuilder 中的 Widget Props 编辑器使用 `propsSchema` 作为 DynamicForm 的 Schema。参数表单提交后写入 `ui.widgetProps`；它不能修改字段的 `valueSchema`。DynamicForm 渲染 Widget 时，Props 合并规则为：
+SchemaBuilder 中的 Widget Props 编辑器使用 `propsSchema` 作为 DynamicForm 的 Schema，隐藏独立 Submit 按钮并在每次 Change 时写入 `ui.widgetProps`；它不能修改字段的 `valueSchema`。DynamicForm 渲染 Widget 时，Props 合并规则为：
 
 ```text
 propsSchema 中的 default < 已保存的 ui.widgetProps
 ```
+
+### 4.3 enum 与选择类 Widget options
+
+`enum/enumNames` 是 Schema 的校验表示，`ui.widgetProps.options` 是 Widget 的展示表示。编辑器打开选择类 Widget 的 Props 时，将两者按值和 JSON 类型去重合并：保留 `enum` 顺序，追加仅存在于 `widgetProps.options` 的值；重复值的 label、disabled 等展示属性以 `widgetProps.options` 为准。仅打开或切换标签不会写回 Schema。
+
+用户实际修改 options 后，从最终列表同时重建：
+
+- `enum`：选项值列表；
+- `enumNames`：选项标签列表；
+- `ui.widgetProps.options`：包含 `value`、`label` 和 `disabled` 的展示配置。
+
+这样既兼容历史上只有 `enum` 的隐式 Widget（`string + enum` 的默认 Widget 仍为 `select`），又保证控件可选值与 Schema 校验保持一致。选项值保留原始 JSON 标量类型；数字、布尔值不能静默转换为字符串。数组 `items.enum` 属于数组元素约束，不能写入父数组字段的 Widget Props。
 
 ## 5. Widget 选择与 Schema 更新流程
 

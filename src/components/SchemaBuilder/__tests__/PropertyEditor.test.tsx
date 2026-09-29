@@ -466,6 +466,66 @@ describe('PropertyEditor', () => {
     })
   })
 
+  describe('Widget Props 表单', () => {
+    it('应隐藏 Submit 并在 props 变更时实时写入 ui.widgetProps', async () => {
+      const onUpdate = jest.fn()
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          onUpdate,
+          schema: {
+            type: 'object',
+            properties: {
+              upload: {
+                type: 'object',
+                ui: {
+                  widget: 'upload-input',
+                  widgetProps: { accept: '.pdf' },
+                },
+              },
+            },
+          },
+          selectedPath: ['properties', 'upload'],
+          widgetDefinitions: [
+            {
+              name: 'upload-input',
+              component: (() => null) as React.ComponentType<any>,
+              propsSchema: {
+                type: 'object',
+                properties: {
+                  accept: {
+                    type: 'string',
+                    title: 'Accepted File Types',
+                  },
+                },
+              },
+            },
+          ],
+        }),
+      })
+
+      fireEvent.click(screen.getByText('UI Config'))
+
+      expect(
+        screen.queryByRole('button', { name: 'Submit' }),
+      ).not.toBeInTheDocument()
+
+      const acceptInput = getFormGroupInput('Accepted File Types')
+      fireEvent.change(acceptInput, { target: { value: '.png' } })
+
+      await waitFor(() => {
+        expect(onUpdate).toHaveBeenCalledWith(
+          ['properties', 'upload'],
+          expect.objectContaining({
+            ui: expect.objectContaining({
+              widgetProps: { accept: '.png' },
+            }),
+          }),
+        )
+      })
+    })
+  })
+
   describe('根节点', () => {
     it('应该显示 Schema-Level Configuration', () => {
       render(<PropertyEditor />, {
@@ -544,7 +604,7 @@ describe('PropertyEditor', () => {
       })
     })
 
-    it('string 类型的数组 items 应该允许编辑 Options', () => {
+    it('string 类型的数组 items 应该通过默认 select 的 Widget Props 编辑 Options', async () => {
       const onUpdate = jest.fn()
       const arraySchema = {
         type: 'object',
@@ -572,31 +632,133 @@ describe('PropertyEditor', () => {
         }),
       })
 
-      const optionsGroup = screen
-        .getByText('Options (enum)')
-        .closest('.bp6-form-group, .bp5-form-group')
-      const inputs = optionsGroup?.querySelectorAll('input') ?? []
-      const buttons = optionsGroup?.querySelectorAll('button') ?? []
-
-      expect(inputs).toHaveLength(2)
-      expect(buttons).toHaveLength(2)
-      Array.from(inputs).forEach((input) => expect(input).not.toBeDisabled())
-      Array.from(buttons).forEach((button) => expect(button).not.toBeDisabled())
-      fireEvent.change(inputs[0], { target: { value: 'typescript' } })
-      expect(onUpdate).toHaveBeenCalledWith(['properties', 'tags', 'items'], {
-        enum: ['typescript'],
+      fireEvent.click(screen.getByText('UI Config'))
+      const optionValue = screen.getByLabelText('Option 1 value')
+      expect(optionValue).toHaveValue('react')
+      expect(optionValue).not.toBeDisabled()
+      expect(screen.getByLabelText('Option 1 label')).toHaveValue('React')
+      fireEvent.change(optionValue, {
+        target: { value: 'typescript' },
+      })
+      expect(optionValue).toHaveValue('typescript')
+      await waitFor(() => {
+        expect(onUpdate).toHaveBeenLastCalledWith(
+          ['properties', 'tags', 'items'],
+          expect.objectContaining({
+            enum: ['typescript'],
+            enumNames: ['React'],
+            ui: expect.objectContaining({
+              widgetProps: expect.objectContaining({
+                options: [
+                  { value: 'typescript', label: 'React', disabled: false },
+                ],
+              }),
+            }),
+          }),
+        )
       })
     })
 
-    it('普通 string 字段应该保持 Options 编辑控件可用', () => {
+    it('普通 string 字段不再显示独立 Options 编辑控件', () => {
       render(<PropertyEditor />, {
         wrapper: createWrapper(defaultContextValue),
       })
 
-      const addOptionButton = screen.getByRole('button', {
-        name: 'Add Option',
+      expect(screen.queryByText('Options (enum)')).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: 'Add Option' }),
+      ).not.toBeInTheDocument()
+    })
+
+    it('历史 enum 应投影到隐式 select 的 Widget Props，修改时同步 enum 与 options', async () => {
+      const onUpdate = jest.fn()
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            enum: ['draft', 'published'],
+            enumNames: ['Draft', 'Published'],
+          },
+        },
+      }
+
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema,
+          selectedPath: ['properties', 'status'],
+          onUpdate,
+        }),
       })
-      expect(addOptionButton).not.toBeDisabled()
+
+      fireEvent.click(screen.getByText('UI Config'))
+
+      expect(screen.getByText('Widget Props')).toBeInTheDocument()
+      expect(screen.getByLabelText('Option 1 value')).toHaveValue('draft')
+      expect(screen.getByLabelText('Option 1 label')).toHaveValue('Draft')
+      expect(screen.getByLabelText('Option 2 value')).toHaveValue('published')
+
+      fireEvent.change(screen.getByLabelText('Option 1 value'), {
+        target: { value: 'queued' },
+      })
+
+      await waitFor(() => {
+        expect(onUpdate).toHaveBeenLastCalledWith(
+          ['properties', 'status'],
+          expect.objectContaining({
+            enum: ['queued', 'published'],
+            enumNames: ['Draft', 'Published'],
+            ui: expect.objectContaining({
+              widgetProps: expect.objectContaining({
+                options: [
+                  { value: 'queued', label: 'Draft', disabled: false },
+                  { value: 'published', label: 'Published', disabled: false },
+                ],
+              }),
+            }),
+          }),
+        )
+      })
+    })
+
+    it('历史 enum 与 widgetProps.options 应按类型去重且保留 options 展示属性', () => {
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            enum: ['same', 'legacy'],
+            enumNames: ['Schema Label', 'Legacy'],
+            ui: {
+              widget: 'select',
+              widgetProps: {
+                options: [
+                  { value: 'same', label: 'Widget Label', disabled: true },
+                  { value: 'widget-only', label: 'Widget Only' },
+                ],
+              },
+            },
+          },
+        },
+      }
+
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema,
+          selectedPath: ['properties', 'status'],
+        }),
+      })
+      fireEvent.click(screen.getByText('UI Config'))
+
+      expect(screen.getAllByLabelText(/^Option \d+ value$/)).toHaveLength(3)
+      expect(screen.getByLabelText('Option 1 label')).toHaveValue(
+        'Widget Label',
+      )
+      expect(screen.getByLabelText('Option 2 value')).toHaveValue('legacy')
+      expect(screen.getByLabelText('Option 3 value')).toHaveValue('widget-only')
+      expect(screen.getByLabelText('Option 1 disabled')).toBeChecked()
     })
   })
 

@@ -33,6 +33,11 @@ import JsonView from '../../../JsonView'
 import { DynamicForm } from '../../../DynamicForm'
 import type { ExtendedJSONSchema } from '@/components/DynamicForm'
 import {
+  WidgetOptionsEditor,
+  selectionWidgetDefinitions,
+} from '../../../DynamicForm/widgets'
+import type { FieldOption } from '../../../DynamicForm/types/schema'
+import {
   checkWidgetCompatibility,
   getSchemaDefaults,
   mergeWidgetValueSchema,
@@ -48,6 +53,57 @@ const getNode = (schema: any, path: string[]) => {
     return schema
   }
   return get(schema, path)
+}
+
+const getOptionValueKey = (value: unknown): string =>
+  `${typeof value}:${JSON.stringify(value)}`
+
+const mergeWidgetOptions = ({
+  schema,
+  widgetPropsOptions,
+}: {
+  schema: ExtendedJSONSchema
+  widgetPropsOptions?: FieldOption[]
+}): FieldOption[] => {
+  const schemaOptions = (schema.enum || []).map((value, index) => ({
+    value,
+    label: schema.enumNames?.[index] ?? String(value),
+    disabled: false,
+  }))
+  const merged = new Map<string, FieldOption>()
+
+  schemaOptions.forEach((option) => {
+    merged.set(getOptionValueKey(option.value), option)
+  })
+  widgetPropsOptions?.forEach((option) => {
+    const key = getOptionValueKey(option.value)
+    merged.set(key, {
+      ...merged.get(key),
+      ...option,
+      disabled: option.disabled ?? false,
+    })
+  })
+
+  return Array.from(merged.values())
+}
+
+const getOptionValueType = (schema: ExtendedJSONSchema): string => {
+  const enumTypes = Array.from(
+    new Set((schema.enum || []).map((value) => typeof value)),
+  )
+  if (
+    enumTypes.length === 1 &&
+    ['string', 'number', 'boolean'].includes(enumTypes[0])
+  ) {
+    return enumTypes[0]
+  }
+  if (schema.type === 'integer' || schema.type === 'number') {
+    return 'number'
+  }
+  if (schema.type === 'boolean') {
+    return 'boolean'
+  }
+  return 'string'
 }
 
 interface FieldHelpLabelParams {
@@ -457,7 +513,7 @@ export const PropertyEditor: React.FC = () => {
       'url',
       'select',
       'radio',
-      'checkbox',
+      'checkbox-group',
     ],
     number: ['range'],
     integer: ['range'],
@@ -474,10 +530,17 @@ export const PropertyEditor: React.FC = () => {
       value: widget,
     }),
   )
-  const customWidgetOptions = widgetDefinitions.map((definition) => ({
-    label: `${definition.name}${definition.valueSchema?.type ? ` · ${definition.valueSchema.type}` : ''}`,
-    value: definition.name,
-  }))
+  const customWidgetOptions = widgetDefinitions
+    .filter(
+      (definition) =>
+        !selectionWidgetDefinitions.some(
+          (builtinDefinition) => builtinDefinition.name === definition.name,
+        ),
+    )
+    .map((definition) => ({
+      label: `${definition.name}${definition.valueSchema?.type ? ` · ${definition.valueSchema.type}` : ''}`,
+      value: definition.name,
+    }))
   // 保存当前 schema 中已经配置的 widget 名称，用于回显自定义 widget，
   // 即使它不在 SchemaBuilder 的内置 widget 列表中也不能丢失。
   const configuredWidget = currentNode.ui?.widget
@@ -509,14 +572,97 @@ export const PropertyEditor: React.FC = () => {
     customWidgetOptions.length > 0 ||
     isItemsSchemaNode
   const defaultWidget = getDefaultWidget(currentNode)
+  const effectiveWidget = watch('ui.widget') || defaultWidget
+  const effectiveWidgetDefinitionName =
+    effectiveWidget === 'checkbox' && currentType !== 'boolean'
+      ? 'checkbox-group'
+      : effectiveWidget
   const editorReadonly =
     options?.readonly?.all ||
     options?.readonly?.schema ||
     options?.readonly?.propertyEditor
 
-  const selectedWidgetDefinition = widgetDefinitions.find(
-    (definition) => definition.name === configuredWidget,
-  )
+  const selectedWidgetDefinition =
+    widgetDefinitions.find(
+      (definition) => definition.name === effectiveWidgetDefinitionName,
+    ) ??
+    selectionWidgetDefinitions.find(
+      (definition) => definition.name === effectiveWidgetDefinitionName,
+    )
+  const widgetPropsSchema = selectedWidgetDefinition?.propsSchema
+    ? {
+        ...selectedWidgetDefinition.propsSchema,
+        properties: selectedWidgetDefinition.propsSchema.properties
+          ? {
+              ...selectedWidgetDefinition.propsSchema.properties,
+              ...(selectedWidgetDefinition.propsSchema.properties.options
+                ? {
+                    options: {
+                      ...selectedWidgetDefinition.propsSchema.properties
+                        .options,
+                      ui: {
+                        ...selectedWidgetDefinition.propsSchema.properties
+                          .options.ui,
+                        widgetProps: {
+                          defaultValueType: getOptionValueType(currentNode),
+                        },
+                      },
+                    },
+                  }
+                : {}),
+            }
+          : undefined,
+      }
+    : undefined
+
+  const getWidgetPropsDefaults = () => {
+    if (!selectedWidgetDefinition?.propsSchema) {
+      return {}
+    }
+    const defaults = getSchemaDefaults(selectedWidgetDefinition.propsSchema)
+    const currentProps = currentNode.ui?.widgetProps || {}
+    if (!selectedWidgetDefinition.propsSchema.properties?.options) {
+      return { ...defaults, ...currentProps }
+    }
+    return {
+      ...defaults,
+      ...currentProps,
+      options: mergeWidgetOptions({
+        schema: currentNode,
+        widgetPropsOptions: currentProps.options,
+      }),
+    }
+  }
+
+  const handleWidgetPropsChange = (values: Record<string, any>) => {
+    const nextOptions = values.options
+    const nextProps = { ...values }
+    if (Array.isArray(nextOptions)) {
+      const normalizedOptions: FieldOption[] = nextOptions.map(
+        (option: FieldOption) => ({
+          ...option,
+          disabled: option.disabled ?? false,
+        }),
+      )
+      nextProps.options = normalizedOptions
+      onUpdate(selectedPath, {
+        enum: normalizedOptions.length
+          ? normalizedOptions.map((option) => option.value)
+          : undefined,
+        enumNames: normalizedOptions.length
+          ? normalizedOptions.map((option) => option.label)
+          : undefined,
+        ui: {
+          ...currentNode.ui,
+          widgetProps: nextProps,
+        },
+      })
+      return
+    }
+    handleUIChange('widgetProps', nextProps)
+  }
+  const shouldShowWidgetProps =
+    Boolean(configuredWidget) || Boolean(currentNode.enum)
   const widgetContractSchema = getWidgetContractSchemaAtPath({
     schema,
     path: selectedPath,
@@ -845,145 +991,6 @@ export const PropertyEditor: React.FC = () => {
                       }
                     }}
                   />
-                )}
-
-                {currentType === 'string' && (
-                  <>
-                    <FormGroup
-                      label="Options (enum)"
-                      helperText="Define allowed values. Used by radio, select, checkbox-group widgets."
-                    >
-                      {(() => {
-                        const enumValues: any[] = currentNode.enum || []
-                        const enumNames: string[] = currentNode.enumNames || []
-
-                        const handleAddOption = () => {
-                          onUpdate(selectedPath, {
-                            enum: [...enumValues, ''],
-                            enumNames: [...enumNames, ''],
-                          })
-                        }
-
-                        const handleRemoveOption = (index: number) => {
-                          const newEnum = enumValues.filter(
-                            (_: any, i: number) => i !== index,
-                          )
-                          const newEnumNames = enumNames.filter(
-                            (_: any, i: number) => i !== index,
-                          )
-                          onUpdate(selectedPath, {
-                            enum: newEnum.length > 0 ? newEnum : undefined,
-                            enumNames:
-                              newEnumNames.length > 0
-                                ? newEnumNames
-                                : undefined,
-                          })
-                        }
-
-                        const handleUpdateValue = (
-                          index: number,
-                          value: string,
-                        ) => {
-                          const newEnum = [...enumValues]
-                          newEnum[index] = value
-                          onUpdate(selectedPath, { enum: newEnum })
-                        }
-
-                        const handleUpdateLabel = (
-                          index: number,
-                          label: string,
-                        ) => {
-                          const newEnumNames = [...enumNames]
-                          newEnumNames[index] = label
-                          onUpdate(selectedPath, { enumNames: newEnumNames })
-                        }
-
-                        return (
-                          <div
-                            style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: 6,
-                            }}
-                          >
-                            {enumValues.length > 0 && (
-                              <div
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 8,
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    flex: 1,
-                                    fontSize: '12px',
-                                    color: '#5c7080',
-                                    fontWeight: 500,
-                                  }}
-                                >
-                                  Value
-                                </span>
-                                <span
-                                  style={{
-                                    flex: 1,
-                                    fontSize: '12px',
-                                    color: '#5c7080',
-                                    fontWeight: 500,
-                                  }}
-                                >
-                                  Label
-                                </span>
-                                <span style={{ width: 24 }} />
-                              </div>
-                            )}
-                            {enumValues.map((value: any, index: number) => (
-                              <div
-                                key={index}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 8,
-                                }}
-                              >
-                                <div style={{ flex: 1 }}>
-                                  <InputGroup
-                                    value={String(value)}
-                                    onChange={(e) =>
-                                      handleUpdateValue(index, e.target.value)
-                                    }
-                                    fill
-                                  />
-                                </div>
-                                <div style={{ flex: 1 }}>
-                                  <InputGroup
-                                    placeholder="Display text"
-                                    value={enumNames[index] || ''}
-                                    onChange={(e) =>
-                                      handleUpdateLabel(index, e.target.value)
-                                    }
-                                    fill
-                                  />
-                                </div>
-                                <Button
-                                  icon="cross"
-                                  minimal
-                                  small
-                                  onClick={() => handleRemoveOption(index)}
-                                />
-                              </div>
-                            ))}
-                            <Button
-                              icon="add"
-                              text="Add Option"
-                              minimal
-                              onClick={handleAddOption}
-                            />
-                          </div>
-                        )
-                      })()}
-                    </FormGroup>
-                  </>
                 )}
               </div>
             }
@@ -1478,7 +1485,7 @@ export const PropertyEditor: React.FC = () => {
                       </FormGroup>
                     )}
 
-                    {showWidgetConfig && watch('ui.widget') && (
+                    {showWidgetConfig && shouldShowWidgetProps && (
                       <FormGroup
                         label={renderLabelWithTooltip({
                           label: 'Widget Props',
@@ -1490,26 +1497,19 @@ export const PropertyEditor: React.FC = () => {
                             'Keeping these values in schema lets the same widget serve multiple business scenarios without custom code per field.',
                           ],
                         })}
-                        helperText={
-                          selectedWidgetDefinition?.propsSchema
-                            ? 'Configure widget props with the widget schema.'
-                            : 'Additional props passed directly to the widget (JSON object)'
-                        }
+                        helperText="Configure options and other parameters for this widget."
                       >
-                        {selectedWidgetDefinition?.propsSchema ? (
+                        {widgetPropsSchema ? (
                           <DynamicForm
-                            schema={selectedWidgetDefinition.propsSchema}
-                            defaultValues={{
-                              ...getSchemaDefaults(
-                                selectedWidgetDefinition.propsSchema,
-                              ),
-                              ...(currentNode.ui?.widgetProps || {}),
-                            }}
-                            onSubmit={(values) =>
-                              handleUIChange('widgetProps', values)
-                            }
-                            showSubmitButton
+                            schema={widgetPropsSchema}
+                            defaultValues={getWidgetPropsDefaults()}
+                            // Widget props 是 SchemaBuilder 的即时配置，不需要独立提交动作。
+                            showSubmitButton={false}
                             renderAsForm
+                            widgets={{
+                              'widget-options-editor': WidgetOptionsEditor,
+                            }}
+                            onChange={handleWidgetPropsChange}
                           />
                         ) : (
                           <ObjectEditor
@@ -1522,7 +1522,7 @@ export const PropertyEditor: React.FC = () => {
                       </FormGroup>
                     )}
 
-                    {showWidgetConfig && watch('ui.widget') && (
+                    {showWidgetConfig && shouldShowWidgetProps && (
                       <FormGroup
                         label={renderLabelWithTooltip({
                           label: 'Widget Callback Props',

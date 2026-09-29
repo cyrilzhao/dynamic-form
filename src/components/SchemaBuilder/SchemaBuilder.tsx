@@ -35,6 +35,7 @@ import { DynamicForm } from '../DynamicForm'
 import {
   uploadInputWidgetDefinition,
   uploadListInputWidgetDefinition,
+  selectionWidgetDefinitions,
 } from '../DynamicForm/widgets'
 import {
   getWidgetContractSchemaAtPath,
@@ -93,10 +94,14 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
     const isReadonly = readonly.all === true || readonly.schema === true
     const resolvedWidgetDefinitions = useMemo(
       () => [
+        ...selectionWidgetDefinitions,
         uploadInputWidgetDefinition,
         uploadListInputWidgetDefinition,
         ...widgetDefinitions.filter(
           (definition) =>
+            !selectionWidgetDefinitions.some(
+              (builtinDefinition) => builtinDefinition.name === definition.name,
+            ) &&
             definition.name !== uploadInputWidgetDefinition.name &&
             definition.name !== uploadListInputWidgetDefinition.name,
         ),
