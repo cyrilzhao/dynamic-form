@@ -467,6 +467,124 @@ describe('PropertyEditor', () => {
   })
 
   describe('Widget Props 表单', () => {
+    it('切换 widget 时应缓存当前配置并加载目标 widget 的默认配置', async () => {
+      const onUpdate = jest.fn()
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          description: {
+            type: 'string',
+            ui: {
+              widget: 'select',
+              widgetProps: {
+                options: [{ value: 'open', label: 'Open' }],
+                multiple: true,
+              },
+            },
+          },
+        },
+      }
+
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema,
+          selectedPath: ['properties', 'description'],
+          onUpdate,
+        }),
+      })
+      fireEvent.click(screen.getByText('UI Config'))
+      const widgetSelect = getFormGroupSelect('Widget')
+      fireEvent.change(widgetSelect, { target: { value: 'textarea' } })
+
+      await waitFor(() => {
+        expect(onUpdate).toHaveBeenLastCalledWith(
+          ['properties', 'description'],
+          expect.objectContaining({
+            ui: expect.objectContaining({
+              widget: 'textarea',
+              widgetProps: { rows: 4 },
+              __schemaBuilder: expect.objectContaining({
+                widgetPropsByWidget: expect.objectContaining({
+                  select: expect.objectContaining({ multiple: true }),
+                }),
+              }),
+            }),
+          }),
+        )
+      })
+    })
+
+    it('textarea 应通过 propsSchema 展示 rows 和 maxLength', () => {
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          description: { type: 'string', ui: { widget: 'textarea' } },
+        },
+      }
+
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema,
+          selectedPath: ['properties', 'description'],
+        }),
+      })
+      fireEvent.click(screen.getByText('UI Config'))
+
+      expect(screen.getByText('Rows')).toBeInTheDocument()
+      expect(screen.getByText('Maximum Length')).toBeInTheDocument()
+    })
+
+    it('切回已有配置的 widget 时应恢复对应缓存', async () => {
+      const onUpdate = jest.fn()
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          description: {
+            type: 'string',
+            ui: {
+              widget: 'textarea',
+              widgetProps: { rows: 6 },
+              __schemaBuilder: {
+                widgetPropsByWidget: {
+                  select: {
+                    options: [{ value: 'open', label: 'Open' }],
+                    multiple: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      }
+
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema,
+          selectedPath: ['properties', 'description'],
+          onUpdate,
+        }),
+      })
+      fireEvent.click(screen.getByText('UI Config'))
+      fireEvent.change(getFormGroupSelect('Widget'), {
+        target: { value: 'select' },
+      })
+
+      await waitFor(() => {
+        expect(onUpdate).toHaveBeenLastCalledWith(
+          ['properties', 'description'],
+          expect.objectContaining({
+            ui: expect.objectContaining({
+              widget: 'select',
+              widgetProps: expect.objectContaining({ multiple: true }),
+            }),
+          }),
+        )
+      })
+    })
+
     it('应隐藏 Submit 并在 props 变更时实时写入 ui.widgetProps', async () => {
       const onUpdate = jest.fn()
       render(<PropertyEditor />, {

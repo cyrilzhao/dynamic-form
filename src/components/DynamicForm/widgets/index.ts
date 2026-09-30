@@ -26,3 +26,4 @@ export { uploadListInputWidgetDefinition } from './UploadListInputWidget.definit
 export type { UploadListInputWidgetProps } from './UploadListInputWidget'
 export { WidgetOptionsEditor } from './WidgetOptionsEditor'
 export { selectionWidgetDefinitions } from './selectionWidgetDefinitions'
+export { basicWidgetDefinitions } from './basicWidgetDefinitions'

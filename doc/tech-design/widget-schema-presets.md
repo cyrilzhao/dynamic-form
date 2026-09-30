@@ -80,6 +80,10 @@ interface WidgetDefinition {
 
 `propsSchema` 描述 Widget 的静态、可序列化参数，包括类型、校验、说明和默认值。默认 Props 的唯一来源是 `propsSchema.properties.*.default`，不再额外提供 `defaultProps`，避免出现两套默认值冲突。已保存的 `ui.widgetProps` 优先于 `propsSchema` 中的默认值；缺失的 Props 使用 Schema 默认值补齐。函数 Props 不进入 `propsSchema`，继续通过 `callbackProps` 单独配置。内置 `select`、`radio`、`checkbox-group` 与 custom widget 一样可以声明 `propsSchema`，其中选择类 Widget 的 `options`、`multiple` 等参数通过 Props 表单配置。
 
+切换 Widget 时，`ui.widgetProps` 只保存当前 Widget 的配置，避免把上一个 Widget 的参数继续传给新的 Widget。SchemaBuilder 在 `ui.__schemaBuilder.widgetPropsByWidget` 中按 Widget 名称缓存已经编辑过的配置：切换到已有缓存时恢复缓存，首次切换到该 Widget 时使用其 `propsSchema` 默认值；没有 `propsSchema` 的 Widget 不产生运行时 Props。该缓存是编辑器内部元数据，不应被 DynamicForm 展开传递给 Widget，提交到后端前可按项目边界清理。
+
+内置 Widget 与 custom Widget 使用相同的 `propsSchema` 机制，但只为具有稳定业务配置的控件声明参数。例如 `textarea` 暴露 `rows`、`maxLength`，`text` 暴露 `maxLength`、`autoComplete`；字段通用的 `placeholder`、`disabled` 等仍由字段 UI 配置管理，不重复放入 Widget Props。
+
 ### 4.1 upload-input 示例
 
 ```ts

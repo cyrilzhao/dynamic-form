@@ -35,6 +35,7 @@ import type { ExtendedJSONSchema } from '@/components/DynamicForm'
 import {
   WidgetOptionsEditor,
   selectionWidgetDefinitions,
+  basicWidgetDefinitions,
 } from '../../../DynamicForm/widgets'
 import type { FieldOption } from '../../../DynamicForm/types/schema'
 import {
@@ -586,6 +587,9 @@ export const PropertyEditor: React.FC = () => {
     widgetDefinitions.find(
       (definition) => definition.name === effectiveWidgetDefinitionName,
     ) ??
+    basicWidgetDefinitions.find(
+      (definition) => definition.name === effectiveWidgetDefinitionName,
+    ) ??
     selectionWidgetDefinitions.find(
       (definition) => definition.name === effectiveWidgetDefinitionName,
     )
@@ -620,7 +624,17 @@ export const PropertyEditor: React.FC = () => {
       return {}
     }
     const defaults = getSchemaDefaults(selectedWidgetDefinition.propsSchema)
-    const currentProps = currentNode.ui?.widgetProps || {}
+    const currentWidget = currentNode.ui?.widget || defaultWidget
+    const cachedProps =
+      currentNode.ui?.__schemaBuilder?.widgetPropsByWidget?.[
+        effectiveWidgetDefinitionName
+      ]
+    const currentProps =
+      cachedProps ??
+      (effectiveWidgetDefinitionName === currentWidget
+        ? currentNode.ui?.widgetProps
+        : undefined) ??
+      {}
     if (!selectedWidgetDefinition.propsSchema.properties?.options) {
       return { ...defaults, ...currentProps }
     }
@@ -655,11 +669,100 @@ export const PropertyEditor: React.FC = () => {
         ui: {
           ...currentNode.ui,
           widgetProps: nextProps,
+          __schemaBuilder: {
+            ...currentNode.ui?.__schemaBuilder,
+            widgetPropsByWidget: {
+              ...currentNode.ui?.__schemaBuilder?.widgetPropsByWidget,
+              [effectiveWidgetDefinitionName]: nextProps,
+            },
+          },
         },
       })
       return
     }
-    handleUIChange('widgetProps', nextProps)
+    const currentWidget = currentNode.ui?.widget || defaultWidget
+    onUpdate(selectedPath, {
+      ui: {
+        ...currentNode.ui,
+        widgetProps: nextProps,
+        __schemaBuilder: {
+          ...currentNode.ui?.__schemaBuilder,
+          widgetPropsByWidget: {
+            ...currentNode.ui?.__schemaBuilder?.widgetPropsByWidget,
+            [currentWidget]: nextProps,
+          },
+        },
+      },
+    })
+  }
+
+  const handleWidgetChange = (
+    nextWidgetValue: string | number | (string | number)[] | null,
+  ) => {
+    const normalizedWidgetValue = Array.isArray(nextWidgetValue)
+      ? nextWidgetValue[0]
+      : nextWidgetValue
+    const nextWidget = String(normalizedWidgetValue || defaultWidget)
+    const currentWidget = currentNode.ui?.widget || defaultWidget
+    const previousProps = currentNode.ui?.widgetProps
+    const widgetPropsByWidget = {
+      ...currentNode.ui?.__schemaBuilder?.widgetPropsByWidget,
+    }
+    if (previousProps && currentWidget) {
+      widgetPropsByWidget[currentWidget] = previousProps
+    }
+
+    const nextDefinition =
+      widgetDefinitions.find((definition) => definition.name === nextWidget) ??
+      basicWidgetDefinitions.find(
+        (definition) => definition.name === nextWidget,
+      ) ??
+      selectionWidgetDefinitions.find(
+        (definition) => definition.name === nextWidget,
+      )
+    const nextCachedProps = widgetPropsByWidget[nextWidget]
+    const nextDefaults = nextDefinition?.propsSchema
+      ? getSchemaDefaults(nextDefinition.propsSchema)
+      : {}
+    const nextProps = {
+      ...nextDefaults,
+      ...(nextCachedProps ??
+        (nextWidget === currentWidget ? previousProps : {})),
+    }
+    if (nextDefinition?.propsSchema?.properties?.options) {
+      nextProps.options = mergeWidgetOptions({
+        schema: currentNode,
+        widgetPropsOptions: nextProps.options,
+      })
+    }
+    if (nextDefinition?.propsSchema) {
+      widgetPropsByWidget[nextWidget] = nextProps
+    }
+
+    const nextUI = {
+      ...currentNode.ui,
+      widget: normalizedWidgetValue || undefined,
+      widgetProps: nextDefinition?.propsSchema ? nextProps : undefined,
+      __schemaBuilder: {
+        ...currentNode.ui?.__schemaBuilder,
+        widgetPropsByWidget,
+      },
+    }
+    if (nextDefinition?.valueSchema) {
+      const merged = mergeWidgetValueSchema({
+        currentSchema: currentNode,
+        widgetSchema: nextDefinition.valueSchema,
+      })
+      onUpdate(selectedPath, {
+        type: merged.schema.type,
+        properties: merged.schema.properties,
+        items: merged.schema.items,
+        required: merged.schema.required,
+        ui: { ...merged.schema.ui, ...nextUI },
+      })
+      return
+    }
+    onUpdate(selectedPath, { ui: nextUI })
   }
   const shouldShowWidgetProps =
     Boolean(configuredWidget) || Boolean(currentNode.enum)
@@ -1440,27 +1543,7 @@ export const PropertyEditor: React.FC = () => {
                               value={field.value ?? ''}
                               onChange={(value) => {
                                 field.onChange(value)
-                                const definition = widgetDefinitions.find(
-                                  (item) => item.name === value,
-                                )
-                                if (definition?.valueSchema) {
-                                  const merged = mergeWidgetValueSchema({
-                                    currentSchema: currentNode,
-                                    widgetSchema: definition.valueSchema,
-                                  })
-                                  onUpdate(selectedPath, {
-                                    type: merged.schema.type,
-                                    properties: merged.schema.properties,
-                                    items: merged.schema.items,
-                                    required: merged.schema.required,
-                                    ui: {
-                                      ...merged.schema.ui,
-                                      widget: String(value),
-                                    },
-                                  })
-                                } else {
-                                  handleUIChange('widget', value)
-                                }
+                                handleWidgetChange(value)
                               }}
                               options={[
                                 {
