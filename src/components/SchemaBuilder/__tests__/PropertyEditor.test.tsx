@@ -347,6 +347,41 @@ describe('PropertyEditor', () => {
   })
 
   describe('数组 items 节点', () => {
+    it('应该允许编辑元素 Label，但隐藏 Description 和 Default Value', () => {
+      const onUpdate = jest.fn()
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema: {
+            type: 'object',
+            properties: {
+              tags: {
+                type: 'array',
+                items: {
+                  type: 'string',
+                  title: 'Tag',
+                  description: 'A tag',
+                  default: 'general',
+                },
+              },
+            },
+          },
+          selectedPath: ['properties', 'tags', 'items'],
+          onUpdate,
+        }),
+      })
+
+      expect(screen.getByText('Label')).toBeInTheDocument()
+      expect(screen.queryByText('Description')).not.toBeInTheDocument()
+      expect(screen.queryByText('Default Value')).not.toBeInTheDocument()
+
+      const labelInput = screen.getByDisplayValue('Tag')
+      fireEvent.change(labelInput, { target: { value: 'Tag name' } })
+      expect(onUpdate).toHaveBeenCalledWith(['properties', 'tags', 'items'], {
+        title: 'Tag name',
+      })
+    })
+
     it('应该允许配置元素 widget 和基础 schema 约束', () => {
       const onUpdate = jest.fn()
       const contextValue = {

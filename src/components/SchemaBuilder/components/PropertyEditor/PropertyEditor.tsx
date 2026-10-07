@@ -1013,24 +1013,26 @@ export const PropertyEditor: React.FC = () => {
                   />
                 </FormGroup>
 
-                <FormGroup label="Description">
-                  <Controller
-                    name="description"
-                    control={control}
-                    render={({ field }) => {
-                      return (
-                        <TextArea
-                          {...field}
-                          fill
-                          onChange={(e) => {
-                            field.onChange(e)
-                            handleFieldChange('description', e.target.value)
-                          }}
-                        />
-                      )
-                    }}
-                  />
-                </FormGroup>
+                {!isItemsSchemaNode && (
+                  <FormGroup label="Description">
+                    <Controller
+                      name="description"
+                      control={control}
+                      render={({ field }) => {
+                        return (
+                          <TextArea
+                            {...field}
+                            fill
+                            onChange={(e) => {
+                              field.onChange(e)
+                              handleFieldChange('description', e.target.value)
+                            }}
+                          />
+                        )
+                      }}
+                    />
+                  </FormGroup>
+                )}
 
                 <FormGroup label="Type">
                   <Controller
@@ -1053,15 +1055,17 @@ export const PropertyEditor: React.FC = () => {
                   />
                 </FormGroup>
 
-                <Controller
-                  name="default"
-                  control={control}
-                  render={({ field }) => (
-                    <FormGroup label="Default Value">
-                      {renderDefaultValueInput(field)}
-                    </FormGroup>
-                  )}
-                />
+                {!isItemsSchemaNode && (
+                  <Controller
+                    name="default"
+                    control={control}
+                    render={({ field }) => (
+                      <FormGroup label="Default Value">
+                        {renderDefaultValueInput(field)}
+                      </FormGroup>
+                    )}
+                  />
+                )}
 
                 {isObjectProperty && (
                   <Switch
