@@ -236,6 +236,35 @@ describe('widgetSchema utilities', () => {
     ])
   })
 
+  it('校验没有 valueSchema 但声明 supports 的 Widget 类型冲突', () => {
+    const selectWidget: WidgetDefinition = {
+      name: 'select',
+      component: (() => null) as WidgetDefinition['component'],
+      supports: { schemaTypes: ['string', 'array'] },
+    }
+
+    expect(
+      validateWidgetSchemaContracts({
+        schema: {
+          type: 'object',
+          properties: {
+            status: {
+              type: 'object',
+              ui: { widget: 'select' },
+            },
+          },
+        },
+        widgetDefinitions: [selectWidget],
+      }),
+    ).toEqual([
+      {
+        path: '#/properties/status',
+        message:
+          'Widget "select" supports field types "string" or "array", but the field uses type "object".',
+      },
+    ])
+  })
+
   it('校验 Widget 输出 Schema 中的子字段配置必须匹配 valueSchema', () => {
     const issues = validateWidgetSchemaContracts({
       schema: {

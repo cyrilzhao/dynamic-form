@@ -48,7 +48,7 @@ import {
   isWidgetValueSchemaDescendantPath,
 } from '../../utils/widgetSchema'
 
-// Helper to get node from path
+// 按 Schema 路径统一读取节点；根路径和嵌套路径由同一入口处理，避免各处重复分支。
 const getNode = (schema: any, path: string[]) => {
   if (path.length === 0) {
     return schema
@@ -56,6 +56,7 @@ const getNode = (schema: any, path: string[]) => {
   return get(schema, path)
 }
 
+// 同时编码原始类型和值，防止 enum/options 合并时把数字 1 与字符串 "1" 当成同一项。
 const getOptionValueKey = (value: unknown): string =>
   `${typeof value}:${JSON.stringify(value)}`
 
@@ -66,17 +67,20 @@ const mergeWidgetOptions = ({
   schema: ExtendedJSONSchema
   widgetPropsOptions?: FieldOption[]
 }): FieldOption[] => {
+  // 先投影 Schema enum，保证旧数据只有 enum 时仍可在 Widget Props 中编辑。
   const schemaOptions = (schema.enum || []).map((value, index) => ({
     value,
     label: schema.enumNames?.[index] ?? String(value),
     disabled: false,
   }))
+  // 用带类型的 key 去重，并让后续 widgetProps 展示配置覆盖同值的旧展示属性。
   const merged = new Map<string, FieldOption>()
 
   schemaOptions.forEach((option) => {
     merged.set(getOptionValueKey(option.value), option)
   })
   widgetPropsOptions?.forEach((option) => {
+    // 当前 option 可能覆盖历史 label/disabled，但没有明确 disabled 时统一为 false。
     const key = getOptionValueKey(option.value)
     merged.set(key, {
       ...merged.get(key),
@@ -89,6 +93,7 @@ const mergeWidgetOptions = ({
 }
 
 const getOptionValueType = (schema: ExtendedJSONSchema): string => {
+  // 由现有 enum 推断新增 option 的输入类型，避免历史数字或布尔选项被误建成字符串。
   const enumTypes = Array.from(
     new Set((schema.enum || []).map((value) => typeof value)),
   )
@@ -298,29 +303,37 @@ export const PropertyEditor: React.FC = () => {
     options,
     widgetDefinitions = [],
   } = useSchemaBuilder()
+  // 当前被编辑的 Schema 节点；后续默认值、widget 和父级 required 状态都以它为基准。
   const currentNode = getNode(schema, selectedPath)
 
   // 将 selectedPath 数组转换为 JSON Pointer 格式
   // ['properties', 'field1', 'properties', 'field2'] -> '#/properties/field1/properties/field2'
+  // 子编辑器使用 JSON Pointer 标识字段；根节点没有字段路径，因此保持空字符串。
   const currentFieldPath =
     selectedPath.length > 0 ? `#/${selectedPath.join('/')}` : ''
 
   // Determine if it's a root node
+  // 根节点不能按普通字段编辑，其面板只提供 Schema 级条件配置。
   const isRoot = selectedPath.length === 0
 
   // Determine if it's an object property (to allow renaming key)
   // path: ['properties', 'field1'] -> yes
   // path: ['items'] -> no
+  // 只有 object.properties 下的节点才有可编辑的属性名。
   const isObjectProperty =
     selectedPath.length > 0 &&
     selectedPath[selectedPath.length - 2] === 'properties'
+  // 缓存当前属性键，供名称输入、required 更新和路径提示复用。
   const currentKey = isObjectProperty
     ? selectedPath[selectedPath.length - 1]
     : undefined
 
   // Determine if it's an array items node
+  // items 节点需要读取父数组以区别真正的数组元素 schema 与普通名为 items 的节点。
   const parentPath = selectedPath.slice(0, -1)
+  // 父节点决定所选 items 是否属于 array。
   const parentNode = getNode(schema, parentPath)
+  // 该标记控制普通数组元素的专属编辑能力；Widget 契约 items 后续会额外只读保护。
   const isItemsSchemaNode =
     selectedPath.length > 0 &&
     selectedPath[selectedPath.length - 1] === 'items' &&
@@ -332,16 +345,23 @@ export const PropertyEditor: React.FC = () => {
   // Determine if it's a schema-level node (only root)
   // 只有根节点应该只显示条件验证配置
   // 其他节点（包括 object 类型）都应该显示完整的字段配置
+  // rootType 模式把根节点当作字段容器编辑；否则根面板只处理跨字段验证。
   const isSchemaLevelNode = isRoot && !options?.rootType
 
+  // 将标签页选择保存在组件状态中，避免字段内部更新时意外切回默认面板。
   const [selectedTabId, setSelectedTabId] = useState(
     isSchemaLevelNode ? 'validation' : 'basic',
   )
+  // 名称输入需在 blur 时验证后提交，因此暂存输入值，不直接改 Schema。
   const [keyInput, setKeyInput] = useState(currentKey || '')
+  // 暂存名称校验错误，以便输入框立即反馈重复名或空名称。
   const [keyError, setKeyError] = useState('')
+  // 类型不兼容时先保存用户意图，等待阻断式弹窗让用户选择如何解决。
   const [pendingType, setPendingType] = useState<SchemaNodeType | null>(null)
+  // 控制类型冲突弹窗；不允许关闭是为了避免冲突状态被无选择地保留。
   const [isTypeConflictOpen, setIsTypeConflictOpen] = useState(false)
 
+  // React Hook Form 管理面板输入态；Schema 更新后 reset 保证表单回显与外部节点一致。
   const { control, reset, watch, setValue } = useForm({
     defaultValues: createEditorFormDefaults({ currentKey, currentNode }),
     mode: 'onBlur',
@@ -371,15 +391,18 @@ export const PropertyEditor: React.FC = () => {
     )
   }
 
+  // 集中提交顶层 Schema 字段变更，避免每个控件重复构造更新路径。
   const handleFieldChange = (field: string, value: any) => {
     onUpdate(selectedPath, { [field]: value })
   }
 
+  // UI 配置必须与现有 ui 合并写回，避免修改单项时覆盖其他 UI 元数据。
   const handleUIChange = (field: string, value: any) => {
     onUpdate(selectedPath, { ui: { ...currentNode.ui, [field]: value } })
   }
 
   const handleKeyChange = (e: React.FocusEvent<HTMLInputElement>) => {
+    // 仅在失焦时提交名称，先去除首尾空格以保持 Schema key 稳定。
     const newKey = e.target.value.trim()
 
     // 验证：不能为空
@@ -391,7 +414,9 @@ export const PropertyEditor: React.FC = () => {
 
     // 验证：不能与其他字段重复
     if (newKey !== currentKey) {
+      // 当前属性的父级 properties 用于检查同级键冲突。
       const propertiesPath = selectedPath.slice(0, -1)
+      // 读取同级属性集合，避免重命名覆盖已有字段。
       const propertiesNode = get(schema, propertiesPath)
       if (propertiesNode && propertiesNode[newKey]) {
         setKeyError(`Field name "${newKey}" already exists`)
@@ -404,6 +429,7 @@ export const PropertyEditor: React.FC = () => {
     }
   }
 
+  // 按字段类型渲染合适的默认值控件，集中处理数值中间态与 Schema 提交转换。
   const renderDefaultValueInput = (field: any) => {
     if (currentType === 'boolean') {
       return (
@@ -440,6 +466,7 @@ export const PropertyEditor: React.FC = () => {
             }
           }}
           onBlur={(e) => {
+            // 数字 default 在 blur 时才提交，允许输入过程中暂存空值等中间状态。
             const v =
               e.target.value === '' ? undefined : parseInt(e.target.value, 10)
             field.onChange(v)
@@ -477,6 +504,7 @@ export const PropertyEditor: React.FC = () => {
             }
           }}
           onBlur={(e) => {
+            // 小数 default 同样在 blur 时解析，避免每次按键都破坏输入中的临时文本。
             const v =
               e.target.value === '' ? undefined : parseFloat(e.target.value)
             field.onChange(v)
@@ -497,6 +525,7 @@ export const PropertyEditor: React.FC = () => {
     )
   }
 
+  // 集中维护可选 JSON Schema 基本类型，供字段类型选择器复用。
   const typeOptions = [
     { label: 'String', value: 'string' },
     { label: 'Number', value: 'number' },
@@ -506,6 +535,7 @@ export const PropertyEditor: React.FC = () => {
     { label: 'Array', value: 'array' },
   ]
 
+  // 内置候选按字段类型分类；custom Widget 则另行追加，不因类型不匹配而隐藏。
   const widgetOptions = {
     string: [
       'textarea',
@@ -523,7 +553,9 @@ export const PropertyEditor: React.FC = () => {
     object: ['object-editor'],
   }
 
+  // 监听表单中的类型草稿，候选内置 Widget 随用户编辑立即更新。
   const currentType = watch('type') as SchemaNodeType
+  // 当前类型对应的内置控件候选，减少不适用的内置选择项。
   const currentWidgetOptions = (widgetOptions[currentType] || []).map(
     (widget) => ({
       label:
@@ -531,6 +563,7 @@ export const PropertyEditor: React.FC = () => {
       value: widget,
     }),
   )
+  // custom Widget 保持跨类型可见，便于选择后按其 valueSchema 同步字段类型。
   const customWidgetOptions = widgetDefinitions
     .filter(
       (definition) =>
@@ -544,12 +577,15 @@ export const PropertyEditor: React.FC = () => {
     }))
   // 保存当前 schema 中已经配置的 widget 名称，用于回显自定义 widget，
   // 即使它不在 SchemaBuilder 的内置 widget 列表中也不能丢失。
+  // 保存 schema 中显式配置的 Widget，用于编辑器回显和区分默认 Widget。
   const configuredWidget = currentNode.ui?.widget
   // 数组 items 允许调用方使用注册在 DynamicForm.widgets 中的任意名称，
   // 因此即使元素类型没有内置候选项，也必须显示 widget 编辑入口。
+  // 未进入内置候选的已配置名称仍要保留，否则打开编辑器会丢失既有配置。
   const hasConfiguredCustomWidget =
     !!configuredWidget &&
     !currentWidgetOptions.some((option) => option.value === configuredWidget)
+  // 把当前未知但已保存的 Widget 插入候选，保证历史/外部注册值可见。
   const widgetOptionsWithConfiguredValue = hasConfiguredCustomWidget
     ? [
         {
@@ -559,6 +595,7 @@ export const PropertyEditor: React.FC = () => {
         ...currentWidgetOptions,
       ]
     : currentWidgetOptions
+  // 合并当前类型的内置候选与全部 custom 候选，同时按名称去重。
   const allWidgetOptions = [
     ...widgetOptionsWithConfiguredValue,
     ...customWidgetOptions.filter(
@@ -568,21 +605,27 @@ export const PropertyEditor: React.FC = () => {
         ),
     ),
   ]
+  // items 即使没有类型候选也允许输入自定义 Widget 名称，因此单独决定配置入口显隐。
   const showWidgetConfig =
     currentWidgetOptions.length > 0 ||
     customWidgetOptions.length > 0 ||
     isItemsSchemaNode
+  // 计算 DynamicForm 对当前 schema 的默认渲染方式，用于空选择和缓存键回退。
   const defaultWidget = getDefaultWidget(currentNode)
+  // 使用表单草稿中的 Widget；未显式选择时仍按 Schema 默认渲染控件配置。
   const effectiveWidget = watch('ui.widget') || defaultWidget
+  // checkbox 在非 boolean 字段上代表复选组，映射到其独立配置定义名称。
   const effectiveWidgetDefinitionName =
     effectiveWidget === 'checkbox' && currentType !== 'boolean'
       ? 'checkbox-group'
       : effectiveWidget
+  // 统一计算面板只读策略，避免后续编辑器和契约只读判断重复展开全局选项。
   const editorReadonly =
     options?.readonly?.all ||
     options?.readonly?.schema ||
     options?.readonly?.propertyEditor
 
+  // 优先使用调用方注册定义，再回退到内置定义，以共享 value/props schema 契约。
   const selectedWidgetDefinition =
     widgetDefinitions.find(
       (definition) => definition.name === effectiveWidgetDefinitionName,
@@ -593,6 +636,7 @@ export const PropertyEditor: React.FC = () => {
     selectionWidgetDefinitions.find(
       (definition) => definition.name === effectiveWidgetDefinitionName,
     )
+  // 注入 options 编辑器的默认值类型提示，不修改注册定义本身。
   const widgetPropsSchema = selectedWidgetDefinition?.propsSchema
     ? {
         ...selectedWidgetDefinition.propsSchema,
@@ -623,12 +667,16 @@ export const PropertyEditor: React.FC = () => {
     if (!selectedWidgetDefinition?.propsSchema) {
       return {}
     }
+    // propsSchema 提供首次使用的默认值，之后才由缓存或当前配置覆盖。
     const defaults = getSchemaDefaults(selectedWidgetDefinition.propsSchema)
+    // 当前 Widget 名用于兼容尚未拥有按 Widget 缓存的历史 ui.widgetProps。
     const currentWidget = currentNode.ui?.widget || defaultWidget
+    // 按 Widget 名恢复编辑器缓存，避免不同控件的参数表单串用。
     const cachedProps =
       currentNode.ui?.__schemaBuilder?.widgetPropsByWidget?.[
         effectiveWidgetDefinitionName
       ]
+    // 仅当正在编辑当前 Widget 时读取旧 widgetProps，避免把另一控件参数当作目标配置。
     const currentProps =
       cachedProps ??
       (effectiveWidgetDefinitionName === currentWidget
@@ -649,9 +697,12 @@ export const PropertyEditor: React.FC = () => {
   }
 
   const handleWidgetPropsChange = (values: Record<string, any>) => {
+    // options 分支需同时同步 enum 校验值，其余参数仅写入 ui.widgetProps。
     const nextOptions = values.options
+    // 构造独立配置对象，避免直接修改 DynamicForm 返回的表单值。
     const nextProps = { ...values }
     if (Array.isArray(nextOptions)) {
+      // 补齐 disabled 默认值，确保展示配置结构稳定并能完整写回缓存。
       const normalizedOptions: FieldOption[] = nextOptions.map(
         (option: FieldOption) => ({
           ...option,
@@ -680,6 +731,7 @@ export const PropertyEditor: React.FC = () => {
       })
       return
     }
+    // 默认 Widget 也需要独立缓存，否则从隐式默认控件切出时会丢掉刚编辑的参数。
     const currentWidget = currentNode.ui?.widget || defaultWidget
     onUpdate(selectedPath, {
       ui: {
@@ -699,12 +751,17 @@ export const PropertyEditor: React.FC = () => {
   const handleWidgetChange = (
     nextWidgetValue: string | number | (string | number)[] | null,
   ) => {
+    // Select 可返回单值或多值；此处规范为一个 widget 名以便匹配定义和缓存。
     const normalizedWidgetValue = Array.isArray(nextWidgetValue)
       ? nextWidgetValue[0]
       : nextWidgetValue
+    // 空选择表示恢复 Schema 推导出的默认 Widget。
     const nextWidget = String(normalizedWidgetValue || defaultWidget)
+    // 当前 Widget 是旧配置缓存的键，未显式设置时使用默认 Widget 名。
     const currentWidget = currentNode.ui?.widget || defaultWidget
+    // 先保存当前生效参数，切回该 Widget 时才能恢复用户配置。
     const previousProps = currentNode.ui?.widgetProps
+    // 克隆缓存映射以保证 Schema 更新不可变，避免污染当前节点。
     const widgetPropsByWidget = {
       ...currentNode.ui?.__schemaBuilder?.widgetPropsByWidget,
     }
@@ -712,6 +769,7 @@ export const PropertyEditor: React.FC = () => {
       widgetPropsByWidget[currentWidget] = previousProps
     }
 
+    // 定位目标控件定义，决定其默认 Props 与 valueSchema 行为。
     const nextDefinition =
       widgetDefinitions.find((definition) => definition.name === nextWidget) ??
       basicWidgetDefinitions.find(
@@ -720,10 +778,13 @@ export const PropertyEditor: React.FC = () => {
       selectionWidgetDefinitions.find(
         (definition) => definition.name === nextWidget,
       )
+    // 优先恢复目标 Widget 历史配置；只有首次使用时才采用 schema 默认值。
     const nextCachedProps = widgetPropsByWidget[nextWidget]
+    // 默认参数来自目标 propsSchema，保证新切换的控件从有效初始状态开始。
     const nextDefaults = nextDefinition?.propsSchema
       ? getSchemaDefaults(nextDefinition.propsSchema)
       : {}
+    // 合并默认值与该控件专属缓存，禁止沿用其他控件的 widgetProps。
     const nextProps = {
       ...nextDefaults,
       ...(nextCachedProps ??
@@ -739,6 +800,7 @@ export const PropertyEditor: React.FC = () => {
       widgetPropsByWidget[nextWidget] = nextProps
     }
 
+    // 当前运行时只暴露目标 Widget 的参数；缓存留在 SchemaBuilder 内部元数据中。
     const nextUI = {
       ...currentNode.ui,
       widget: normalizedWidgetValue || undefined,
@@ -749,6 +811,7 @@ export const PropertyEditor: React.FC = () => {
       },
     }
     if (nextDefinition?.valueSchema) {
+      // 有 valueSchema 时同步字段值类型和完整结构，确保选择器切换后契约一致。
       const merged = mergeWidgetValueSchema({
         currentSchema: currentNode,
         widgetSchema: nextDefinition.valueSchema,
@@ -764,27 +827,39 @@ export const PropertyEditor: React.FC = () => {
     }
     onUpdate(selectedPath, { ui: nextUI })
   }
+  // 历史 enum 即使未显式设置 widget 也需展示隐式 select 的 options 编辑入口。
   const shouldShowWidgetProps =
     Boolean(configuredWidget) || Boolean(currentNode.enum)
+  // 查询当前路径对应的 Widget 输出契约，为契约根字段禁用不兼容编辑操作。
   const widgetContractSchema = getWidgetContractSchemaAtPath({
     schema,
     path: selectedPath,
     widgetDefinitions,
   })
+  // 契约根节点仍可编辑通用字段信息，但不能破坏 Widget 声明的值结构。
   const isWidgetContractField = widgetContractSchema !== undefined
+  // 数组 Widget 的 items 子树整体受 valueSchema 管理，不能增删或修改。
   const isWidgetArrayItemsContract = isWidgetArrayItemsContractPath({
     schema,
     path: selectedPath,
     widgetDefinitions,
   })
+  // object Widget 的契约子字段以 valueSchema 为唯一来源，因此整个属性面板只读。
   const isWidgetValueSchemaDescendant = isWidgetValueSchemaDescendantPath({
     schema,
     path: selectedPath,
     widgetDefinitions,
   })
+  // 冲突弹窗需要显示 Widget 真正要求的类型，valueSchema 优先于简写 valueType。
   const widgetRequiredType =
     selectedWidgetDefinition?.valueSchema?.type ??
     selectedWidgetDefinition?.valueType
+  const widgetSupportedTypes = selectedWidgetDefinition?.supports?.schemaTypes
+  const conflictUseType = widgetSupportedTypes?.includes(
+    currentNode.type as never,
+  )
+    ? currentNode.type
+    : (widgetSupportedTypes?.[0] ?? widgetRequiredType)
 
   const applySchemaReplacement = (replacement: ExtendedJSONSchema) => {
     onUpdate(selectedPath, {
@@ -797,7 +872,9 @@ export const PropertyEditor: React.FC = () => {
   }
 
   const handleTypeChange = (nextType: SchemaNodeType) => {
-    if (selectedWidgetDefinition) {
+    // 只有用户显式选择了 Widget 才锁定其类型；默认 Widget 会随字段类型自然变化。
+    if (selectedWidgetDefinition && currentNode.ui?.widget) {
+      // 在应用类型之前校验 Widget 输出契约，避免生成不能正确提交的字段 Schema。
       const compatibility = checkWidgetCompatibility({
         fieldSchema: { ...currentNode, type: nextType },
         widgetDefinition: selectedWidgetDefinition,
@@ -819,18 +896,28 @@ export const PropertyEditor: React.FC = () => {
     if (!selectedWidgetDefinition) {
       return
     }
-    const resolved = resolveWidgetTypeConflict({
-      action: 'use-widget-type',
-      currentSchema: currentNode,
-      widgetDefinition: selectedWidgetDefinition,
-    })
-    applySchemaReplacement(resolved.schema)
-    setValue('type', resolved.schema.type)
+    if (!selectedWidgetDefinition.valueSchema) {
+      const targetType = conflictUseType
+      if (targetType) {
+        onUpdate(selectedPath, { type: targetType })
+        setValue('type', targetType)
+      }
+    } else {
+      // 统一使用契约解析器重建类型及结构，避免只改 type 留下不匹配的子树。
+      const resolved = resolveWidgetTypeConflict({
+        action: 'use-widget-type',
+        currentSchema: currentNode,
+        widgetDefinition: selectedWidgetDefinition,
+      })
+      applySchemaReplacement(resolved.schema)
+      setValue('type', resolved.schema.type)
+    }
     setPendingType(null)
     setIsTypeConflictOpen(false)
   }
 
   const handleRemoveWidget = () => {
+    // 保留用户刚选择的字段类型，同时移除冲突 Widget 及其专属配置。
     const resolved = selectedWidgetDefinition
       ? resolveWidgetTypeConflict({
           action: 'remove-widget',
@@ -931,6 +1018,7 @@ export const PropertyEditor: React.FC = () => {
                 }}
                 onChange={(validationConfig) => {
                   // 更新条件验证配置
+                  // 只收集本次编辑器实际提供的条件关键字，避免未编辑项被误清除。
                   const updates: any = {}
 
                   // dependencies - 使用 'in' 操作符检查键是否存在
@@ -1072,7 +1160,9 @@ export const PropertyEditor: React.FC = () => {
                     style={{ marginBottom: '16px' }}
                     label="Required"
                     checked={(() => {
+                      // required 存在于父 object 上，需从字段路径回退到该父节点。
                       const parentPath = selectedPath.slice(0, -2)
+                      // 读取父对象以回显当前字段是否在 required 列表中。
                       const parentNode =
                         parentPath.length === 0
                           ? schema
@@ -1080,16 +1170,21 @@ export const PropertyEditor: React.FC = () => {
                       return parentNode?.required?.includes(currentKey) || false
                     })()}
                     onChange={(e) => {
+                      // 记录用户本次 required 开关选择，用于更新父对象的 required 集合。
                       const isRequired = e.currentTarget.checked
+                      // required 规则写在父 object，不能更新当前字段自身。
                       const parentPath = selectedPath.slice(0, -2)
+                      // 将父节点限定为 Schema 类型，便于安全读取并更新 required。
                       const parentNode: ExtendedJSONSchema =
                         parentPath.length === 0
                           ? schema
                           : get(schema, parentPath)
 
                       if (parentNode) {
+                        // 复制现有必填项集合，后续添加或移除不会修改原 Schema 数组。
                         const currentRequired: string[] =
                           parentNode.required || []
+                        // 根据开关状态生成新列表，避免重复加入或误删其他必填项。
                         const newRequired = isRequired
                           ? [...currentRequired, currentKey!]
                           : currentRequired.filter((k) => k !== currentKey)
@@ -1687,13 +1782,17 @@ export const PropertyEditor: React.FC = () => {
                           helperText="Configure display labels for boolean values (used with radio/checkbox widget)"
                         >
                           {(() => {
+                            // boolean enumNames 保存 true/false 的展示文案，缺省时允许逐项补齐。
                             const enumNames = currentNode.enumNames || []
+                            // 固定布尔值顺序，使标签编辑始终对应 true 后 false。
                             const displayEnum = [true, false]
 
+                            // 仅更新布尔选项的展示名称，存储值始终固定为 true/false。
                             const handleUpdateLabel = (
                               index: number,
                               label: string,
                             ) => {
+                              // 使用副本更新单个标签，保留另一个布尔值的展示名称。
                               const newEnumNames = [...enumNames]
                               newEnumNames[index] = label
 
@@ -2075,12 +2174,18 @@ export const PropertyEditor: React.FC = () => {
                           helperText="Configure available options for static array (multi-select checkboxes)"
                         >
                           {(() => {
+                            // 静态数组选项实际定义在 items schema，而非数组字段本身。
                             const items = currentNode.items || {}
+                            // 读取元素可选值，供列表展示和增删改回调使用。
                             const enumValues = items.enum || []
+                            // 与 enumValues 同索引保存标签；缺失标签时保持空列表兼容旧数据。
                             const enumNames = items.enumNames || []
 
+                            // 新增静态数组选项时同时扩展值和标签列表，保持索引对应。
                             const handleAddOption = () => {
+                              // 新选项先用空值占位，保持 value 与 label 数组索引对齐。
                               const newEnum = [...enumValues, '']
+                              // 新 label 同步增加占位，确保后续编辑不会错配选项。
                               const newEnumNames = [...enumNames, '']
                               onUpdate(selectedPath, {
                                 items: {
@@ -2091,10 +2196,13 @@ export const PropertyEditor: React.FC = () => {
                               })
                             }
 
+                            // 删除选项时同步裁剪 enum 与 enumNames，避免留下错位标签。
                             const handleRemoveOption = (index: number) => {
+                              // 从值和标签数组按同一索引删除，避免标签与值错位。
                               const newEnum = enumValues.filter(
                                 (_: any, i: number) => i !== index,
                               )
+                              // 同步移除对应标签，保持 items.enumNames 与 enum 对齐。
                               const newEnumNames = enumNames.filter(
                                 (_: any, i: number) => i !== index,
                               )
@@ -2111,10 +2219,12 @@ export const PropertyEditor: React.FC = () => {
                               })
                             }
 
+                            // 更新静态选项的实际值，同时保留同索引展示标签。
                             const handleUpdateValue = (
                               index: number,
                               value: string,
                             ) => {
+                              // 复制选项值列表后修改单项，避免原地更改 Schema。
                               const newEnum = [...enumValues]
                               newEnum[index] = value
                               onUpdate(selectedPath, {
@@ -2122,10 +2232,12 @@ export const PropertyEditor: React.FC = () => {
                               })
                             }
 
+                            // 更新静态选项展示标签，不改变其实际校验值。
                             const handleUpdateLabel = (
                               index: number,
                               label: string,
                             ) => {
+                              // 复制标签列表后修改单项，避免原地更改 Schema。
                               const newEnumNames = [...enumNames]
                               newEnumNames[index] = label
                               onUpdate(selectedPath, {
@@ -2338,8 +2450,10 @@ export const PropertyEditor: React.FC = () => {
                       value={currentNode.ui?.variants}
                       defaultVariant={currentNode.ui?.defaultVariant}
                       onChange={(variants, nextDefaultVariant) => {
+                        // 记录更新前是否已有 Variant，以区分首次添加与清空后的默认恢复。
                         const hadVariants =
                           (currentNode.ui?.variants?.length ?? 0) > 0
+                        // 更新后是否仍有 Variant，决定是否切换到 VariantWidget。
                         const hasVariants = (variants?.length ?? 0) > 0
                         onUpdate(selectedPath, {
                           ui: {
@@ -2371,11 +2485,11 @@ export const PropertyEditor: React.FC = () => {
       >
         <DialogBody>
           <Callout intent="warning">
-            The selected Widget requires type "
-            {selectedWidgetDefinition &&
-              (selectedWidgetDefinition.valueSchema?.type ??
-                selectedWidgetDefinition.valueType)}
-            ", but the field type is "{pendingType}".
+            {widgetSupportedTypes?.length
+              ? `The selected Widget supports field types ${widgetSupportedTypes
+                  .map((type) => `"${type}"`)
+                  .join(' or ')}, but the field type is "${pendingType}".`
+              : `The selected Widget requires type "${widgetRequiredType}", but the field type is "${pendingType}".`}
           </Callout>
           <p style={{ marginTop: 12 }}>
             Choose how to resolve the conflict before continuing.
@@ -2385,9 +2499,7 @@ export const PropertyEditor: React.FC = () => {
           actions={
             <>
               <Button intent="primary" onClick={handleUseWidgetType}>
-                {widgetRequiredType
-                  ? `Use ${widgetRequiredType}`
-                  : 'Use widget type'}
+                {conflictUseType ? `Use ${conflictUseType}` : 'Use widget type'}
               </Button>
               <Button onClick={handleRemoveWidget}>Remove widget</Button>
             </>

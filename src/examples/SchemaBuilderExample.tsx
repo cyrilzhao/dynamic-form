@@ -6,6 +6,13 @@ import {
 } from '@/components/SchemaBuilder/SchemaBuilder'
 import type { ExtendedJSONSchema } from '@/components/DynamicForm'
 import { isExtendedJSONSchema } from '@/components/SchemaBuilder/utils/validateExtendedJSONSchema'
+import { validateWidgetSchemaContracts } from '@/components/SchemaBuilder/utils/widgetSchema'
+import {
+  basicWidgetDefinitions,
+  selectionWidgetDefinitions,
+  uploadInputWidgetDefinition,
+  uploadListInputWidgetDefinition,
+} from '@/components/DynamicForm/widgets'
 
 // const initialSchema: ExtendedJSONSchema = {
 //   type: 'object',
@@ -163,8 +170,29 @@ export const SchemaBuilderExample: React.FC = () => {
 
   const handleValidate = () => {
     const currentSchema = builderRef.current?.getSchema()
-    const isValid = currentSchema ? isExtendedJSONSchema(currentSchema) : false
-    setValidationMessage(isValid ? 'Schema is valid.' : 'Schema is invalid.')
+    const isBaseSchemaValid = currentSchema
+      ? isExtendedJSONSchema(currentSchema)
+      : false
+    const widgetDefinitions = [
+      ...basicWidgetDefinitions,
+      ...selectionWidgetDefinitions,
+      uploadInputWidgetDefinition,
+      uploadListInputWidgetDefinition,
+    ]
+    const contractIssues = currentSchema
+      ? validateWidgetSchemaContracts({
+          schema: currentSchema,
+          widgetDefinitions,
+        })
+      : []
+    const isValid = isBaseSchemaValid && contractIssues.length === 0
+    setValidationMessage(
+      isValid
+        ? 'Schema is valid.'
+        : contractIssues.length > 0
+          ? `Schema is invalid: ${contractIssues[0].message}`
+          : 'Schema is invalid.',
+    )
   }
 
   const handleReadSchema = () => {

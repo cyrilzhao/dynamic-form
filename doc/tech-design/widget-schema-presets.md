@@ -78,6 +78,8 @@ interface WidgetDefinition {
 
 `valueSchema` 是 Widget 输出值的完整契约，优先级高于单独的 `valueType`。`valueType` 适用于只需要声明标量类型的 Widget。二者都不存在时，Widget 保持当前行为，不自动生成字段。
 
+对于没有固定输出结构、但只适用于部分字段类型的 Widget，使用 `supports.schemaTypes` 声明允许的字段类型。例如选择类 Widget 可以声明 `select: ['string', 'array']`、`radio: ['string', 'boolean']`、`checkbox-group: ['array']`。SchemaBuilder 的类型编辑和 Validate Schema 都必须检查这项声明；不兼容时阻止静默保存，并要求用户选择恢复到 Widget 支持的类型或移除 Widget。
+
 `propsSchema` 描述 Widget 的静态、可序列化参数，包括类型、校验、说明和默认值。默认 Props 的唯一来源是 `propsSchema.properties.*.default`，不再额外提供 `defaultProps`，避免出现两套默认值冲突。已保存的 `ui.widgetProps` 优先于 `propsSchema` 中的默认值；缺失的 Props 使用 Schema 默认值补齐。函数 Props 不进入 `propsSchema`，继续通过 `callbackProps` 单独配置。内置 `select`、`radio`、`checkbox-group` 与 custom widget 一样可以声明 `propsSchema`，其中选择类 Widget 的 `options`、`multiple` 等参数通过 Props 表单配置。
 
 切换 Widget 时，`ui.widgetProps` 只保存当前 Widget 的配置，避免把上一个 Widget 的参数继续传给新的 Widget。SchemaBuilder 在 `ui.__schemaBuilder.widgetPropsByWidget` 中按 Widget 名称缓存已经编辑过的配置：切换到已有缓存时恢复缓存，首次切换到该 Widget 时使用其 `propsSchema` 默认值；没有 `propsSchema` 的 Widget 不产生运行时 Props。该缓存是编辑器内部元数据，不应被 DynamicForm 展开传递给 Widget，提交到后端前可按项目边界清理。

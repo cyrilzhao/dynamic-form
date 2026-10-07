@@ -23,6 +23,7 @@ export const selectionWidgetDefinitions: WidgetDefinition[] = [
   {
     name: 'select',
     component: SelectWidget,
+    supports: { schemaTypes: ['string', 'array'] },
     propsSchema: {
       type: 'object',
       properties: {
@@ -34,11 +35,13 @@ export const selectionWidgetDefinitions: WidgetDefinition[] = [
   {
     name: 'radio',
     component: RadioWidget,
+    supports: { schemaTypes: ['string', 'boolean'] },
     propsSchema: { type: 'object', properties: { options: optionsSchema } },
   },
   {
     name: 'checkbox-group',
     component: CheckboxGroupWidget,
+    supports: { schemaTypes: ['array'] },
     propsSchema: { type: 'object', properties: { options: optionsSchema } },
   },
 ]

@@ -7,6 +7,7 @@ export const basicWidgetDefinitions: WidgetDefinition[] = [
   {
     name: 'text',
     component: TextWidget,
+    supports: { schemaTypes: ['string'] },
     propsSchema: {
       type: 'object',
       properties: {
@@ -25,6 +26,7 @@ export const basicWidgetDefinitions: WidgetDefinition[] = [
   {
     name: 'textarea',
     component: TextareaWidget,
+    supports: { schemaTypes: ['string'] },
     propsSchema: {
       type: 'object',
       properties: {

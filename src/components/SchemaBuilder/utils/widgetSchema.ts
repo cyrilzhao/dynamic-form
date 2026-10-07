@@ -5,6 +5,7 @@ import type { ExtendedJSONSchema } from '../../DynamicForm/types/schema'
 export interface WidgetCompatibilityResult {
   compatible: boolean
   expectedType?: ExtendedJSONSchema['type']
+  supportedTypes?: WidgetDefinition['supports']['schemaTypes']
   actualType?: ExtendedJSONSchema['type']
 }
 
@@ -74,7 +75,21 @@ export const checkWidgetCompatibility = ({
 }): WidgetCompatibilityResult => {
   const expectedType = getWidgetValueType(widgetDefinition)
   const actualType = fieldSchema.type
-  if (!expectedType || !actualType) {
+  if (!actualType) {
+    return { compatible: true, expectedType, actualType }
+  }
+  if (!expectedType && widgetDefinition.supports?.schemaTypes) {
+    const actualTypes = Array.isArray(actualType) ? actualType : [actualType]
+    return {
+      compatible: actualTypes.every((type) =>
+        widgetDefinition.supports!.schemaTypes!.includes(type),
+      ),
+      expectedType,
+      supportedTypes: widgetDefinition.supports.schemaTypes,
+      actualType,
+    }
+  }
+  if (!expectedType) {
     return { compatible: true, expectedType, actualType }
   }
   return {
@@ -463,6 +478,25 @@ export const validateWidgetSchemaContracts = ({
     const widgetDefinition = widgetDefinitions.find(
       (definition) => definition.name === currentSchema.ui?.widget,
     )
+    const supportedTypes = widgetDefinition?.supports?.schemaTypes
+    const actualTypes = currentSchema.type
+      ? Array.isArray(currentSchema.type)
+        ? currentSchema.type
+        : [currentSchema.type]
+      : []
+    if (
+      widgetDefinition &&
+      !getWidgetValueType(widgetDefinition) &&
+      supportedTypes?.length &&
+      actualTypes.some((type) => !supportedTypes.includes(type))
+    ) {
+      issues.push({
+        path: `#/${path.join('/')}`,
+        message: `Widget "${widgetDefinition.name}" supports field types ${supportedTypes
+          .map((type) => `"${type}"`)
+          .join(' or ')}, but the field uses type "${currentSchema.type}".`,
+      })
+    }
     if (widgetDefinition?.valueSchema) {
       validateWidgetValueSchema({
         actualSchema: currentSchema,
