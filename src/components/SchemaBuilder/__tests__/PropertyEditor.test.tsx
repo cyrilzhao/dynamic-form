@@ -935,6 +935,41 @@ describe('PropertyEditor', () => {
   })
 
   describe('字段属性编辑', () => {
+    it('Widget 类型冲突弹窗应在按钮文案中显示实际的目标类型', () => {
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema: {
+            type: 'object',
+            properties: {
+              name: {
+                type: 'string',
+                ui: { widget: 'array-input' },
+              },
+            },
+          },
+          widgetDefinitions: [
+            {
+              name: 'array-input',
+              component: (() => null) as React.ComponentType<any>,
+              valueSchema: { type: 'array', items: { type: 'string' } },
+            },
+          ],
+        }),
+      })
+
+      fireEvent.change(getFormGroupSelect('Type'), {
+        target: { value: 'object' },
+      })
+
+      expect(
+        screen.getByRole('button', { name: 'Use array' }),
+      ).toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: 'Use object' }),
+      ).not.toBeInTheDocument()
+    })
+
     it('修改 title 应该调用 onUpdate', () => {
       const onUpdate = jest.fn()
       render(<PropertyEditor />, {

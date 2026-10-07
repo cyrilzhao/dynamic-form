@@ -782,6 +782,9 @@ export const PropertyEditor: React.FC = () => {
     path: selectedPath,
     widgetDefinitions,
   })
+  const widgetRequiredType =
+    selectedWidgetDefinition?.valueSchema?.type ??
+    selectedWidgetDefinition?.valueType
 
   const applySchemaReplacement = (replacement: ExtendedJSONSchema) => {
     onUpdate(selectedPath, {
@@ -2378,7 +2381,9 @@ export const PropertyEditor: React.FC = () => {
           actions={
             <>
               <Button intent="primary" onClick={handleUseWidgetType}>
-                Use object
+                {widgetRequiredType
+                  ? `Use ${widgetRequiredType}`
+                  : 'Use widget type'}
               </Button>
               <Button onClick={handleRemoveWidget}>Remove widget</Button>
             </>
