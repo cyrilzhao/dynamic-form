@@ -1560,44 +1560,46 @@ export const PropertyEditor: React.FC = () => {
                   )}
 
                   {/* 以下配置只对叶子节点（非 object 和 array）显示 */}
-                  {currentType !== 'object' && currentType !== 'array' && (
-                    <ConfigSection
-                      title="Required Message"
-                      description="Customize the validation message shown when required field input is missing."
-                    >
-                      <FormGroup
-                        label={renderLabelWithTooltip({
-                          label: 'Required Error Message',
-                          title: 'Required validation message',
-                          description:
-                            'Custom error message shown when this field is required but the user leaves it empty.',
-                          reasons: [
-                            'Use business-specific wording so users understand exactly what value is missing.',
-                            'A clear required message reduces form submission failures in operational workflows.',
-                          ],
-                        })}
+                  {currentType !== 'object' &&
+                    currentType !== 'array' &&
+                    !isItemsSchemaNode && (
+                      <ConfigSection
+                        title="Required Message"
+                        description="Customize the validation message shown when required field input is missing."
                       >
-                        <Controller
-                          name="ui.errorMessages.required"
-                          control={control}
-                          render={({ field }) => (
-                            <InputGroup
-                              {...field}
-                              value={field.value ?? ''}
-                              placeholder="This field is required"
-                              onChange={(e) => {
-                                field.onChange(e)
-                                handleUIChange('errorMessages', {
-                                  ...currentNode.ui?.errorMessages,
-                                  required: e.target.value,
-                                })
-                              }}
-                            />
-                          )}
-                        />
-                      </FormGroup>
-                    </ConfigSection>
-                  )}
+                        <FormGroup
+                          label={renderLabelWithTooltip({
+                            label: 'Required Error Message',
+                            title: 'Required validation message',
+                            description:
+                              'Custom error message shown when this field is required but the user leaves it empty.',
+                            reasons: [
+                              'Use business-specific wording so users understand exactly what value is missing.',
+                              'A clear required message reduces form submission failures in operational workflows.',
+                            ],
+                          })}
+                        >
+                          <Controller
+                            name="ui.errorMessages.required"
+                            control={control}
+                            render={({ field }) => (
+                              <InputGroup
+                                {...field}
+                                value={field.value ?? ''}
+                                placeholder="This field is required"
+                                onChange={(e) => {
+                                  field.onChange(e)
+                                  handleUIChange('errorMessages', {
+                                    ...currentNode.ui?.errorMessages,
+                                    required: e.target.value,
+                                  })
+                                }}
+                              />
+                            )}
+                          />
+                        </FormGroup>
+                      </ConfigSection>
+                    )}
                   <ConfigSection
                     title="Custom Validators"
                     description="Add field-level business validation that cannot be expressed with basic JSON Schema constraints."
@@ -1707,63 +1709,67 @@ export const PropertyEditor: React.FC = () => {
                       </FormGroup>
                     )}
 
-                    {showWidgetConfig && shouldShowWidgetProps && (
+                    {showWidgetConfig &&
+                      shouldShowWidgetProps &&
+                      !isItemsSchemaNode && (
+                        <FormGroup
+                          label={renderLabelWithTooltip({
+                            label: 'Widget Callback Props',
+                            title: 'Widget function props',
+                            description:
+                              'Passes function props to the selected widget through callback references or trusted inline scripts.',
+                            reasons: [
+                              'Use it when a widget needs dynamic behavior such as upload handlers, option filtering, or label formatting.',
+                              'Keeping function props separate from widgetProps preserves widgetProps as plain JSON configuration.',
+                            ],
+                          })}
+                          helperText="Function props resolved at render time. These override same-named widgetProps."
+                        >
+                          <Callout
+                            intent="primary"
+                            icon="info-sign"
+                            style={{ marginBottom: 12 }}
+                          >
+                            Callback props are resolved as functions and
+                            override same-named widgetProps.
+                          </Callout>
+                          <CallbackPropsEditor
+                            value={currentNode.ui?.callbackProps}
+                            onChange={(val) =>
+                              handleUIChange('callbackProps', val)
+                            }
+                          />
+                        </FormGroup>
+                      )}
+
+                    {!isItemsSchemaNode && (
                       <FormGroup
                         label={renderLabelWithTooltip({
-                          label: 'Widget Callback Props',
-                          title: 'Widget function props',
+                          label: 'Placeholder',
+                          title: 'Input hint text',
                           description:
-                            'Passes function props to the selected widget through callback references or trusted inline scripts.',
+                            'Shows short guidance inside an empty input before the user enters a value.',
                           reasons: [
-                            'Use it when a widget needs dynamic behavior such as upload handlers, option filtering, or label formatting.',
-                            'Keeping function props separate from widgetProps preserves widgetProps as plain JSON configuration.',
+                            'Use it to clarify expected format or examples without changing validation rules.',
+                            'Good placeholders reduce support cost for fields with business-specific formats like IDs, emails, or percentages.',
                           ],
                         })}
-                        helperText="Function props resolved at render time. These override same-named widgetProps."
                       >
-                        <Callout
-                          intent="primary"
-                          icon="info-sign"
-                          style={{ marginBottom: 12 }}
-                        >
-                          Callback props are resolved as functions and override
-                          same-named widgetProps.
-                        </Callout>
-                        <CallbackPropsEditor
-                          value={currentNode.ui?.callbackProps}
-                          onChange={(val) =>
-                            handleUIChange('callbackProps', val)
-                          }
+                        <Controller
+                          name="ui.placeholder"
+                          control={control}
+                          render={({ field }) => (
+                            <InputGroup
+                              {...field}
+                              value={field.value ?? ''}
+                              onChange={(e) =>
+                                handleUIChange('placeholder', e.target.value)
+                              }
+                            />
+                          )}
                         />
                       </FormGroup>
                     )}
-
-                    <FormGroup
-                      label={renderLabelWithTooltip({
-                        label: 'Placeholder',
-                        title: 'Input hint text',
-                        description:
-                          'Shows short guidance inside an empty input before the user enters a value.',
-                        reasons: [
-                          'Use it to clarify expected format or examples without changing validation rules.',
-                          'Good placeholders reduce support cost for fields with business-specific formats like IDs, emails, or percentages.',
-                        ],
-                      })}
-                    >
-                      <Controller
-                        name="ui.placeholder"
-                        control={control}
-                        render={({ field }) => (
-                          <InputGroup
-                            {...field}
-                            value={field.value ?? ''}
-                            onChange={(e) =>
-                              handleUIChange('placeholder', e.target.value)
-                            }
-                          />
-                        )}
-                      />
-                    </FormGroup>
 
                     {/* Options 配置 - 仅用于 boolean 类型 */}
                     {currentType === 'boolean' && (
@@ -1888,180 +1894,190 @@ export const PropertyEditor: React.FC = () => {
                     )}
                   </ConfigSection>
 
-                  <ConfigSection
-                    title="Visibility and State"
-                    description="Control whether the field is shown, editable, or review-only by default."
-                  >
-                    <Controller
-                      name="ui.hidden"
-                      control={control}
-                      render={({ field }) => (
-                        <Switch
-                          style={{ display: 'flex', alignItems: 'center' }}
-                          labelElement={renderSwitchLabelWithTooltip({
-                            label: 'Hidden',
-                            title: 'Hide this field from the form',
-                            description:
-                              'Removes the field from the visible UI when it should not be shown by default.',
-                            reasons: [
-                              'Use it for fields controlled by business rules, internal data, or progressive disclosure.',
-                              'Hidden fields are skipped by static validation, which prevents users from being blocked by fields they cannot see.',
-                            ],
-                          })}
-                          checked={!!field.value}
-                          onChange={(e) =>
-                            handleUIChange('hidden', e.currentTarget.checked)
-                          }
-                        />
-                      )}
-                    />
-
-                    <Controller
-                      name="ui.disabled"
-                      control={control}
-                      render={({ field }) => (
-                        <Switch
-                          style={{ display: 'flex', alignItems: 'center' }}
-                          labelElement={renderSwitchLabelWithTooltip({
-                            label: 'Disabled',
-                            title: 'Prevent user input',
-                            description:
-                              'Shows the field in a disabled state so users can see it but cannot edit it.',
-                            reasons: [
-                              'Use it for system-managed values, locked workflow states, or fields awaiting another prerequisite.',
-                              'Disabled fields communicate context without allowing accidental changes to protected business data.',
-                            ],
-                          })}
-                          checked={!!field.value}
-                          onChange={(e) =>
-                            handleUIChange('disabled', e.currentTarget.checked)
-                          }
-                        />
-                      )}
-                    />
-
-                    <Controller
-                      name="ui.readonly"
-                      control={control}
-                      render={({ field }) => (
-                        <Switch
-                          style={{ display: 'flex', alignItems: 'center' }}
-                          labelElement={renderSwitchLabelWithTooltip({
-                            label: 'Readonly',
-                            title: 'Display value as read-only',
-                            description:
-                              'Keeps the field visible while making its current value non-editable.',
-                            reasons: [
-                              'Use it when users need to review calculated, imported, or approved values.',
-                              'Readonly is useful when the value should still be part of the form context but edits must happen elsewhere.',
-                            ],
-                          })}
-                          checked={!!field.value}
-                          onChange={(e) =>
-                            handleUIChange('readonly', e.currentTarget.checked)
-                          }
-                        />
-                      )}
-                    />
-                  </ConfigSection>
-
-                  <ConfigSection
-                    title="Layout Rules"
-                    description="Tune how this field occupies space in dense or multi-column forms."
-                  >
-                    <FormGroup
-                      label={renderLabelWithTooltip({
-                        label: 'Layout',
-                        title: 'Field-level layout override',
-                        description:
-                          'Overrides the global form layout for this field: vertical, horizontal, or inline.',
-                        reasons: [
-                          'Use vertical layout for longer inputs, horizontal layout for dense enterprise forms, and inline layout for compact controls.',
-                          'Field-level overrides let important exceptions fit the business workflow without changing the whole form.',
-                        ],
-                      })}
+                  {!isItemsSchemaNode && (
+                    <ConfigSection
+                      title="Visibility and State"
+                      description="Control whether the field is shown, editable, or review-only by default."
                     >
                       <Controller
-                        name="ui.layout"
+                        name="ui.hidden"
                         control={control}
                         render={({ field }) => (
-                          <Select
-                            value={field.value ?? ''}
-                            onChange={(value) => {
-                              field.onChange(value)
-                              handleUIChange('layout', value)
-                            }}
-                            options={[
-                              { label: '(none)', value: '' },
-                              { label: 'vertical', value: 'vertical' },
-                              { label: 'horizontal', value: 'horizontal' },
-                              { label: 'inline', value: 'inline' },
-                            ]}
-                          />
-                        )}
-                      />
-                    </FormGroup>
-
-                    <FormGroup
-                      label={renderLabelWithTooltip({
-                        label: 'Label Width',
-                        title: 'Label width for horizontal layout',
-                        description:
-                          'Controls the label area width when this field uses horizontal layout.',
-                        reasons: [
-                          'Use it to align fields with long business labels and keep inputs starting at a consistent position.',
-                          'Consistent label width improves scanability in operational forms with many parameters.',
-                        ],
-                      })}
-                    >
-                      <Controller
-                        name="ui.labelWidth"
-                        control={control}
-                        render={({ field }) => (
-                          <InputGroup
-                            {...field}
-                            value={field.value ?? ''}
+                          <Switch
+                            style={{ display: 'flex', alignItems: 'center' }}
+                            labelElement={renderSwitchLabelWithTooltip({
+                              label: 'Hidden',
+                              title: 'Hide this field from the form',
+                              description:
+                                'Removes the field from the visible UI when it should not be shown by default.',
+                              reasons: [
+                                'Use it for fields controlled by business rules, internal data, or progressive disclosure.',
+                                'Hidden fields are skipped by static validation, which prevents users from being blocked by fields they cannot see.',
+                              ],
+                            })}
+                            checked={!!field.value}
                             onChange={(e) =>
-                              handleUIChange('labelWidth', e.target.value)
+                              handleUIChange('hidden', e.currentTarget.checked)
                             }
                           />
                         )}
                       />
-                    </FormGroup>
 
-                    <FormGroup
-                      label={renderLabelWithTooltip({
-                        label: 'Column Span',
-                        title: 'Grid width for this field',
-                        description:
-                          'Controls how many layout columns this field occupies inside a multi-column form.',
-                        reasons: [
-                          'Use it to give wide fields like textareas, code editors, or nested objects more room.',
-                          'It lets high-priority or complex business fields remain readable in dense layouts.',
-                        ],
-                      })}
-                      helperText="Number of columns this field spans in multi-column layout"
-                    >
                       <Controller
-                        name="ui.colSpan"
+                        name="ui.disabled"
                         control={control}
                         render={({ field }) => (
-                          <NumericInput
-                            {...field}
-                            value={field.value ?? 1}
-                            onValueChange={(value) =>
-                              handleUIChange('colSpan', value)
+                          <Switch
+                            style={{ display: 'flex', alignItems: 'center' }}
+                            labelElement={renderSwitchLabelWithTooltip({
+                              label: 'Disabled',
+                              title: 'Prevent user input',
+                              description:
+                                'Shows the field in a disabled state so users can see it but cannot edit it.',
+                              reasons: [
+                                'Use it for system-managed values, locked workflow states, or fields awaiting another prerequisite.',
+                                'Disabled fields communicate context without allowing accidental changes to protected business data.',
+                              ],
+                            })}
+                            checked={!!field.value}
+                            onChange={(e) =>
+                              handleUIChange(
+                                'disabled',
+                                e.currentTarget.checked,
+                              )
                             }
-                            min={1}
-                            max={12}
-                            fill
                           />
                         )}
                       />
-                    </FormGroup>
-                  </ConfigSection>
 
-                  {currentType === 'object' && (
+                      <Controller
+                        name="ui.readonly"
+                        control={control}
+                        render={({ field }) => (
+                          <Switch
+                            style={{ display: 'flex', alignItems: 'center' }}
+                            labelElement={renderSwitchLabelWithTooltip({
+                              label: 'Readonly',
+                              title: 'Display value as read-only',
+                              description:
+                                'Keeps the field visible while making its current value non-editable.',
+                              reasons: [
+                                'Use it when users need to review calculated, imported, or approved values.',
+                                'Readonly is useful when the value should still be part of the form context but edits must happen elsewhere.',
+                              ],
+                            })}
+                            checked={!!field.value}
+                            onChange={(e) =>
+                              handleUIChange(
+                                'readonly',
+                                e.currentTarget.checked,
+                              )
+                            }
+                          />
+                        )}
+                      />
+                    </ConfigSection>
+                  )}
+
+                  {!isItemsSchemaNode && (
+                    <ConfigSection
+                      title="Layout Rules"
+                      description="Tune how this field occupies space in dense or multi-column forms."
+                    >
+                      <FormGroup
+                        label={renderLabelWithTooltip({
+                          label: 'Layout',
+                          title: 'Field-level layout override',
+                          description:
+                            'Overrides the global form layout for this field: vertical, horizontal, or inline.',
+                          reasons: [
+                            'Use vertical layout for longer inputs, horizontal layout for dense enterprise forms, and inline layout for compact controls.',
+                            'Field-level overrides let important exceptions fit the business workflow without changing the whole form.',
+                          ],
+                        })}
+                      >
+                        <Controller
+                          name="ui.layout"
+                          control={control}
+                          render={({ field }) => (
+                            <Select
+                              value={field.value ?? ''}
+                              onChange={(value) => {
+                                field.onChange(value)
+                                handleUIChange('layout', value)
+                              }}
+                              options={[
+                                { label: '(none)', value: '' },
+                                { label: 'vertical', value: 'vertical' },
+                                { label: 'horizontal', value: 'horizontal' },
+                                { label: 'inline', value: 'inline' },
+                              ]}
+                            />
+                          )}
+                        />
+                      </FormGroup>
+
+                      <FormGroup
+                        label={renderLabelWithTooltip({
+                          label: 'Label Width',
+                          title: 'Label width for horizontal layout',
+                          description:
+                            'Controls the label area width when this field uses horizontal layout.',
+                          reasons: [
+                            'Use it to align fields with long business labels and keep inputs starting at a consistent position.',
+                            'Consistent label width improves scanability in operational forms with many parameters.',
+                          ],
+                        })}
+                      >
+                        <Controller
+                          name="ui.labelWidth"
+                          control={control}
+                          render={({ field }) => (
+                            <InputGroup
+                              {...field}
+                              value={field.value ?? ''}
+                              onChange={(e) =>
+                                handleUIChange('labelWidth', e.target.value)
+                              }
+                            />
+                          )}
+                        />
+                      </FormGroup>
+
+                      <FormGroup
+                        label={renderLabelWithTooltip({
+                          label: 'Column Span',
+                          title: 'Grid width for this field',
+                          description:
+                            'Controls how many layout columns this field occupies inside a multi-column form.',
+                          reasons: [
+                            'Use it to give wide fields like textareas, code editors, or nested objects more room.',
+                            'It lets high-priority or complex business fields remain readable in dense layouts.',
+                          ],
+                        })}
+                        helperText="Number of columns this field spans in multi-column layout"
+                      >
+                        <Controller
+                          name="ui.colSpan"
+                          control={control}
+                          render={({ field }) => (
+                            <NumericInput
+                              {...field}
+                              value={field.value ?? 1}
+                              onValueChange={(value) =>
+                                handleUIChange('colSpan', value)
+                              }
+                              min={1}
+                              max={12}
+                              fill
+                            />
+                          )}
+                        />
+                      </FormGroup>
+                    </ConfigSection>
+                  )}
+
+                  {currentType === 'object' && !isItemsSchemaNode && (
                     <ConfigSection
                       title="Object Flattening"
                       description="Flatten nested object fields when backend structure and user workflow should differ."
@@ -2383,60 +2399,66 @@ export const PropertyEditor: React.FC = () => {
                     </ConfigSection>
                   )}
 
-                  <ConfigSection
-                    title="Data Handling"
-                    description="Configure value conversion when the displayed input differs from stored form data."
-                  >
-                    <FormGroup
-                      label={renderLabelWithTooltip({
-                        label: 'Field Transform',
-                        title: 'Convert between input and stored values',
-                        description:
-                          'Configures transformation functions for cases where the displayed input domain differs from the value stored in form data.',
-                        reasons: [
-                          'Use it for business-friendly inputs such as percentages shown as 96 while storing 0.96.',
-                          'Transforms keep external API payloads correct without forcing users to enter backend-oriented values.',
-                        ],
-                      })}
+                  {!isItemsSchemaNode && (
+                    <ConfigSection
+                      title="Data Handling"
+                      description="Configure value conversion when the displayed input differs from stored form data."
                     >
-                      <Callout
-                        intent="primary"
-                        icon="info-sign"
-                        style={{ marginBottom: 12 }}
+                      <FormGroup
+                        label={renderLabelWithTooltip({
+                          label: 'Field Transform',
+                          title: 'Convert between input and stored values',
+                          description:
+                            'Configures transformation functions for cases where the displayed input domain differs from the value stored in form data.',
+                          reasons: [
+                            'Use it for business-friendly inputs such as percentages shown as 96 while storing 0.96.',
+                            'Transforms keep external API payloads correct without forcing users to enter backend-oriented values.',
+                          ],
+                        })}
                       >
-                        Transform functions convert between the value users type
-                        and the value stored in form data.
-                      </Callout>
-                      <TransformEditor
-                        value={currentNode.ui?.transform}
-                        onChange={(transform) =>
-                          handleUIChange('transform', transform)
-                        }
-                      />
-                    </FormGroup>
-                  </ConfigSection>
+                        <Callout
+                          intent="primary"
+                          icon="info-sign"
+                          style={{ marginBottom: 12 }}
+                        >
+                          Transform functions convert between the value users
+                          type and the value stored in form data.
+                        </Callout>
+                        <TransformEditor
+                          value={currentNode.ui?.transform}
+                          onChange={(transform) =>
+                            handleUIChange('transform', transform)
+                          }
+                        />
+                      </FormGroup>
+                    </ConfigSection>
+                  )}
                 </div>
               </div>
             }
           />
 
-          <Tab
-            id="linkage"
-            title="Linkage"
-            panel={
-              <div className="editor-panel">
-                <LinkagesEditor
-                  key={selectedPath.join('.')}
-                  value={currentNode.ui?.linkages}
-                  onChange={(linkages) => handleUIChange('linkages', linkages)}
-                  currentFieldPath={currentFieldPath}
-                  schema={schema}
-                />
-              </div>
-            }
-          />
+          {!isItemsSchemaNode && (
+            <Tab
+              id="linkage"
+              title="Linkage"
+              panel={
+                <div className="editor-panel">
+                  <LinkagesEditor
+                    key={selectedPath.join('.')}
+                    value={currentNode.ui?.linkages}
+                    onChange={(linkages) =>
+                      handleUIChange('linkages', linkages)
+                    }
+                    currentFieldPath={currentFieldPath}
+                    schema={schema}
+                  />
+                </div>
+              }
+            />
+          )}
 
-          {!options?.hidden?.variantsTab && (
+          {!isItemsSchemaNode && !options?.hidden?.variantsTab && (
             <Tab
               id="variants"
               title="Variants"

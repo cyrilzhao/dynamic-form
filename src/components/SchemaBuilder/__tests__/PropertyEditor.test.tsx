@@ -382,6 +382,44 @@ describe('PropertyEditor', () => {
       })
     })
 
+    it('应该仅保留元素校验和 widget 配置，隐藏字段级 UI、联动及变体配置', () => {
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema: {
+            type: 'object',
+            properties: {
+              tags: {
+                type: 'array',
+                items: { type: 'string', ui: { widget: 'textarea' } },
+              },
+            },
+          },
+          selectedPath: ['properties', 'tags', 'items'],
+        }),
+      })
+
+      expect(screen.queryByText('Linkage')).not.toBeInTheDocument()
+      expect(screen.queryByText('Variants')).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByText('Validation'))
+      expect(screen.getByText('String Constraints')).toBeInTheDocument()
+      expect(screen.getByText('Custom Validators')).toBeInTheDocument()
+      expect(
+        screen.queryByText('Required Error Message'),
+      ).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByText('UI Config'))
+      expect(screen.getByText('Widget')).toBeInTheDocument()
+      expect(
+        screen.queryByText('Widget Callback Props'),
+      ).not.toBeInTheDocument()
+      expect(screen.queryByText('Placeholder')).not.toBeInTheDocument()
+      expect(screen.queryByText('Visibility and State')).not.toBeInTheDocument()
+      expect(screen.queryByText('Layout Rules')).not.toBeInTheDocument()
+      expect(screen.queryByText('Data Handling')).not.toBeInTheDocument()
+    })
+
     it('应该允许配置元素 widget 和基础 schema 约束', () => {
       const onUpdate = jest.fn()
       const contextValue = {
