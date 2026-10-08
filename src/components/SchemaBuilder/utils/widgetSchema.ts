@@ -1,11 +1,14 @@
 import { cloneDeep, isEqual } from 'lodash'
-import type { WidgetDefinition } from '../../DynamicForm/types/widgets'
+import type {
+  WidgetDefinition,
+  WidgetTypeSupport,
+} from '../../DynamicForm/types/widgets'
 import type { ExtendedJSONSchema } from '../../DynamicForm/types/schema'
 
 export interface WidgetCompatibilityResult {
   compatible: boolean
   expectedType?: ExtendedJSONSchema['type']
-  supportedTypes?: WidgetDefinition['supports']['schemaTypes']
+  supportedTypes?: WidgetTypeSupport['schemaTypes']
   actualType?: ExtendedJSONSchema['type']
 }
 

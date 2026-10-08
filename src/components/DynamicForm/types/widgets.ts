@@ -12,6 +12,14 @@ export type WidgetSchemaType =
   | 'null'
 
 /**
+ * Widget 对 JSON Schema 类型的兼容范围。
+ * `supports` 一旦声明就必须明确可支持的类型，避免产生没有约束含义的空配置。
+ */
+export interface WidgetTypeSupport {
+  schemaTypes: WidgetSchemaType[]
+}
+
+/**
  * Widget 元数据定义。
  * valueSchema/valueType 描述 Widget 的提交值，propsSchema 描述静态配置参数。
  */
@@ -21,9 +29,7 @@ export interface WidgetDefinition {
   valueSchema?: ExtendedJSONSchema
   valueType?: WidgetSchemaType
   propsSchema?: ExtendedJSONSchema
-  supports?: {
-    schemaTypes?: WidgetSchemaType[]
-  }
+  supports?: WidgetTypeSupport
 }
 
 /**
