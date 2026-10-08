@@ -12,6 +12,36 @@ import {
 beforeAll(setupDynamicFormTest)
 
 describe('DynamicForm 字段变更事件契约', () => {
+  it('Widget 自定义 onChange 仍应触发 DynamicForm 的 onChange', async () => {
+    const onChange = jest.fn()
+    const widgetOnChange = jest.fn()
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          title: 'Name',
+          ui: { widgetProps: { onChange: widgetOnChange } },
+        },
+      },
+    }
+    const { formRef, container } = renderDynamicForm({
+      props: { schema, onChange },
+    })
+    await waitForFormReady({ formRef })
+    onChange.mockClear()
+
+    fireEvent.change(container.querySelector('[name="name"]')!, {
+      target: { value: 'Ada' },
+    })
+
+    await waitFor(() => {
+      expect(widgetOnChange).toHaveBeenCalled()
+      expect(onChange).toHaveBeenCalledTimes(1)
+    })
+    expect(onChange.mock.calls[0][0]).toEqual({ name: 'Ada' })
+  })
+
   const contactsSchema: ExtendedJSONSchema = {
     type: 'object',
     properties: {
