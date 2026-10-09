@@ -18,6 +18,8 @@ import {
   CodeEditorWidget,
   ObjectEditorWidget,
   FileWidget,
+  UploadInputWidget,
+  UploadListInputWidget,
 } from '../widgets'
 import type { WidgetPreset } from '../types/widgets'
 
@@ -46,4 +48,6 @@ export const blueprintPreset: WidgetPreset = {
   'code-editor': CodeEditorWidget,
   'object-editor': ObjectEditorWidget,
   file: FileWidget,
+  'upload-input': UploadInputWidget,
+  'upload-list-input': UploadListInputWidget,
 }

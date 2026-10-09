@@ -7,14 +7,14 @@ import React, {
   useRef,
   useImperativeHandle,
   forwardRef,
+  useMemo,
 } from 'react'
-import { cloneDeep, get, set, unset } from 'lodash'
+import { cloneDeep, get } from 'lodash'
 import type {
   SchemaBuilderProps,
   SchemaBuilderContextType,
   SchemaNode,
   SchemaNodeType,
-  PreviewMode,
   SchemaBuilderRef,
 } from './types'
 import type { ExtendedJSONSchema } from '../DynamicForm/types/schema'
@@ -32,6 +32,18 @@ import {
   Callout,
 } from '@blueprintjs/core'
 import { DynamicForm } from '../DynamicForm'
+import {
+  uploadInputWidgetDefinition,
+  uploadListInputWidgetDefinition,
+  selectionWidgetDefinitions,
+  basicWidgetDefinitions,
+} from '../DynamicForm/widgets'
+import {
+  getWidgetContractSchemaAtPath,
+  isWidgetArrayItemsContractPath,
+  isWidgetValueSchemaDescendantPath,
+  isWidgetValueSchemaOwnerPath,
+} from './utils/widgetSchema'
 import { CodeMirrorView } from '../CodeEditor'
 import { isExtendedJSONSchema } from './utils/validateExtendedJSONSchema'
 import {
@@ -46,10 +58,13 @@ import './SchemaBuilder.scss'
 
 type BuilderViewMode = 'edit' | 'preview'
 
+// Context 与消费 Hook 必须和 SchemaBuilder 保持同一模块，避免循环依赖。
+// eslint-disable-next-line react-refresh/only-export-components
 export const SchemaBuilderContext = createContext<
   SchemaBuilderContextType | undefined
 >(undefined)
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useSchemaBuilder = () => {
   const context = useContext(SchemaBuilderContext)
   if (!context) {
@@ -71,12 +86,33 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
       className,
       style,
       options,
+      widgetDefinitions = [],
     },
     ref,
   ) => {
     const hidden = options?.hidden ?? {}
     const readonly = options?.readonly ?? {}
     const isReadonly = readonly.all === true || readonly.schema === true
+    const resolvedWidgetDefinitions = useMemo(
+      () => [
+        ...basicWidgetDefinitions,
+        ...selectionWidgetDefinitions,
+        uploadInputWidgetDefinition,
+        uploadListInputWidgetDefinition,
+        ...widgetDefinitions.filter(
+          (definition) =>
+            !selectionWidgetDefinitions.some(
+              (builtinDefinition) => builtinDefinition.name === definition.name,
+            ) &&
+            !basicWidgetDefinitions.some(
+              (builtinDefinition) => builtinDefinition.name === definition.name,
+            ) &&
+            definition.name !== uploadInputWidgetDefinition.name &&
+            definition.name !== uploadListInputWidgetDefinition.name,
+        ),
+      ],
+      [widgetDefinitions],
+    )
     // 初始化时确保至少有一个一级节点
     const getInitialSchema = () => {
       const initialSchema = normalizeSchemaNumericValues(
@@ -102,26 +138,29 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
     }
 
     // 获取初始选中路径
-    const getInitialSelectedPath = useCallback((schema: ExtendedJSONSchema): string[] => {
-      if (!initialSelectedPath) {
+    const getInitialSelectedPath = useCallback(
+      (schema: ExtendedJSONSchema): string[] => {
+        if (!initialSelectedPath) {
+          return getFirstLevelNodePath(schema)
+        }
+
+        // 支持 JSON Pointer 格式
+        const pathArray =
+          typeof initialSelectedPath === 'string'
+            ? parseJsonPointer(initialSelectedPath)
+            : initialSelectedPath
+
+        // 验证路径是否有效
+        if (pathArray.length > 0 && validatePath(schema, pathArray)) {
+          return pathArray
+        }
+
+        // 如果路径无效，回退到第一个一级节点
+        console.warn('Invalid initialSelectedPath, falling back to first node')
         return getFirstLevelNodePath(schema)
-      }
-
-      // 支持 JSON Pointer 格式
-      const pathArray =
-        typeof initialSelectedPath === 'string'
-          ? parseJsonPointer(initialSelectedPath)
-          : initialSelectedPath
-
-      // 验证路径是否有效
-      if (pathArray.length > 0 && validatePath(schema, pathArray)) {
-        return pathArray
-      }
-
-      // 如果路径无效，回退到第一个一级节点
-      console.warn('Invalid initialSelectedPath, falling back to first node')
-      return getFirstLevelNodePath(schema)
-    }, [initialSelectedPath])
+      },
+      [initialSelectedPath],
+    )
 
     const initialSchema = getInitialSchema()
     const initialSchemaRef = useRef(initialSchema)
@@ -281,6 +320,34 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
             return prevSchema
           }
 
+          const widgetContractSchema = getWidgetContractSchemaAtPath({
+            schema: prevSchema,
+            path,
+            widgetDefinitions: resolvedWidgetDefinitions,
+          })
+          const isWidgetArrayItemsContract = isWidgetArrayItemsContractPath({
+            schema: prevSchema,
+            path,
+            widgetDefinitions: resolvedWidgetDefinitions,
+          })
+          const isWidgetValueSchemaDescendant =
+            isWidgetValueSchemaDescendantPath({
+              schema: prevSchema,
+              path,
+              widgetDefinitions: resolvedWidgetDefinitions,
+            })
+          if (isWidgetArrayItemsContract || isWidgetValueSchemaDescendant) {
+            return prevSchema
+          }
+          if (
+            widgetContractSchema &&
+            (newKey !== undefined ||
+              (updates.type !== undefined &&
+                updates.type !== widgetContractSchema.type))
+          ) {
+            return prevSchema
+          }
+
           // Apply updates - 对于值为 undefined 的属性，需要删除而不是赋值
           Object.keys(updates).forEach((key) => {
             const value = updates[key as keyof typeof updates]
@@ -409,12 +476,32 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           return normalizedSchema
         })
       },
-      [isReadonly, onChange],
+      [isReadonly, onChange, resolvedWidgetDefinitions],
     )
 
     const handleAddChild = useCallback(
       (path: string[], type: SchemaNodeType) => {
         setSchema((prevSchema) => {
+          if (
+            isWidgetArrayItemsContractPath({
+              schema: prevSchema,
+              path,
+              widgetDefinitions: resolvedWidgetDefinitions,
+            }) ||
+            isWidgetValueSchemaOwnerPath({
+              schema: prevSchema,
+              path,
+              widgetDefinitions: resolvedWidgetDefinitions,
+            }) ||
+            isWidgetValueSchemaDescendantPath({
+              schema: prevSchema,
+              path,
+              widgetDefinitions: resolvedWidgetDefinitions,
+            })
+          ) {
+            return prevSchema
+          }
+
           const nextSchema = cloneDeep(prevSchema)
           const targetNode =
             path.length === 0 ? nextSchema : get(nextSchema, path)
@@ -467,7 +554,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           return nextSchema
         })
       },
-      [onChange],
+      [onChange, resolvedWidgetDefinitions],
     )
 
     const handleAddSibling = useCallback(
@@ -477,6 +564,21 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
         }
 
         setSchema((prevSchema) => {
+          if (
+            isWidgetArrayItemsContractPath({
+              schema: prevSchema,
+              path,
+              widgetDefinitions: resolvedWidgetDefinitions,
+            }) ||
+            isWidgetValueSchemaDescendantPath({
+              schema: prevSchema,
+              path,
+              widgetDefinitions: resolvedWidgetDefinitions,
+            })
+          ) {
+            return prevSchema
+          }
+
           const nextSchema = cloneDeep(prevSchema)
 
           if (path.length >= 2 && path[path.length - 2] === 'properties') {
@@ -521,12 +623,31 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           return nextSchema
         })
       },
-      [onChange],
+      [onChange, resolvedWidgetDefinitions],
     )
 
     const handleDelete = useCallback(
       (path: string[]) => {
         if (path.length === 0) {
+          return
+        }
+        if (
+          getWidgetContractSchemaAtPath({
+            schema,
+            path,
+            widgetDefinitions: resolvedWidgetDefinitions,
+          }) ||
+          isWidgetArrayItemsContractPath({
+            schema,
+            path,
+            widgetDefinitions: resolvedWidgetDefinitions,
+          }) ||
+          isWidgetValueSchemaDescendantPath({
+            schema,
+            path,
+            widgetDefinitions: resolvedWidgetDefinitions,
+          })
+        ) {
           return
         }
 
@@ -562,7 +683,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           })
         }, 0)
       },
-      [onChange],
+      [onChange, resolvedWidgetDefinitions, schema],
     )
 
     const handleMoveUp = useCallback(
@@ -572,6 +693,21 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
         }
 
         setSchema((prevSchema) => {
+          if (
+            isWidgetArrayItemsContractPath({
+              schema: prevSchema,
+              path,
+              widgetDefinitions: resolvedWidgetDefinitions,
+            }) ||
+            isWidgetValueSchemaDescendantPath({
+              schema: prevSchema,
+              path,
+              widgetDefinitions: resolvedWidgetDefinitions,
+            })
+          ) {
+            return prevSchema
+          }
+
           const nextSchema = cloneDeep(prevSchema)
           const propertiesPath = path.slice(0, -1)
           const propertiesNode = get(nextSchema, propertiesPath)
@@ -603,7 +739,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           return nextSchema
         })
       },
-      [onChange],
+      [onChange, resolvedWidgetDefinitions],
     )
 
     const handleMoveDown = useCallback(
@@ -613,6 +749,21 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
         }
 
         setSchema((prevSchema) => {
+          if (
+            isWidgetArrayItemsContractPath({
+              schema: prevSchema,
+              path,
+              widgetDefinitions: resolvedWidgetDefinitions,
+            }) ||
+            isWidgetValueSchemaDescendantPath({
+              schema: prevSchema,
+              path,
+              widgetDefinitions: resolvedWidgetDefinitions,
+            })
+          ) {
+            return prevSchema
+          }
+
           const nextSchema = cloneDeep(prevSchema)
           const propertiesPath = path.slice(0, -1)
           const propertiesNode = get(nextSchema, propertiesPath)
@@ -645,7 +796,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
           return nextSchema
         })
       },
-      [onChange],
+      [onChange, resolvedWidgetDefinitions],
     )
 
     const handleAddChildWithAccess = (
@@ -752,6 +903,7 @@ export const SchemaBuilder = forwardRef<SchemaBuilderRef, SchemaBuilderProps>(
         value={{
           schema,
           options,
+          widgetDefinitions: resolvedWidgetDefinitions,
           selectedPath,
           expandedPaths,
           onSelect: setSelectedPath,

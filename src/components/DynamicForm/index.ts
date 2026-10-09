@@ -15,9 +15,7 @@ export type {
 } from './types'
 export { FieldRegistry } from './core/FieldRegistry'
 export { SchemaParser } from './core/SchemaParser'
-export {
-  createMultipartFormData,
-} from './utils/createMultipartFormData'
+export { createMultipartFormData } from './utils/createMultipartFormData'
 export type {
   MultipartFileReference,
   MultipartFormDataOptions,
@@ -39,6 +37,13 @@ export { CodeEditorWidget } from './widgets/CodeEditorWidget'
 export { ObjectEditorWidget } from './widgets/ObjectEditorWidget'
 export { FileWidget } from './widgets/FileWidget'
 export type { FileWidgetProps } from './widgets/FileWidget'
+export { UploadInputWidget, uploadInputWidgetDefinition } from './widgets'
+export type { UploadInputWidgetProps, UploadValue } from './widgets'
+export {
+  UploadListInputWidget,
+  uploadListInputWidgetDefinition,
+} from './widgets'
+export type { UploadListInputWidgetProps } from './widgets'
 
 // Widget 预设系统
 export { blueprintPreset } from './presets'
@@ -47,3 +52,4 @@ export type {
   PartialWidgetPreset,
   WidgetRegistry,
 } from './presets'
+export type { WidgetDefinition, WidgetSchemaType } from './types/widgets'

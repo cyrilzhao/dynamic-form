@@ -1,9 +1,10 @@
 import '@testing-library/jest-dom'
 import React from 'react'
-import { act, fireEvent, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { DynamicForm } from '../DynamicForm'
 import type { ExtendedJSONSchema } from '../types/schema'
 import {
+  refreshLinkage,
   renderDynamicForm,
   setupDynamicFormTest,
   waitForFormReady,
@@ -12,6 +13,166 @@ import {
 beforeAll(setupDynamicFormTest)
 
 describe('DynamicForm 字段变更事件契约', () => {
+  it('自定义字段切换 options 并清空 Select 后，Select 后续变更仍应派发 onChange', async () => {
+    const onChange = jest.fn()
+    const CustomWidget = React.forwardRef<
+      HTMLButtonElement,
+      { onChange?: (value: unknown) => void }
+    >(({ onChange: handleChange }, ref) => (
+      <button
+        ref={ref}
+        type="button"
+        data-testid="custom-widget"
+        onClick={() => handleChange?.('next')}
+      >
+        Change source
+      </button>
+    ))
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        source: {
+          type: 'string',
+          title: 'Source',
+          ui: { widget: 'custom-widget' },
+        },
+        choice: {
+          type: 'string',
+          title: 'Choice',
+          ui: {
+            widget: 'select',
+            linkages: [
+              {
+                type: 'options',
+                dependencies: ['#/properties/source'],
+                when: { field: 'source', operator: '==', value: 'next' },
+                fulfill: { options: [{ label: 'New option', value: 'new' }] },
+                otherwise: {
+                  options: [{ label: 'Old option', value: 'old' }],
+                },
+              },
+            ],
+          },
+        },
+      },
+    }
+    const { formRef, container } = renderDynamicForm({
+      props: {
+        schema,
+        onChange,
+        defaultValues: { source: 'old', choice: 'old' },
+        widgets: { 'custom-widget': CustomWidget },
+      },
+    })
+    await waitForFormReady({ formRef })
+    await refreshLinkage({ formRef })
+    onChange.mockClear()
+
+    fireEvent.click(container.querySelector('[data-testid="custom-widget"]')!)
+    await waitFor(() =>
+      expect(formRef.current!.getValue('choice')).toBeUndefined(),
+    )
+    await waitFor(() => expect(onChange).toHaveBeenCalled())
+    onChange.mockClear()
+
+    fireEvent.click(document.querySelector('.select-trigger')!)
+    fireEvent.click(screen.getByText('New option'))
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1))
+    expect(onChange.mock.calls[0][0]).toEqual({ source: 'next', choice: 'new' })
+  })
+
+  it('自定义 Widget 变更后，下方 Select 仍应持续触发 DynamicForm onChange', async () => {
+    const onChange = jest.fn()
+    const CustomWidget = React.forwardRef<
+      HTMLButtonElement,
+      { name: string; onChange?: (value: unknown) => void }
+    >(({ name, onChange: handleChange }, ref) => (
+      <button
+        ref={ref}
+        type="button"
+        data-testid="custom-widget"
+        onClick={() => handleChange?.({ id: 'custom-value' })}
+      >
+        {name}
+      </button>
+    ))
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        custom: {
+          type: 'object',
+          title: 'Custom',
+          ui: { widget: 'custom-widget' },
+        },
+        choice: {
+          type: 'string',
+          title: 'Choice',
+          enum: ['a', 'b', 'c'],
+          enumNames: ['Option A', 'Option B', 'Option C'],
+          ui: { widget: 'select' },
+        },
+      },
+    }
+    const { formRef, container } = renderDynamicForm({
+      props: { schema, onChange, widgets: { 'custom-widget': CustomWidget } },
+    })
+    await waitForFormReady({ formRef })
+    onChange.mockClear()
+
+    fireEvent.click(container.querySelector('[data-testid="custom-widget"]')!)
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1))
+
+    const openSelect = async () => {
+      fireEvent.click(document.querySelector('.select-trigger')!)
+      await waitFor(() =>
+        expect(document.querySelector('.select-dropdown')).toBeInTheDocument(),
+      )
+    }
+    await openSelect()
+    fireEvent.click(screen.getByText('Option A'))
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(2))
+
+    fireEvent.click(document.querySelector('.select-trigger')!)
+    fireEvent.click(screen.getByText('Option B'))
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(3))
+    expect(onChange.mock.calls.map(([data]) => data)).toEqual([
+      { custom: { id: 'custom-value' } },
+      { custom: { id: 'custom-value' }, choice: 'a' },
+      { custom: { id: 'custom-value' }, choice: 'b' },
+    ])
+  })
+
+  it('Widget 自定义 onChange 仍应触发 DynamicForm 的 onChange', async () => {
+    const onChange = jest.fn()
+    const widgetOnChange = jest.fn()
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          title: 'Name',
+          ui: { widgetProps: { onChange: widgetOnChange } },
+        },
+      },
+    }
+    const { formRef, container } = renderDynamicForm({
+      props: { schema, onChange },
+    })
+    await waitForFormReady({ formRef })
+    onChange.mockClear()
+
+    fireEvent.change(container.querySelector('[name="name"]')!, {
+      target: { value: 'Ada' },
+    })
+
+    await waitFor(() => {
+      expect(widgetOnChange).toHaveBeenCalled()
+      expect(onChange).toHaveBeenCalledTimes(1)
+    })
+    expect(onChange.mock.calls[0][0]).toEqual({ name: 'Ada' })
+  })
+
   const contactsSchema: ExtendedJSONSchema = {
     type: 'object',
     properties: {
