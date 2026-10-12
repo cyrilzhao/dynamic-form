@@ -419,6 +419,134 @@ describe('DynamicForm 字段变更事件契约', () => {
     ])
   })
 
+  it('动态嵌套 schema 中的 Select 变化应触发根表单 onChange', async () => {
+    const onChange = jest.fn()
+    const dynamicSchema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        environment: {
+          type: 'object',
+          properties: {
+            NODE_ENV: {
+              type: 'string',
+              title: 'NODE_ENV',
+              enum: ['development', 'production'],
+            },
+          },
+        },
+      },
+    }
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        actionId: { type: 'string', title: 'Action Type' },
+        content: {
+          type: 'object',
+          properties: {},
+          ui: {
+            linkages: [
+              {
+                type: 'schema',
+                dependencies: ['actionId'],
+                fulfill: { function: 'loadSchema' },
+              },
+            ],
+          },
+        },
+      },
+    }
+    const { formRef, container } = renderDynamicForm({
+      props: {
+        schema,
+        onChange,
+        linkageFunctions: {
+          loadSchema: () => dynamicSchema,
+        },
+        defaultValues: { actionId: 'runScript' },
+      },
+    })
+    await waitForFormReady({ formRef })
+    await refreshLinkage({ formRef })
+    await waitFor(() => expect(screen.getByText('NODE_ENV')).toBeInTheDocument())
+    onChange.mockClear()
+
+    fireEvent.click(container.querySelectorAll('.select-trigger')[0])
+    fireEvent.click(screen.getByText('production'))
+
+    await waitFor(() => expect(onChange).toHaveBeenCalled())
+    expect(onChange.mock.calls[onChange.mock.calls.length - 1]?.[0]).toMatchObject({
+      content: { environment: { NODE_ENV: 'production' } },
+    })
+  })
+
+  it('异步加载的 Run Script 环境变量 Select 变化应触发根表单 onChange', async () => {
+    const onChange = jest.fn()
+    const runScriptSchema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        environment: {
+          type: 'object',
+          title: 'Environment Variables',
+          properties: {
+            NODE_ENV: {
+              type: 'string',
+              title: 'NODE_ENV',
+              enum: ['development', 'production', 'test'],
+              default: 'development',
+            },
+          },
+        },
+      },
+    }
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        actionId: {
+          type: 'string',
+          title: 'Action Type',
+          enum: ['runScript'],
+        },
+        content: {
+          type: 'object',
+          properties: {},
+          ui: {
+            linkages: [
+              {
+                type: 'schema',
+                dependencies: ['actionId'],
+                when: { field: 'actionId', operator: 'isNotEmpty' },
+                fulfill: { function: 'loadSchema' },
+              },
+            ],
+          },
+        },
+      },
+    }
+    const { container } = renderDynamicForm({
+      props: {
+        schema,
+        onChange,
+        linkageFunctions: {
+          loadSchema: async () => {
+            await new Promise((resolve) => setTimeout(resolve, 20))
+            return runScriptSchema
+          },
+        },
+      },
+    })
+    await waitFor(() => expect(container.querySelectorAll('.select-trigger').length).toBe(1))
+    fireEvent.click(container.querySelector('.select-trigger')!)
+    fireEvent.click(screen.getByText('runScript'))
+    await waitFor(() => expect(screen.getByText('NODE_ENV')).toBeInTheDocument())
+    onChange.mockClear()
+
+    const selectTriggers = container.querySelectorAll('.select-trigger')
+    fireEvent.click(selectTriggers[1])
+    fireEvent.click(screen.getByText('production'))
+
+    await waitFor(() => expect(onChange).toHaveBeenCalled())
+  })
+
   it('数组项 asNestedForm 的联动应归属根表单同一批次', async () => {
     const onChange = jest.fn()
     const schema: ExtendedJSONSchema = {
