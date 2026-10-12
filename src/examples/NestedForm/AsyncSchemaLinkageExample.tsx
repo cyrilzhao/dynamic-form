@@ -1,6 +1,9 @@
 import React, { useState, useMemo } from 'react'
 import { DynamicForm } from '@/components/DynamicForm'
-import type { ExtendedJSONSchema } from '@/components/DynamicForm'
+import type {
+  ExtendedJSONSchema,
+  LinkageFunction,
+} from '@/components/DynamicForm'
 import { Card, Callout, Tag } from '@blueprintjs/core'
 
 /**
@@ -188,13 +191,13 @@ let apiCallCount = 0
  * 实际场景中会从服务器获取 schema
  */
 const fetchActionSchema = async (
-  actionId: string
+  actionId: string,
 ): Promise<ExtendedJSONSchema> => {
   apiCallCount++
   const callNumber = apiCallCount
 
   console.log(
-    `[API Call #${callNumber}] Fetching schema for action: ${actionId}`
+    `[API Call #${callNumber}] Fetching schema for action: ${actionId}`,
   )
 
   // 模拟网络延迟（不同 action 有不同的延迟时间，用于演示竞态条件处理）
@@ -221,7 +224,9 @@ export const AsyncSchemaLinkageExample: React.FC = () => {
   const [currentApiCalls, setCurrentApiCalls] = useState(0)
 
   // 定义联动函数
-  const linkageFunctions = useMemo(
+  const linkageFunctions = useMemo<{
+    [name: string]: LinkageFunction
+  }>(
     () => ({
       /**
        * 异步加载 action 对应的 content schema
@@ -230,7 +235,7 @@ export const AsyncSchemaLinkageExample: React.FC = () => {
        * 2. 竞态条件处理 - 快速切换时只应用最新结果
        * 3. 缓存机制 - 通过 enableCache 启用
        */
-      loadActionContentSchema: async (formData: Record<string, any>) => {
+      loadActionContentSchema: async ({ formData }) => {
         const actionId = formData?.actionId
 
         if (!actionId) {
@@ -249,7 +254,7 @@ export const AsyncSchemaLinkageExample: React.FC = () => {
         }
       },
     }),
-    []
+    [],
   )
 
   // 表单 Schema 定义
@@ -334,7 +339,7 @@ export const AsyncSchemaLinkageExample: React.FC = () => {
       },
       required: ['actionId', 'actionName'],
     }),
-    []
+    [],
   )
 
   const handleSubmit = (data: any) => {
@@ -400,6 +405,10 @@ export const AsyncSchemaLinkageExample: React.FC = () => {
         schema={schema}
         onSubmit={handleSubmit}
         linkageFunctions={linkageFunctions}
+        onChange={(data, meta) => {
+          console.info('cyril data: ', data)
+          console.info('cyril meta: ', meta)
+        }}
       />
 
       {submittedData && (
