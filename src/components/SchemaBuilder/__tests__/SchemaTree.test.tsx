@@ -20,7 +20,7 @@ const createWrapper = (contextValue: any) => {
 const getTreeNodeContent = (label: RegExp): HTMLElement => {
   const labelNode = screen
     .getAllByText(label)
-    .find(node => node.closest('.schema-tree-node-label'))
+    .find((node) => node.closest('.schema-tree-node-label'))
   const content = labelNode?.closest('.tree-node-content')
 
   if (!(content instanceof HTMLElement)) {
@@ -212,7 +212,7 @@ describe('SchemaTree', () => {
       })
 
       expect(
-        getTreeNodeContent(/Tag \(items\)/i).querySelector('.node-actions')
+        getTreeNodeContent(/Tag \(items\)/i).querySelector('.node-actions'),
       ).not.toBeInTheDocument()
     })
 
@@ -225,9 +225,8 @@ describe('SchemaTree', () => {
         }),
       })
 
-      const actions = getTreeNodeContent(/Contact \(items\)/i).querySelector(
-        '.node-actions'
-      )
+      const actions =
+        getTreeNodeContent(/Contact \(items\)/i).querySelector('.node-actions')
       expect(actions).toBeInTheDocument()
       expect(actions?.querySelector('button')).toBeInTheDocument()
     })
@@ -350,6 +349,107 @@ describe('SchemaTree', () => {
           expect(onDelete).toHaveBeenCalled()
         }
       }
+    })
+  })
+
+  describe('array Widget items 契约操作', () => {
+    it('items 子字段不显示任何节点操作入口', () => {
+      const schema = {
+        type: 'object' as const,
+        properties: {
+          uploads: {
+            type: 'array' as const,
+            ui: { widget: 'upload-list-input' },
+            items: {
+              type: 'object' as const,
+              properties: {
+                fileId: { type: 'string' as const, title: 'File ID' },
+                fileName: { type: 'string' as const, title: 'File Name' },
+              },
+            },
+          },
+        },
+      }
+      const widgetDefinitions = [
+        {
+          name: 'upload-list-input',
+          component: (() => null) as React.ComponentType<any>,
+          valueSchema: {
+            type: 'array' as const,
+            items: {
+              type: 'object' as const,
+              properties: {
+                fileId: { type: 'string' as const },
+                fileName: { type: 'string' as const },
+              },
+            },
+          },
+        },
+      ]
+      render(<SchemaTree />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema,
+          widgetDefinitions,
+          expandedPaths: {
+            '': true,
+            'properties.uploads': true,
+            'properties.uploads.items': true,
+          },
+        }),
+      })
+
+      const content = getTreeNodeContent(/File ID/)
+      expect(content.querySelector('.node-actions')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('object Widget 输出契约操作', () => {
+    it('Widget 字段不能新增子节点，契约子字段不显示操作入口', () => {
+      const schema = {
+        type: 'object' as const,
+        properties: {
+          upload: {
+            type: 'object' as const,
+            title: 'Upload',
+            ui: { widget: 'upload-input' },
+            properties: {
+              fileId: { type: 'string' as const, title: 'File ID' },
+              fileName: { type: 'string' as const, title: 'File Name' },
+            },
+          },
+        },
+      }
+      const widgetDefinitions = [
+        {
+          name: 'upload-input',
+          component: (() => null) as React.ComponentType<any>,
+          valueSchema: {
+            type: 'object' as const,
+            properties: {
+              fileId: { type: 'string' as const },
+              fileName: { type: 'string' as const },
+            },
+          },
+        },
+      ]
+      render(<SchemaTree />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema,
+          widgetDefinitions,
+          expandedPaths: { '': true, 'properties.upload': true },
+        }),
+      })
+
+      const uploadContent = getTreeNodeContent(/Upload/)
+      fireEvent.click(uploadContent.querySelector('button')!)
+      expect(screen.queryByText('Add Child Node')).not.toBeInTheDocument()
+
+      const fileIdContent = getTreeNodeContent(/File ID/)
+      expect(
+        fileIdContent.querySelector('.node-actions'),
+      ).not.toBeInTheDocument()
     })
   })
 

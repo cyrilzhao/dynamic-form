@@ -443,6 +443,7 @@ function buildEffectiveSchemaTree({
   helpers,
   variantStore,
   path = '',
+  nestedSchemas,
 }: {
   schema: ExtendedJSONSchema
   value: any
@@ -450,9 +451,13 @@ function buildEffectiveSchemaTree({
   helpers: Record<string, any>
   variantStore: ReturnType<typeof createFieldVariantStore>
   path?: string
+  nestedSchemas?: Map<string, ExtendedJSONSchema>
 }): ExtendedJSONSchema {
+  // 动态 NestedFormWidget 的运行时 schema 才包含其当前渲染字段；静态根 schema
+  // 可能仍只有空 properties。对外数据转换必须使用同一份有效 schema。
+  const resolvedSchema = nestedSchemas?.get(path) ?? schema
   const effective = getEffectiveVariantSchema(
-    schema,
+    resolvedSchema,
     value,
     callbacks,
     helpers,
@@ -470,6 +475,7 @@ function buildEffectiveSchemaTree({
           helpers,
           variantStore,
           path: path ? `${path}.${key}` : key,
+          nestedSchemas,
         }),
       ]),
     )
@@ -486,6 +492,7 @@ function buildEffectiveSchemaTree({
       helpers,
       variantStore,
       path: path ? `${path}.items` : 'items',
+      nestedSchemas,
     })
   }
   return effective
@@ -1364,6 +1371,7 @@ const DynamicFormInner = React.memo(
                 callbacks: callbacksRef.current,
                 helpers: mergedHelpers,
                 variantStore,
+                nestedSchemas: nestedSchemaRegistry?.getAllSchemas(),
               }),
               callbacksRef.current,
               mergedHelpers,
@@ -1448,6 +1456,7 @@ const DynamicFormInner = React.memo(
                     callbacks: callbacksRef.current,
                     helpers: mergedHelpers,
                     variantStore,
+                    nestedSchemas: nestedSchemaRegistry?.getAllSchemas(),
                   }),
                   callbacksRef.current,
                   mergedHelpers,
@@ -1541,6 +1550,7 @@ const DynamicFormInner = React.memo(
               callbacks: callbacksRef.current,
               helpers: helpersRef.current,
               variantStore: variantStoreRef.current,
+              nestedSchemas: nestedSchemaRegistry?.getAllSchemas(),
             })
             previousChangeDataRef.current = applyFieldTransforms(
               transformFormData(initialData, initialSchema),
@@ -1564,6 +1574,7 @@ const DynamicFormInner = React.memo(
               callbacks: callbacksRef.current,
               helpers: helpersRef.current,
               variantStore: variantStoreRef.current,
+              nestedSchemas: nestedSchemaRegistry?.getAllSchemas(),
             })
             const processedData = transformFormData(data, effectiveSchema)
             const externalData = applyFieldTransforms(
@@ -1891,6 +1902,7 @@ const DynamicFormInner = React.memo(
               callbacks: stableCallbacks,
               helpers: mergedHelpers,
               variantStore,
+              nestedSchemas: nestedSchemaRegistry?.getAllSchemas(),
             })
             const filteredData = transformFormData(
               data,
