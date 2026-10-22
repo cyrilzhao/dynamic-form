@@ -226,24 +226,24 @@ export interface DynamicFormRef {
   ) => void
 
   /**
-   * 重置表单到初始值或指定值
+   * 重置表单到初始默认值或指定值
    *
    * 注意事项：
    * - 如果提供 `values` 参数，会重置到指定值
-   * - 如果不提供参数或提供空对象，会重置为类型恰当的空值（避免受控组件变为非受控组件）
+   * - 如果不提供参数或提供空对象，会恢复 schema 默认值与 DynamicForm.defaultValues
    * - 会清除表单的脏状态、错误状态和触摸状态
    * - 会应用字段的 `reverseCallback` 转换
    * - 会递归设置所有嵌套字段
    *
-   * @param values - 可选的重置目标值（存储域值）。不提供则重置为空值
+   * @param values - 可选的重置目标值（存储域值）。不提供则恢复初始默认值
    *
    * @example
    * ```tsx
    * // 重置为初始值（defaultValues）
    * formRef.current?.reset();
    *
-   * // 重置为空值
-   * formRef.current?.reset({});
+   * // 清空所有字段
+   * formRef.current?.clear();
    *
    * // 重置为指定值
    * formRef.current?.reset({
@@ -255,6 +255,9 @@ export interface DynamicFormRef {
    * ```
    */
   reset: (values?: Record<string, any>) => void
+
+  /** 清空表单值，并为字段写入类型恰当的空值。 */
+  clear: () => void
 
   /**
    * 触发表单验证

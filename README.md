@@ -1051,6 +1051,23 @@ const schema = {
 
 For advanced validation scenarios beyond JSON Schema rules and custom formats, you can use `ui.validators` to define field-level custom validators. Validators can use inline script helpers; see [Inline Script Helpers](#inline-script-helpers).
 
+##### Which `type` values are supported?
+
+Currently, `ui.validators` supports only one validator type:
+
+| `type`     | Status    | Description                                                                                            |
+| ---------- | --------- | ------------------------------------------------------------------------------------------------------ |
+| `'script'` | Supported | Runs a JavaScript validator function, either from the `callbacks` registry or from inline script code. |
+
+There are no other built-in `ui.validators` types at present. In particular, the following are **not** additional validator types:
+
+- `callback: 'validateUsername'` is a reference to a registered function. The validator `type` is still `'script'`.
+- `callback: { type: 'script', code: '...' }` is an inline function reference. The nested `type` describes the callback representation, not a second validator type.
+- JSON Schema keywords such as `required`, `pattern`, `format`, and `minimum` are standard schema validation rules, not `ui.validators` entries.
+- `customFormats` defines named JSON Schema formats and is a separate extension point.
+
+`ValidatorRule` is intentionally modeled as a discriminated union so additional validator types can be added in the future. Until such an implementation is provided, do not use values such as `type: 'regex'`, `type: 'async'`, or `type: 'zod'`; they are not recognized by the current runtime.
+
 **ScriptValidator** allows you to define custom validation logic using JavaScript functions. It supports two callback modes:
 
 1. **Function Name Mode**: Reference a function from the `callbacks` registry (recommended for reusable validation logic)
@@ -3600,10 +3617,11 @@ formRef.current?.setValues({
 Reset form to default values or provided values. Supports nested objects and arrays.
 
 ```typescript
-// Clear the form (each field is reset to a type-appropriate empty value)
-// string -> '', array -> [], object -> recursively empty object, number/boolean -> undefined
+// Restore schema defaults, overridden by DynamicForm.defaultValues
 formRef.current?.reset()
-formRef.current?.reset({})
+
+// Clear all fields to their type-appropriate empty values
+formRef.current?.clear()
 
 // Reset with complete data (supports nested objects and arrays)
 formRef.current?.reset({
@@ -3620,7 +3638,8 @@ formRef.current?.reset({
 
 > **Note**:
 >
-> - `reset()` or `reset({})` generates type-appropriate empty values from the schema, so controlled React components clear their displayed values correctly.
+> - `reset()` or `reset({})` restores the form's initial values: merged schema defaults and `DynamicForm.defaultValues`. Fields without a default return to their type-appropriate empty value.
+> - `clear()` clears all fields to type-appropriate empty values.
 > - `reset(values)` automatically handles primitive-array wrapping and recursively sets nested object paths so fields inside nested forms update correctly.
 
 #### Validation Methods

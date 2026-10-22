@@ -347,6 +347,79 @@ describe('PropertyEditor', () => {
   })
 
   describe('数组 items 节点', () => {
+    it('应该允许编辑元素 Label，但隐藏 Description 和 Default Value', () => {
+      const onUpdate = jest.fn()
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema: {
+            type: 'object',
+            properties: {
+              tags: {
+                type: 'array',
+                items: {
+                  type: 'string',
+                  title: 'Tag',
+                  description: 'A tag',
+                  default: 'general',
+                },
+              },
+            },
+          },
+          selectedPath: ['properties', 'tags', 'items'],
+          onUpdate,
+        }),
+      })
+
+      expect(screen.getByText('Label')).toBeInTheDocument()
+      expect(screen.queryByText('Description')).not.toBeInTheDocument()
+      expect(screen.queryByText('Default Value')).not.toBeInTheDocument()
+
+      const labelInput = screen.getByDisplayValue('Tag')
+      fireEvent.change(labelInput, { target: { value: 'Tag name' } })
+      expect(onUpdate).toHaveBeenCalledWith(['properties', 'tags', 'items'], {
+        title: 'Tag name',
+      })
+    })
+
+    it('应该仅保留元素校验和 widget 配置，隐藏字段级 UI、联动及变体配置', () => {
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema: {
+            type: 'object',
+            properties: {
+              tags: {
+                type: 'array',
+                items: { type: 'string', ui: { widget: 'textarea' } },
+              },
+            },
+          },
+          selectedPath: ['properties', 'tags', 'items'],
+        }),
+      })
+
+      expect(screen.queryByText('Linkage')).not.toBeInTheDocument()
+      expect(screen.queryByText('Variants')).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByText('Validation'))
+      expect(screen.getByText('String Constraints')).toBeInTheDocument()
+      expect(screen.getByText('Custom Validators')).toBeInTheDocument()
+      expect(
+        screen.queryByText('Required Error Message'),
+      ).not.toBeInTheDocument()
+
+      fireEvent.click(screen.getByText('UI Config'))
+      expect(screen.getByText('Widget')).toBeInTheDocument()
+      expect(
+        screen.queryByText('Widget Callback Props'),
+      ).not.toBeInTheDocument()
+      expect(screen.queryByText('Placeholder')).not.toBeInTheDocument()
+      expect(screen.queryByText('Visibility and State')).not.toBeInTheDocument()
+      expect(screen.queryByText('Layout Rules')).not.toBeInTheDocument()
+      expect(screen.queryByText('Data Handling')).not.toBeInTheDocument()
+    })
+
     it('应该允许配置元素 widget 和基础 schema 约束', () => {
       const onUpdate = jest.fn()
       const contextValue = {
@@ -421,6 +494,226 @@ describe('PropertyEditor', () => {
 
       fireEvent.click(screen.getByText('UI Config'))
       expect(screen.queryByText('Array Mode')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('Widget valueSchema 契约字段', () => {
+    it('upload-input 的子字段应完全以 valueSchema 为准并只读展示', () => {
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema: {
+            type: 'object',
+            properties: {
+              upload: {
+                type: 'object',
+                ui: { widget: 'upload-input' },
+                properties: {
+                  fileId: { type: 'string', title: 'File ID' },
+                  fileName: { type: 'string', title: 'File Name' },
+                },
+              },
+            },
+          },
+          selectedPath: ['properties', 'upload', 'properties', 'fileId'],
+          widgetDefinitions: [
+            {
+              name: 'upload-input',
+              component: (() => null) as React.ComponentType<any>,
+              valueSchema: {
+                type: 'object',
+                properties: {
+                  fileId: { type: 'string', title: 'File ID' },
+                  fileName: { type: 'string', title: 'File Name' },
+                },
+              },
+            },
+          ],
+        }),
+      })
+
+      expect(screen.getByText('Schema (Read Only)')).toBeInTheDocument()
+      expect(screen.queryByText('Basic')).not.toBeInTheDocument()
+      expect(screen.queryByText('Validation')).not.toBeInTheDocument()
+      expect(screen.queryByText('UI Config')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('Widget Props 表单', () => {
+    it('切换 widget 时应缓存当前配置并加载目标 widget 的默认配置', async () => {
+      const onUpdate = jest.fn()
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          description: {
+            type: 'string',
+            ui: {
+              widget: 'select',
+              widgetProps: {
+                options: [{ value: 'open', label: 'Open' }],
+                multiple: true,
+              },
+            },
+          },
+        },
+      }
+
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema,
+          selectedPath: ['properties', 'description'],
+          onUpdate,
+        }),
+      })
+      fireEvent.click(screen.getByText('UI Config'))
+      const widgetSelect = getFormGroupSelect('Widget')
+      fireEvent.change(widgetSelect, { target: { value: 'textarea' } })
+
+      await waitFor(() => {
+        expect(onUpdate).toHaveBeenLastCalledWith(
+          ['properties', 'description'],
+          expect.objectContaining({
+            ui: expect.objectContaining({
+              widget: 'textarea',
+              widgetProps: { rows: 4 },
+              __schemaBuilder: expect.objectContaining({
+                widgetPropsByWidget: expect.objectContaining({
+                  select: expect.objectContaining({ multiple: true }),
+                }),
+              }),
+            }),
+          }),
+        )
+      })
+    })
+
+    it('textarea 应通过 propsSchema 展示 rows 和 maxLength', () => {
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          description: { type: 'string', ui: { widget: 'textarea' } },
+        },
+      }
+
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema,
+          selectedPath: ['properties', 'description'],
+        }),
+      })
+      fireEvent.click(screen.getByText('UI Config'))
+
+      expect(screen.getByText('Rows')).toBeInTheDocument()
+      expect(screen.getByText('Maximum Length')).toBeInTheDocument()
+    })
+
+    it('切回已有配置的 widget 时应恢复对应缓存', async () => {
+      const onUpdate = jest.fn()
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          description: {
+            type: 'string',
+            ui: {
+              widget: 'textarea',
+              widgetProps: { rows: 6 },
+              __schemaBuilder: {
+                widgetPropsByWidget: {
+                  select: {
+                    options: [{ value: 'open', label: 'Open' }],
+                    multiple: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      }
+
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema,
+          selectedPath: ['properties', 'description'],
+          onUpdate,
+        }),
+      })
+      fireEvent.click(screen.getByText('UI Config'))
+      fireEvent.change(getFormGroupSelect('Widget'), {
+        target: { value: 'select' },
+      })
+
+      await waitFor(() => {
+        expect(onUpdate).toHaveBeenLastCalledWith(
+          ['properties', 'description'],
+          expect.objectContaining({
+            ui: expect.objectContaining({
+              widget: 'select',
+              widgetProps: expect.objectContaining({ multiple: true }),
+            }),
+          }),
+        )
+      })
+    })
+
+    it('应隐藏 Submit 并在 props 变更时实时写入 ui.widgetProps', async () => {
+      const onUpdate = jest.fn()
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          onUpdate,
+          schema: {
+            type: 'object',
+            properties: {
+              upload: {
+                type: 'object',
+                ui: {
+                  widget: 'upload-input',
+                  widgetProps: { accept: '.pdf' },
+                },
+              },
+            },
+          },
+          selectedPath: ['properties', 'upload'],
+          widgetDefinitions: [
+            {
+              name: 'upload-input',
+              component: (() => null) as React.ComponentType<any>,
+              propsSchema: {
+                type: 'object',
+                properties: {
+                  accept: {
+                    type: 'string',
+                    title: 'Accepted File Types',
+                  },
+                },
+              },
+            },
+          ],
+        }),
+      })
+
+      fireEvent.click(screen.getByText('UI Config'))
+
+      expect(
+        screen.queryByRole('button', { name: 'Submit' }),
+      ).not.toBeInTheDocument()
+
+      const acceptInput = getFormGroupInput('Accepted File Types')
+      fireEvent.change(acceptInput, { target: { value: '.png' } })
+
+      await waitFor(() => {
+        expect(onUpdate).toHaveBeenCalledWith(
+          ['properties', 'upload'],
+          expect.objectContaining({
+            ui: expect.objectContaining({
+              widgetProps: { accept: '.png' },
+            }),
+          }),
+        )
+      })
     })
   })
 
@@ -502,7 +795,7 @@ describe('PropertyEditor', () => {
       })
     })
 
-    it('string 类型的数组 items 应该允许编辑 Options', () => {
+    it('string 类型的数组 items 应该通过默认 select 的 Widget Props 编辑 Options', async () => {
       const onUpdate = jest.fn()
       const arraySchema = {
         type: 'object',
@@ -530,31 +823,133 @@ describe('PropertyEditor', () => {
         }),
       })
 
-      const optionsGroup = screen
-        .getByText('Options (enum)')
-        .closest('.bp6-form-group, .bp5-form-group')
-      const inputs = optionsGroup?.querySelectorAll('input') ?? []
-      const buttons = optionsGroup?.querySelectorAll('button') ?? []
-
-      expect(inputs).toHaveLength(2)
-      expect(buttons).toHaveLength(2)
-      Array.from(inputs).forEach((input) => expect(input).not.toBeDisabled())
-      Array.from(buttons).forEach((button) => expect(button).not.toBeDisabled())
-      fireEvent.change(inputs[0], { target: { value: 'typescript' } })
-      expect(onUpdate).toHaveBeenCalledWith(['properties', 'tags', 'items'], {
-        enum: ['typescript'],
+      fireEvent.click(screen.getByText('UI Config'))
+      const optionValue = screen.getByLabelText('Option 1 value')
+      expect(optionValue).toHaveValue('react')
+      expect(optionValue).not.toBeDisabled()
+      expect(screen.getByLabelText('Option 1 label')).toHaveValue('React')
+      fireEvent.change(optionValue, {
+        target: { value: 'typescript' },
+      })
+      expect(optionValue).toHaveValue('typescript')
+      await waitFor(() => {
+        expect(onUpdate).toHaveBeenLastCalledWith(
+          ['properties', 'tags', 'items'],
+          expect.objectContaining({
+            enum: ['typescript'],
+            enumNames: ['React'],
+            ui: expect.objectContaining({
+              widgetProps: expect.objectContaining({
+                options: [
+                  { value: 'typescript', label: 'React', disabled: false },
+                ],
+              }),
+            }),
+          }),
+        )
       })
     })
 
-    it('普通 string 字段应该保持 Options 编辑控件可用', () => {
+    it('普通 string 字段不再显示独立 Options 编辑控件', () => {
       render(<PropertyEditor />, {
         wrapper: createWrapper(defaultContextValue),
       })
 
-      const addOptionButton = screen.getByRole('button', {
-        name: 'Add Option',
+      expect(screen.queryByText('Options (enum)')).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: 'Add Option' }),
+      ).not.toBeInTheDocument()
+    })
+
+    it('历史 enum 应投影到隐式 select 的 Widget Props，修改时同步 enum 与 options', async () => {
+      const onUpdate = jest.fn()
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            enum: ['draft', 'published'],
+            enumNames: ['Draft', 'Published'],
+          },
+        },
+      }
+
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema,
+          selectedPath: ['properties', 'status'],
+          onUpdate,
+        }),
       })
-      expect(addOptionButton).not.toBeDisabled()
+
+      fireEvent.click(screen.getByText('UI Config'))
+
+      expect(screen.getByText('Widget Props')).toBeInTheDocument()
+      expect(screen.getByLabelText('Option 1 value')).toHaveValue('draft')
+      expect(screen.getByLabelText('Option 1 label')).toHaveValue('Draft')
+      expect(screen.getByLabelText('Option 2 value')).toHaveValue('published')
+
+      fireEvent.change(screen.getByLabelText('Option 1 value'), {
+        target: { value: 'queued' },
+      })
+
+      await waitFor(() => {
+        expect(onUpdate).toHaveBeenLastCalledWith(
+          ['properties', 'status'],
+          expect.objectContaining({
+            enum: ['queued', 'published'],
+            enumNames: ['Draft', 'Published'],
+            ui: expect.objectContaining({
+              widgetProps: expect.objectContaining({
+                options: [
+                  { value: 'queued', label: 'Draft', disabled: false },
+                  { value: 'published', label: 'Published', disabled: false },
+                ],
+              }),
+            }),
+          }),
+        )
+      })
+    })
+
+    it('历史 enum 与 widgetProps.options 应按类型去重且保留 options 展示属性', () => {
+      const schema: ExtendedJSONSchema = {
+        type: 'object',
+        properties: {
+          status: {
+            type: 'string',
+            enum: ['same', 'legacy'],
+            enumNames: ['Schema Label', 'Legacy'],
+            ui: {
+              widget: 'select',
+              widgetProps: {
+                options: [
+                  { value: 'same', label: 'Widget Label', disabled: true },
+                  { value: 'widget-only', label: 'Widget Only' },
+                ],
+              },
+            },
+          },
+        },
+      }
+
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema,
+          selectedPath: ['properties', 'status'],
+        }),
+      })
+      fireEvent.click(screen.getByText('UI Config'))
+
+      expect(screen.getAllByLabelText(/^Option \d+ value$/)).toHaveLength(3)
+      expect(screen.getByLabelText('Option 1 label')).toHaveValue(
+        'Widget Label',
+      )
+      expect(screen.getByLabelText('Option 2 value')).toHaveValue('legacy')
+      expect(screen.getByLabelText('Option 3 value')).toHaveValue('widget-only')
+      expect(screen.getByLabelText('Option 1 disabled')).toBeChecked()
     })
   })
 
@@ -613,6 +1008,41 @@ describe('PropertyEditor', () => {
   })
 
   describe('字段属性编辑', () => {
+    it('Widget 类型冲突弹窗应在按钮文案中显示实际的目标类型', () => {
+      render(<PropertyEditor />, {
+        wrapper: createWrapper({
+          ...defaultContextValue,
+          schema: {
+            type: 'object',
+            properties: {
+              name: {
+                type: 'string',
+                ui: { widget: 'array-input' },
+              },
+            },
+          },
+          widgetDefinitions: [
+            {
+              name: 'array-input',
+              component: (() => null) as React.ComponentType<any>,
+              valueSchema: { type: 'array', items: { type: 'string' } },
+            },
+          ],
+        }),
+      })
+
+      fireEvent.change(getFormGroupSelect('Type'), {
+        target: { value: 'object' },
+      })
+
+      expect(
+        screen.getByRole('button', { name: 'Use array' }),
+      ).toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: 'Use object' }),
+      ).not.toBeInTheDocument()
+    })
+
     it('修改 title 应该调用 onUpdate', () => {
       const onUpdate = jest.fn()
       render(<PropertyEditor />, {

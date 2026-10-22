@@ -236,19 +236,19 @@ const linkageFunctions = {
 // src/types/schema.ts
 
 export interface UIConfig {
-  widget?: WidgetType;
-  placeholder?: string;
-  disabled?: boolean;
-  readonly?: boolean;
-  hidden?: boolean;
-  help?: string;
-  className?: string;
-  style?: React.CSSProperties;
-  order?: string[];
-  errorMessages?: ErrorMessages;
-  linkages?: LinkageConfig[]; // UI 联动配置（包括动态 schema 加载）
+  widget?: WidgetType
+  placeholder?: string
+  disabled?: boolean
+  readonly?: boolean
+  hidden?: boolean
+  help?: string
+  className?: string
+  style?: React.CSSProperties
+  order?: string[]
+  errorMessages?: ErrorMessages
+  linkages?: LinkageConfig[] // UI 联动配置（包括动态 schema 加载）
 
-  [key: string]: any;
+  [key: string]: any
 }
 ```
 
@@ -262,13 +262,13 @@ export interface UIConfig {
 // src/components/DynamicForm/widgets/NestedFormWidget.tsx
 
 export interface NestedFormWidgetProps {
-  name: string;
-  schema: ExtendedJSONSchema;
-  disabled?: boolean;
-  readonly?: boolean;
-  layout?: 'vertical' | 'horizontal' | 'inline';
-  labelWidth?: number | string;
-  noCard?: boolean;
+  name: string
+  schema: ExtendedJSONSchema
+  disabled?: boolean
+  readonly?: boolean
+  layout?: 'vertical' | 'horizontal' | 'inline'
+  labelWidth?: number | string
+  noCard?: boolean
 }
 ```
 
@@ -299,6 +299,7 @@ NestedFormWidget 组件的完整实现请参考源代码：`src/components/Dynam
 **动态 Schema 加载**：
 
 动态 schema 加载通过 UI 联动系统实现，配置方式请参考：
+
 - [UI 联动设计方案](./linkage.md)
 - 本文档第 2.2 和 2.3 节的示例代码
 
@@ -335,6 +336,7 @@ const schema = {
 ```
 
 **说明**：
+
 - address 字段会自动渲染为 NestedFormWidget（因为 type: 'object' 默认使用 nested-form widget）
 - 内层字段会自动添加路径前缀（address.street, address.city, address.zipCode）
 - 数据通过父表单的 FormContext 自动管理
@@ -462,21 +464,25 @@ const schema = {
 使用 `filterValueWithNestedSchemas` 工具函数在表单提交时过滤数据：
 
 ```typescript
-import { filterValueWithNestedSchemas } from '@/components/DynamicForm/utils/filterValueWithNestedSchemas';
+import { filterValueWithNestedSchemas } from '@/components/DynamicForm/utils/filterValueWithNestedSchemas'
 
 // 在 DynamicForm 的 onSubmit 中使用
 const handleSubmit = (data: Record<string, any>) => {
   // 获取嵌套 schema 注册表（由 NestedSchemaContext 提供）
-  const nestedSchemaRegistry = useNestedSchemaRegistry();
+  const nestedSchemaRegistry = useNestedSchemaRegistry()
 
   // 根据当前 schema 和注册的嵌套 schema 过滤数据
   const filteredData = nestedSchemaRegistry
-    ? filterValueWithNestedSchemas(data, schema, nestedSchemaRegistry.getAllSchemas())
-    : filterValueWithNestedSchemas(data, schema, new Map());
+    ? filterValueWithNestedSchemas(
+        data,
+        schema,
+        nestedSchemaRegistry.getAllSchemas(),
+      )
+    : filterValueWithNestedSchemas(data, schema, new Map())
 
   // 提交过滤后的数据
-  onSubmit?.(filteredData);
-};
+  onSubmit?.(filteredData)
+}
 ```
 
 **关键点**：
@@ -494,7 +500,7 @@ const handleSubmit = (data: Record<string, any>) => {
 **函数签名**：
 
 ```typescript
-function filterValueBySchema(value: any, schema: ExtendedJSONSchema): any;
+function filterValueBySchema(value: any, schema: ExtendedJSONSchema): any
 ```
 
 **适用场景**：
@@ -518,8 +524,8 @@ function filterValueWithNestedSchemas(
   value: any,
   schema: ExtendedJSONSchema,
   nestedSchemas: Map<string, ExtendedJSONSchema>,
-  currentPath?: string
-): any;
+  currentPath?: string,
+): any
 ```
 
 **适用场景**：
@@ -550,8 +556,8 @@ function filterValueWithNestedSchemas(
   value: any,
   schema: ExtendedJSONSchema,
   nestedSchemas: Map<string, ExtendedJSONSchema>,
-  currentPath?: string
-): any;
+  currentPath?: string,
+): any
 ```
 
 **参数说明**：
@@ -581,10 +587,10 @@ const schema: ExtendedJSONSchema = {
       properties: {}, // 初始为空，由动态 schema 填充
     },
   },
-};
+}
 
 // 嵌套 schema 注册表（由 NestedFormWidget 自动维护）
-const nestedSchemas = new Map<string, ExtendedJSONSchema>();
+const nestedSchemas = new Map<string, ExtendedJSONSchema>()
 
 // 当前 details 字段使用的是 company schema
 nestedSchemas.set('details', {
@@ -593,7 +599,7 @@ nestedSchemas.set('details', {
     companyName: { type: 'string' },
     taxId: { type: 'string' },
   },
-});
+})
 
 // 用户数据（包含切换类型时遗留的字段）
 const dirtyData = {
@@ -606,10 +612,10 @@ const dirtyData = {
     companyName: 'Acme Inc',
     taxId: '123456',
   },
-};
+}
 
 // 使用 filterValueWithNestedSchemas 过滤
-const cleanData = filterValueWithNestedSchemas(dirtyData, schema, nestedSchemas);
+const cleanData = filterValueWithNestedSchemas(dirtyData, schema, nestedSchemas)
 
 // 结果：只保留 company schema 中定义的字段
 // {
@@ -713,7 +719,7 @@ const schema = {
       },
     },
   },
-};
+}
 ```
 
 ### 8.3 多层嵌套
@@ -738,7 +744,7 @@ const schema = {
       },
     },
   },
-};
+}
 ```
 
 ---
@@ -790,7 +796,7 @@ const schema = {
       required: ['city'], // 内层验证
     },
   },
-};
+}
 ```
 
 ### 9.3 性能优化
@@ -808,8 +814,8 @@ const nestedSchema = useMemo(
       zipCode: { type: 'string', title: 'Zip Code' },
     },
   }),
-  [] // 静态 schema 无需依赖
-);
+  [], // 静态 schema 无需依赖
+)
 
 // 动态 schema 根据依赖缓存
 const dynamicSchema = useMemo(
@@ -817,8 +823,8 @@ const dynamicSchema = useMemo(
     type: 'object',
     properties: userType === 'personal' ? personalProps : companyProps,
   }),
-  [userType] // 只在 userType 变化时重新计算
-);
+  [userType], // 只在 userType 变化时重新计算
+)
 ```
 
 #### 9.3.2 使用 React.memo 避免不必要的重渲染
@@ -870,7 +876,7 @@ export const NestedFormWidget = memo(
 通过 `ref.current.setValues()` 或 `ref.current.reset(values)` 向嵌套表单设值时，无需特殊处理——传入原始的嵌套对象即可：
 
 ```typescript
-const formRef = useRef<DynamicFormRef>(null);
+const formRef = useRef<DynamicFormRef>(null)
 
 // 直接传入嵌套对象，内部会自动递归展开
 formRef.current?.setValues({
@@ -888,22 +894,22 @@ formRef.current?.setValues({
     },
   },
   tags: ['frontend', 'react'],
-});
+})
 
 // reset 同样支持嵌套对象
 formRef.current?.reset({
   name: 'Jane',
   address: { street: '456 Oak Ave', city: 'LA' },
-});
+})
 
 // 清空所有字段（包括嵌套字段）
-formRef.current?.reset({});
+formRef.current?.clear()
 ```
 
 **内部机制**：
 
 - `setValues` 递归遍历传入的对象，对每一层路径（如 `address`、`address.street`、`company.location.city`）都调用 `setValue`，确保嵌套 `NestedFormWidget` 内部的子 Controller 都能正确更新
-- `reset({})` 根据 schema 结构为每个字段生成类型恰当的空值（`string → ''`、`array → []`、`object → {}`），避免 React 受控组件因收到 `undefined` 而保留旧值
+- `reset()` 恢复 schema 默认值与 `DynamicForm.defaultValues`；`clear()` 根据 schema 结构为每个字段生成类型恰当的空值（`string → ''`、`array → []`、`object → {}`），避免 React 受控组件因收到 `undefined` 而保留旧值
 - 由 `ArrayFieldWidget/useFieldArray` 管理的动态基本类型数组（如 `tags: ['a', 'b']`）会在内部自动包装为对象数组格式，对外仍保持原始基本类型数组
 - 显式配置为多选 Select（`ui.widget: 'select'` 且 `widgetProps.multiple: true`）的数组不会包装；其内部和外部值都保持基本类型数组，确保 Select 与 options 联动能按 option value 正确匹配
 
