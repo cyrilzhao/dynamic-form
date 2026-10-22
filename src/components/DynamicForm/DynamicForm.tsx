@@ -250,7 +250,9 @@ function setValuesRecursive(
       methods.setValue(path, value, options)
     } catch (error) {
       // 只有当前失败写入对应的令牌可以撤销；之前成功路径的令牌必须保留给延迟 watch 消费。
-      if (mutationToken) cancelMutationContext?.({ path, token: mutationToken })
+      if (mutationToken) {
+        cancelMutationContext?.({ path, token: mutationToken })
+      }
       throw error
     }
     // 普通对象递归展开（数组和 null 除外）：
@@ -273,7 +275,7 @@ function setValuesRecursive(
 /**
  * 根据 schema 结构构建类型恰当的空值对象
  *
- * 用于 reset({}) 场景：需要为每个字段生成正确类型的空值，
+ * 用于 clear() 场景：需要为每个字段生成正确类型的空值，
  * 避免使用 undefined（会导致 React 受控组件变为非受控组件，保留旧值）。
  *
  * 类型映射：
@@ -516,7 +518,13 @@ function applyFieldTransforms(
   variantStore?: ReturnType<typeof createFieldVariantStore>,
   path = '',
 ): any {
-  if (isFileSchema(schema) || isBinaryFileValue(data) || !data || typeof data !== 'object' || Array.isArray(data)) {
+  if (
+    isFileSchema(schema) ||
+    isBinaryFileValue(data) ||
+    !data ||
+    typeof data !== 'object' ||
+    Array.isArray(data)
+  ) {
     return data
   }
   const result: Record<string, any> = { ...data }
@@ -624,7 +632,13 @@ function reverseFieldTransforms(
   variantStore?: ReturnType<typeof createFieldVariantStore>,
   path = '',
 ): any {
-  if (isFileSchema(schema) || isBinaryFileValue(data) || !data || typeof data !== 'object' || Array.isArray(data)) {
+  if (
+    isFileSchema(schema) ||
+    isBinaryFileValue(data) ||
+    !data ||
+    typeof data !== 'object' ||
+    Array.isArray(data)
+  ) {
     return data
   }
   const result: Record<string, any> = { ...data }
@@ -1008,7 +1022,9 @@ const DynamicFormInner = React.memo(
       const flushChangeBatch = useCallback((batchId: number) => {
         changeBatchControllerRef.current.markStable({ batchId })
         const meta = changeBatchControllerRef.current.tryDetach({ batchId })
-        if (!meta || !pendingDataRef.current) return
+        if (!meta || !pendingDataRef.current) {
+          return
+        }
         const nextData = pendingDataRef.current
         pendingDataRef.current = null
         if (activeChangeBatchIdRef.current === batchId) {
@@ -1085,16 +1101,21 @@ const DynamicFormInner = React.memo(
         ownChangeBatchRuntime
 
       React.useEffect(() => {
+        const changeBatchController = changeBatchControllerRef.current
+        const pendingMutationContextQueue =
+          pendingMutationContextQueueRef.current
+        const directMutationPaths = directMutationPathsRef.current
+        const directMutationSourceByPath = directMutationSourceByPathRef.current
         return () => {
           if (changeFlushTimerRef.current !== null) {
             clearTimeout(changeFlushTimerRef.current)
           }
-          changeBatchControllerRef.current.dispose()
+          changeBatchController.dispose()
           activeChangeBatchIdRef.current = null
           pendingDataRef.current = null
-          pendingMutationContextQueueRef.current.clear()
-          directMutationPathsRef.current.clear()
-          directMutationSourceByPathRef.current.clear()
+          pendingMutationContextQueue.clear()
+          directMutationPaths.clear()
+          directMutationSourceByPath.clear()
         }
       }, [])
 
@@ -1473,12 +1494,12 @@ const DynamicFormInner = React.memo(
                   cancelMutationContext,
                 )
               } else {
-                // 清空：构建类型恰当的空值，确保受控组件正确清除
-                const emptyValues = buildEmptyValues(schema)
-                methods.reset(emptyValues)
+                const resetValues =
+                  processedDefaultValues ?? buildEmptyValues(schema)
+                methods.reset(resetValues)
                 setValuesRecursive(
                   methods,
-                  emptyValues,
+                  resetValues,
                   undefined,
                   '',
                   beforeSetValue,
@@ -1489,6 +1510,47 @@ const DynamicFormInner = React.memo(
               changeSourceRef.current = previousSource
               closeChangeBatch(batchId)
               // RHF 的 reset/setValue 通知可能在当前调用栈结束后才派发，保持来源到下一轮事件循环。
+              window.setTimeout(
+                () =>
+                  operationController.setMutationSource(previousMutationSource),
+                0,
+              )
+            }
+          },
+          clear: () => {
+            operationController.markFormMutation()
+            const batchId = beginChangeBatch('reset')
+            const previousSource = changeSourceRef.current
+            const previousMutationSource =
+              operationController.setMutationSource('reset')
+            changeSourceRef.current = 'reset'
+            const beforeSetValue = (path: string): PendingMutationToken => {
+              const mutationContext: FormMutationContext = {
+                batchId,
+                source: 'reset',
+                isLinkageWrite: false,
+              }
+              const directPaths =
+                directMutationPathsRef.current.get(batchId) ?? new Set<string>()
+              directPaths.add(path)
+              directMutationPathsRef.current.set(batchId, directPaths)
+              directMutationSourceByPathRef.current.set(path, 'reset')
+              return registerMutationContext({ context: mutationContext, path })
+            }
+            try {
+              const emptyValues = buildEmptyValues(schema)
+              methods.reset(emptyValues)
+              setValuesRecursive(
+                methods,
+                emptyValues,
+                undefined,
+                '',
+                beforeSetValue,
+                cancelMutationContext,
+              )
+            } finally {
+              changeSourceRef.current = previousSource
+              closeChangeBatch(batchId)
               window.setTimeout(
                 () =>
                   operationController.setMutationSource(previousMutationSource),
@@ -1536,6 +1598,8 @@ const DynamicFormInner = React.memo(
           closeChangeBatch,
           registerMutationContext,
           cancelMutationContext,
+          nestedSchemaRegistry,
+          processedDefaultValues,
         ],
       )
 
@@ -1724,16 +1788,16 @@ const DynamicFormInner = React.memo(
                           : mutationContext?.source === 'setValues'
                             ? 'setValues'
                             : 'setValue'))
-                    : directSource
-                      ? directSource
-                      : mutationContext !== undefined
-                        ? mutationContext.isLinkageWrite
-                          ? 'linkage'
-                          : mutationContext.source
-                        : operationControllerRef.current.getMutationSource() ===
-                            'linkage'
-                          ? 'linkage'
-                          : changeSourceRef.current,
+                      : directSource
+                        ? directSource
+                        : mutationContext !== undefined
+                          ? mutationContext.isLinkageWrite
+                            ? 'linkage'
+                            : mutationContext.source
+                          : operationControllerRef.current.getMutationSource() ===
+                              'linkage'
+                            ? 'linkage'
+                            : changeSourceRef.current,
                   ...(arrayAction ? { arrayAction } : {}),
                 })
               }
@@ -1877,7 +1941,9 @@ const DynamicFormInner = React.memo(
             ) {
               const isImplicitUserBatch =
                 mutationContextRef.current?.source === 'user'
-              if (isImplicitUserBatch) closeChangeBatch(implicitBatchId)
+              if (isImplicitUserBatch) {
+                closeChangeBatch(implicitBatchId)
+              }
             }
           })
           return () => {
@@ -1889,7 +1955,14 @@ const DynamicFormInner = React.memo(
             clearArrayAction(subscribedMethods.control)
           }
         }
-      }, [watch, hasOnChange])
+      }, [
+        watch,
+        hasOnChange,
+        nestedSchemaRegistry,
+        beginChangeBatch,
+        closeChangeBatch,
+        consumeMutationContext,
+      ])
 
       // ✅ 使用 useCallback 缓存 onSubmitHandler，避免每次渲染创建新函
       const onSubmitHandler = useCallback(

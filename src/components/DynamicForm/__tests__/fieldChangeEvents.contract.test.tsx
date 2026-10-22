@@ -467,14 +467,18 @@ describe('DynamicForm 字段变更事件契约', () => {
     })
     await waitForFormReady({ formRef })
     await refreshLinkage({ formRef })
-    await waitFor(() => expect(screen.getByText('NODE_ENV')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByText('NODE_ENV')).toBeInTheDocument(),
+    )
     onChange.mockClear()
 
     fireEvent.click(container.querySelectorAll('.select-trigger')[0])
     fireEvent.click(screen.getByText('production'))
 
     await waitFor(() => expect(onChange).toHaveBeenCalled())
-    expect(onChange.mock.calls[onChange.mock.calls.length - 1]?.[0]).toMatchObject({
+    expect(
+      onChange.mock.calls[onChange.mock.calls.length - 1]?.[0],
+    ).toMatchObject({
       content: { environment: { NODE_ENV: 'production' } },
     })
   })
@@ -534,10 +538,14 @@ describe('DynamicForm 字段变更事件契约', () => {
         },
       },
     })
-    await waitFor(() => expect(container.querySelectorAll('.select-trigger').length).toBe(1))
+    await waitFor(() =>
+      expect(container.querySelectorAll('.select-trigger').length).toBe(1),
+    )
     fireEvent.click(container.querySelector('.select-trigger')!)
     fireEvent.click(screen.getByText('runScript'))
-    await waitFor(() => expect(screen.getByText('NODE_ENV')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByText('NODE_ENV')).toBeInTheDocument(),
+    )
     onChange.mockClear()
 
     const selectTriggers = container.querySelectorAll('.select-trigger')
@@ -1557,7 +1565,7 @@ describe('DynamicForm 字段变更事件契约', () => {
     ])
   })
 
-  it('无参数 reset 应按 schema 空值报告所有实际变化字段', async () => {
+  it('clear 应按 schema 空值报告所有实际变化字段', async () => {
     const onChange = jest.fn()
     const schema: ExtendedJSONSchema = {
       type: 'object',
@@ -1576,7 +1584,7 @@ describe('DynamicForm 字段变更事件契约', () => {
     })
     onChange.mockClear()
     await act(async () => {
-      formRef.current!.reset()
+      formRef.current!.clear()
       await new Promise((resolve) => setTimeout(resolve, 20))
     })
     expect(onChange).toHaveBeenCalledTimes(1)
