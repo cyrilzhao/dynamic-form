@@ -21,6 +21,7 @@ import type { ExtendedJSONSchema } from '../types/schema'
 import { FieldRegistry } from '../core/FieldRegistry'
 import { SchemaParser } from '../core/SchemaParser'
 import { recordArrayAction } from '../utils/arrayActionRegistry'
+import { isFileSchema } from '../utils/fileValue'
 
 export interface ArrayFieldWidgetProps extends FieldWidgetProps {
   schema: ExtendedJSONSchema & {
@@ -126,6 +127,9 @@ function determineArrayMode(schema: ExtendedJSONSchema): 'static' | 'dynamic' {
  * 判断是否为基本类型（需要包装的类型）
  */
 function isPrimitiveType(schema: ExtendedJSONSchema): boolean {
+  if (isFileSchema(schema)) {
+    return false
+  }
   const type = schema.type
   return (
     type === 'string' ||
@@ -168,6 +172,9 @@ function getDefaultPrimitiveValue(schema: ExtendedJSONSchema): any {
  * 对于基本类型，包装成 { value: xxx } 以避免被 useFieldArray 过滤
  */
 function getDefaultValue(itemsSchema: ExtendedJSONSchema): any {
+  if (isFileSchema(itemsSchema)) {
+    return null
+  }
   // 如果是基本类型，包装成对象
   if (isPrimitiveType(itemsSchema)) {
     const defaultVal =
@@ -859,6 +866,8 @@ const ArrayItem = React.memo<ArrayItemProps>(
 
       return rules
     }, [schema])
+    const directFileValue = isFileSchema(schema)
+    const controllerName = directFileValue ? name : `${name}.value`
 
     return (
       <div
@@ -882,7 +891,7 @@ const ArrayItem = React.memo<ArrayItemProps>(
         {/* 字段内容 */}
         <div className="array-item-field" style={{ flex: 1 }}>
           <Controller
-            name={`${name}.value`}
+            name={controllerName}
             control={control}
             rules={{
               ...validationRules,
@@ -908,7 +917,7 @@ const ArrayItem = React.memo<ArrayItemProps>(
               return (
                 <>
                   <WidgetComponent
-                    name={`${name}.value`}
+                    name={controllerName}
                     schema={schema}
                     value={controllerField.value}
                     onChange={(newValue: any) => {

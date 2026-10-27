@@ -1,4 +1,5 @@
-import type { ExtendedJSONSchema } from "../types/schema";
+import type { ExtendedJSONSchema } from '../types/schema'
+import { isBinaryFileValue, isFileSchema } from './fileValue'
 
 /**
  * 根据 schema 递归过滤数据，只保留 schema 中定义的字段
@@ -37,45 +38,49 @@ export function filterValueBySchema(
 ): any {
   // 处理 null 或 undefined
   if (value === null || value === undefined) {
-    return value;
+    return value
+  }
+
+  if (isFileSchema(schema) || isBinaryFileValue(value)) {
+    return value
   }
 
   // 处理数组类型
-  if (schema.type === "array" && Array.isArray(value)) {
+  if (schema.type === 'array' && Array.isArray(value)) {
     if (!schema.items) {
-      return value;
+      return value
     }
 
     // 递归过滤数组中的每个元素
     return value.map((item) =>
       filterValueBySchema(item, schema.items as ExtendedJSONSchema),
-    );
+    )
   }
 
   // 处理对象类型
   if (
-    schema.type === "object" &&
-    typeof value === "object" &&
+    schema.type === 'object' &&
+    typeof value === 'object' &&
     !Array.isArray(value)
   ) {
     if (!schema.properties) {
-      return value;
+      return value
     }
 
-    const filtered: Record<string, any> = {};
-    const validKeys = Object.keys(schema.properties);
+    const filtered: Record<string, any> = {}
+    const validKeys = Object.keys(schema.properties)
 
     for (const key of validKeys) {
       if (key in value) {
-        const fieldSchema = schema.properties[key];
+        const fieldSchema = schema.properties[key]
         // 递归处理嵌套字段
-        filtered[key] = filterValueBySchema(value[key], fieldSchema);
+        filtered[key] = filterValueBySchema(value[key], fieldSchema)
       }
     }
 
-    return filtered;
+    return filtered
   }
 
   // 基本类型直接返回
-  return value;
+  return value
 }

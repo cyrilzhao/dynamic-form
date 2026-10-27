@@ -25,6 +25,7 @@ export interface WidgetPreset {
   variant: ComponentType<FieldWidgetProps>;
   "code-editor": ComponentType<FieldWidgetProps>;
   "object-editor": ComponentType<FieldWidgetProps>;
+  file: ComponentType<FieldWidgetProps>;
 }
 
 /**

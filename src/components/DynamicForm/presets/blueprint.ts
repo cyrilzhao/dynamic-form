@@ -17,6 +17,7 @@ import {
   VariantWidget,
   CodeEditorWidget,
   ObjectEditorWidget,
+  FileWidget,
 } from '../widgets'
 import type { WidgetPreset } from '../types/widgets'
 
@@ -44,4 +45,5 @@ export const blueprintPreset: WidgetPreset = {
   variant: VariantWidget,
   'code-editor': CodeEditorWidget,
   'object-editor': ObjectEditorWidget,
+  file: FileWidget,
 }

@@ -16,3 +16,5 @@ export { CodeEditorWidget } from "./CodeEditorWidget";
 export { ObjectEditorWidget } from "./ObjectEditorWidget";
 export { VariantWidget } from "./VariantWidget";
 export { SchemaBuilderWidget } from "./SchemaBuilderWidget";
+export { FileWidget } from './FileWidget';
+export type { FileWidgetProps } from './FileWidget';
