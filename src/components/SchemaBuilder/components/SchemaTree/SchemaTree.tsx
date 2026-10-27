@@ -12,6 +12,12 @@ import { Tree } from '../../../Tree'
 import type { TreeNodeInfo } from '../../../Tree'
 import { useSchemaBuilder } from '../../SchemaBuilder'
 import type { ExtendedJSONSchema } from '../../../DynamicForm/types/schema'
+import {
+  getWidgetContractSchemaAtPath,
+  isWidgetArrayItemsContractPath,
+  isWidgetValueSchemaDescendantPath,
+  isWidgetValueSchemaOwnerPath,
+} from '../../utils/widgetSchema'
 
 const canAddChildToNode = (schema: ExtendedJSONSchema): boolean =>
   schema.type === 'object'
@@ -29,6 +35,7 @@ export const SchemaTree: React.FC = () => {
     onMoveUp,
     onMoveDown,
     options,
+    widgetDefinitions = [],
   } = useSchemaBuilder()
   const readonly = options?.readonly ?? {}
   const hideTreeActions = readonly.all || readonly.schema || readonly.tree
@@ -79,16 +86,44 @@ export const SchemaTree: React.FC = () => {
       // Can delete if not root and not 'items' of an array (enforcing read-only structure for items)
       // 如果是最后一个一级节点，则不能删除
       const canDelete = !isRoot && key !== 'items' && !isLastFirstLevelNode
+      const isWidgetContractField =
+        getWidgetContractSchemaAtPath({
+          schema,
+          path,
+          widgetDefinitions,
+        }) !== undefined
+      const isWidgetArrayItemsContract = isWidgetArrayItemsContractPath({
+        schema,
+        path,
+        widgetDefinitions,
+      })
+      const isWidgetValueSchemaDescendant = isWidgetValueSchemaDescendantPath({
+        schema,
+        path,
+        widgetDefinitions,
+      })
+      const isReadonlyWidgetContract =
+        isWidgetContractField ||
+        isWidgetArrayItemsContract ||
+        isWidgetValueSchemaDescendant
+      const isWidgetValueSchemaOwner = isWidgetValueSchemaOwnerPath({
+        schema,
+        path,
+        widgetDefinitions,
+      })
 
       return (
         <Menu>
-          {canAddChild && !hideAdd && (
-            <MenuItem
-              text="Add Child Node"
-              icon="plus"
-              onClick={() => onAddChild(path, 'string')}
-            />
-          )}
+          {canAddChild &&
+            !isReadonlyWidgetContract &&
+            !isWidgetValueSchemaOwner &&
+            !hideAdd && (
+              <MenuItem
+                text="Add Child Node"
+                icon="plus"
+                onClick={() => onAddChild(path, 'string')}
+              />
+            )}
           {canAddSibling && !hideAdd && (
             <MenuItem
               text="Add Sibling Node"
@@ -114,9 +149,9 @@ export const SchemaTree: React.FC = () => {
             </>
           )}
 
-          {canMove && canDelete && <MenuDivider />}
+          {canMove && canDelete && !isReadonlyWidgetContract && <MenuDivider />}
 
-          {canDelete && !hideDelete && (
+          {canDelete && !isReadonlyWidgetContract && !hideDelete && (
             <MenuItem
               text="Delete Node"
               icon="trash"
@@ -137,13 +172,14 @@ export const SchemaTree: React.FC = () => {
       hideAdd,
       hideDelete,
       hideReorder,
-    ]
+      widgetDefinitions,
+    ],
   )
 
-  const buildTreeNodes = useCallback(
-    (
+  const nodes = useMemo(() => {
+    const buildTreeNodes = (
       currentSchema: ExtendedJSONSchema,
-      path: string[] = []
+      path: string[] = [],
     ): TreeNodeInfo<string[]>[] => {
       const pathStr = path.join('.')
       const isSelected = path.join('.') === selectedPath.join('.')
@@ -171,8 +207,20 @@ export const SchemaTree: React.FC = () => {
         path.length > 0 && path[path.length - 2] === 'properties'
       const isItemsNode = path[path.length - 1] === 'items'
       const hasNodeManagementActions = path.length > 0 && !isItemsNode
+      const isWidgetArrayItemsContract = isWidgetArrayItemsContractPath({
+        schema,
+        path,
+        widgetDefinitions,
+      })
+      const isWidgetValueSchemaDescendant = isWidgetValueSchemaDescendantPath({
+        schema,
+        path,
+        widgetDefinitions,
+      })
       const showActions =
-        canAddChild || canAddSibling || hasNodeManagementActions
+        !isWidgetArrayItemsContract &&
+        !isWidgetValueSchemaDescendant &&
+        (canAddChild || canAddSibling || hasNodeManagementActions)
 
       const node: TreeNodeInfo<string[]> = {
         id: pathStr || 'root',
@@ -216,9 +264,9 @@ export const SchemaTree: React.FC = () => {
                 ...path,
                 'properties',
                 key,
-              ])
+              ]),
             )
-          }
+          },
         )
       }
 
@@ -230,7 +278,7 @@ export const SchemaTree: React.FC = () => {
             ...buildTreeNodes(itemsSchema as ExtendedJSONSchema, [
               ...path,
               'items',
-            ])
+            ]),
           )
         }
       }
@@ -240,11 +288,10 @@ export const SchemaTree: React.FC = () => {
       }
 
       return [node]
-    },
-    [selectedPath, expandedPaths, renderNodeMenu]
-  )
+    }
 
-  const nodes = useMemo(() => buildTreeNodes(schema), [schema, buildTreeNodes])
+    return buildTreeNodes(schema)
+  }, [schema, selectedPath, expandedPaths, renderNodeMenu, widgetDefinitions])
 
   // 显示根节点
   const displayNodes = nodes

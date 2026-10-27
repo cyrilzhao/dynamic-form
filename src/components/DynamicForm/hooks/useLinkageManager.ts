@@ -147,7 +147,9 @@ function isSameValue(prev: unknown, next: unknown): boolean {
 
   if (prev && next && typeof prev === 'object' && typeof next === 'object') {
     if (isBinaryFileValue(prev) || isBinaryFileValue(next)) {
-      if (!isBinaryFileValue(prev) || !isBinaryFileValue(next)) return false
+      if (!isBinaryFileValue(prev) || !isBinaryFileValue(next)) {
+        return false
+      }
       return (
         prev === next ||
         (prev.size === next.size &&
@@ -177,8 +179,12 @@ function isSameValue(prev: unknown, next: unknown): boolean {
  */
 function cloneFormData(data: Record<string, any>): Record<string, any> {
   const clone = (value: unknown): unknown => {
-    if (isBinaryFileValue(value)) return value
-    if (Array.isArray(value)) return value.map(clone)
+    if (isBinaryFileValue(value)) {
+      return value
+    }
+    if (Array.isArray(value)) {
+      return value.map(clone)
+    }
     if (value && typeof value === 'object') {
       return Object.fromEntries(
         Object.entries(value as Record<string, unknown>).map(([key, item]) => [
@@ -882,8 +888,14 @@ export function useLinkageManager({
       }
       // 清除刷新标志
       taskQueue.setRefreshing(false)
+      // 刷新期间收到的字段 watch 仍会登记联动任务；若它们的定时器在 refreshing 状态下
+      // 触发，processQueue 会提前返回，因此刷新结束后必须重新启动队列，避免批次 run 悬挂。
+      if (!taskQueue.isEmpty()) {
+        processQueue()
+      }
     }
   }, [
+    processQueue,
     taskQueue,
     asyncSequenceManager,
     cache,
@@ -923,7 +935,9 @@ export function useLinkageManager({
   // DynamicForm 父组件可能在无语义变化的重渲染中重建 schema 对象；引用比较会误触发
   // 刷新。签名只用于联动规则版本判断，真正的字段值和转换仍从最新 schema ref 读取。
   const getSchemaVersionKey = (value: unknown): string => {
-    if (value === undefined) return ''
+    if (value === undefined) {
+      return ''
+    }
     try {
       return JSON.stringify(value) ?? ''
     } catch {
