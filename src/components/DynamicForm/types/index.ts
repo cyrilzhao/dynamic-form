@@ -256,7 +256,18 @@ export interface DynamicFormRef {
    */
   reset: (values?: Record<string, any>) => void
 
-  /** 清空表单值，并为字段写入类型恰当的空值。 */
+  /**
+   * 清空表单中的所有字段值，并将字段设置为符合其 Schema 类型的空值，
+   * 例如字符串为 `''`、数组为 `[]`；不会恢复 Schema 默认值或 `defaultValues`。
+   *
+   * 与 `reset()` 一样，会清除表单的脏状态、错误状态和触摸状态，
+   * 并递归更新嵌套字段；若需要恢复初始默认值，请使用 `reset()`。
+   *
+   * @example
+   * ```tsx
+   * formRef.current?.clear();
+   * ```
+   */
   clear: () => void
 
   /**
