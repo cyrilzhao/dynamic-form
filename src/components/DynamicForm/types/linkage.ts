@@ -121,7 +121,11 @@ export interface LinkageFunctionContext {
   arrayIndex?: number
   /** 如果字段在数组内，这是数组的路径，如 'contacts' */
   arrayPath?: string
-  /** 页面级外部数据（通过 linkageContext prop 传入） */
+  /**
+   * 页面级外部数据（通过 DynamicForm 的 linkageContext prop 传入）。
+   *
+   * linkageContext 的任何变化都会自动触发联动重新计算（refreshLinkage）。
+   */
   externalData: Record<string, any>
 }
 

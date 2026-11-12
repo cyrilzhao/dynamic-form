@@ -1604,10 +1604,19 @@ const linkageContext = useMemo(() => ({ apiData }), [apiData]);
 **Benefits:**
 
 - ✅ **Pure functions**: Linkage functions don't depend on closures
-- ✅ **Automatic refresh**: When `linkageContext` changes, linkage automatically re-executes
+- ✅ **Automatic refresh**: When `linkageContext` changes, linkage automatically re-executes all linkage calculations — no need to manually call `refreshLinkage()`
 - ✅ **Type-safe**: Full TypeScript support for context data
 - ✅ **Clear separation**: Distinguishes form data from external context
 - ✅ **Performance**: useMemo prevents unnecessary re-renders
+
+**`linkageContext` vs `helpers` — when to use which:**
+
+| Scenario                                                                                                                                     | Use                                                    |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Data that changes at runtime and must drive linkage re-calculation (e.g. async API responses, page-level state)                              | `linkageContext` → accessed via `context.externalData` |
+| Stable utilities, constants, or mapping tables that don't need to trigger re-calculation (e.g. tool libraries, enum maps, service instances) | `helpers` → accessed via `helpers.*`                   |
+
+> Any change to `linkageContext` triggers an automatic linkage refresh; changes to `helpers` do not. Put data in `helpers` if its changes should **not** re-run linkage.
 
 **6. schema** - Dynamic schema switching
 
@@ -3181,7 +3190,7 @@ DynamicForm provides these helpers by default:
 
 #### Custom Helpers
 
-Use the `helpers` prop to add application-specific utilities. DynamicForm merges them with the built-in helpers:
+Use the `helpers` prop to inject application-specific utilities, constants, and service instances. DynamicForm merges them with the built-in helpers:
 
 ```typescript
 const mergedHelpers = {
@@ -3190,7 +3199,15 @@ const mergedHelpers = {
 }
 ```
 
+**What to put in `helpers`:**
+
+- **Tool libraries**: date formatting, encryption, custom business utilities
+- **Global constants / mapping tables**: enum value maps, static config, unit conversion tables — anything whose changes should **not** automatically re-run linkage
+- **Service instances**: pre-initialized API clients, i18n instances, etc.
+
 User-provided helpers take priority, so you can override a built-in helper when needed. Keep the `helpers` object stable with `useMemo` to avoid unnecessary recalculation and rerenders.
+
+> **Note**: Changes to `helpers` do **not** automatically trigger linkage re-calculation. If you need data changes to automatically re-run linkage, use `linkageContext` instead (accessed via `context.externalData` in linkage functions).
 
 ```typescript
 import React, { useMemo } from 'react';
@@ -3228,17 +3245,40 @@ function App({ token }: { token: string }) {
 }
 ```
 
-Custom helpers are available in every helper-aware function:
+Custom helpers are available in every helper-aware function. The same `helpers` object is shared by `callbacks` (transform, validator, widget callback) and `linkageFunctions`:
 
 ```typescript
+const STATUS_MAP = { 1: 'Active', 0: 'Inactive' }
+
+const helpers = useMemo(() => ({
+  dayjs,                   // tool library: format dates in a transform
+  api: myApiClient,        // service instance: make requests in a validator or linkage
+  STATUS_MAP,              // constant map: enum conversion in a transform
+  formatCurrency: (n: number) => `¥${n.toFixed(2)}`,  // custom utility
+}), [])
+
 const callbacks = {
-  validateUsername: ({ value, helpers }) => {
-    if (helpers.userService.isReservedUsername(value)) {
-      return 'This username is reserved'
-    }
-    return null
+  // transform: use a mapping table from helpers
+  statusToLabel: ({ value, helpers }) => helpers.STATUS_MAP[value] ?? value,
+  // validator: use an API client from helpers
+  checkUsername: async ({ value, helpers }) => {
+    const taken = await helpers.api.checkUsername(value)
+    return taken ? 'Username already exists' : null
   },
 }
+
+const linkageFunctions = {
+  // linkageFunction: use a tool from helpers to compute the result
+  calcExpiry: ({ formData, helpers }) =>
+    helpers.dayjs(formData.startDate).add(30, 'day').format('YYYY-MM-DD'),
+}
+
+<DynamicForm
+  schema={schema}
+  helpers={helpers}
+  callbacks={callbacks}
+  linkageFunctions={linkageFunctions}
+/>
 ```
 
 Inline scripts can use the same custom helpers:
