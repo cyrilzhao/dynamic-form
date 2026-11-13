@@ -275,7 +275,7 @@ FormField
 - `setValues` 保持顶层 patch 语义；
 - 传入对象分支的整体替换行为保持不变；
 - `reset(values)` 保持完整替换语义；
-- `reset({})` 继续按 Schema 生成类型恰当的空值；
+- `reset()` 恢复初始默认值，`clear()` 按 Schema 生成类型恰当的空值；
 - 多选 Select 继续保持基本类型数组；
 - `ArrayFieldWidget/useFieldArray` 的包装与解包规则不变。
 
@@ -331,7 +331,7 @@ FormField
 每个场景应验证：
 
 - 输入值和 `getValues()` 一致；
-- `setValue`、`setValues`、`reset(values)`、`reset({})` 行为不变；
+- `setValue`、`setValues`、`reset(values)` 行为不变；`reset()` 恢复默认值，`clear()` 清空值；
 - dirty、touched、errors 和 isValid 符合原有契约；
 - watch 和外部 `onChange` 没有异常重复或遗漏；
 - 当前 Schema 的默认值正确应用；

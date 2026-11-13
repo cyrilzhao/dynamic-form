@@ -1,7 +1,18 @@
-import React, { useState } from 'react'
-import { SchemaBuilder } from '@/components/SchemaBuilder/SchemaBuilder'
+import React, { useRef, useState } from 'react'
+import { Button, ButtonGroup, Callout, H3, Intent } from '@blueprintjs/core'
+import {
+  SchemaBuilder,
+  type SchemaBuilderRef,
+} from '@/components/SchemaBuilder/SchemaBuilder'
 import type { ExtendedJSONSchema } from '@/components/DynamicForm'
-import { H3 } from '@blueprintjs/core'
+import { isExtendedJSONSchema } from '@/components/SchemaBuilder/utils/validateExtendedJSONSchema'
+import { validateWidgetSchemaContracts } from '@/components/SchemaBuilder/utils/widgetSchema'
+import {
+  basicWidgetDefinitions,
+  selectionWidgetDefinitions,
+  uploadInputWidgetDefinition,
+  uploadListInputWidgetDefinition,
+} from '@/components/DynamicForm/widgets'
 
 // const initialSchema: ExtendedJSONSchema = {
 //   type: 'object',
@@ -150,16 +161,96 @@ const initialSchema: ExtendedJSONSchema = {
 }
 
 export const SchemaBuilderExample: React.FC = () => {
+  const builderRef = useRef<SchemaBuilderRef>(null)
   const [schema, setSchema] = useState<ExtendedJSONSchema>(initialSchema)
+  const [validationMessage, setValidationMessage] = useState<string | null>(
+    null,
+  )
+  const [snapshot, setSnapshot] = useState<ExtendedJSONSchema | null>(null)
+
+  const handleValidate = () => {
+    const currentSchema = builderRef.current?.getSchema()
+    const isBaseSchemaValid = currentSchema
+      ? isExtendedJSONSchema(currentSchema)
+      : false
+    const widgetDefinitions = [
+      ...basicWidgetDefinitions,
+      ...selectionWidgetDefinitions,
+      uploadInputWidgetDefinition,
+      uploadListInputWidgetDefinition,
+    ]
+    const contractIssues = currentSchema
+      ? validateWidgetSchemaContracts({
+          schema: currentSchema,
+          widgetDefinitions,
+        })
+      : []
+    const isValid = isBaseSchemaValid && contractIssues.length === 0
+    setValidationMessage(
+      isValid
+        ? 'Schema is valid.'
+        : contractIssues.length > 0
+          ? `Schema is invalid: ${contractIssues[0].message}`
+          : 'Schema is invalid.',
+    )
+  }
+
+  const handleReadSchema = () => {
+    const currentSchema = builderRef.current?.getSchema()
+    if (currentSchema) {
+      setSnapshot(currentSchema)
+    }
+  }
+
+  const handleReset = () => {
+    builderRef.current?.reset()
+    setSchema(initialSchema)
+    setSnapshot(null)
+    setValidationMessage(null)
+  }
 
   return (
     <div style={{ padding: '20px', margin: '0 auto' }}>
       <H3>Schema Builder</H3>
       <p>Visual editor for ExtendedJSONSchema with integrated preview.</p>
 
+      <ButtonGroup style={{ marginBottom: 12 }}>
+        <Button intent={Intent.PRIMARY} onClick={handleValidate}>
+          Validate Schema
+        </Button>
+        <Button onClick={handleReadSchema}>Read Current Schema</Button>
+        <Button onClick={handleReset}>Reset Schema</Button>
+      </ButtonGroup>
+
+      {validationMessage && (
+        <Callout
+          intent={
+            validationMessage === 'Schema is valid.'
+              ? Intent.SUCCESS
+              : Intent.DANGER
+          }
+          style={{ marginBottom: 12 }}
+        >
+          {validationMessage}
+        </Callout>
+      )}
+
       <div style={{ marginBottom: '20px' }}>
-        <SchemaBuilder defaultValue={initialSchema} onChange={setSchema} />
+        <SchemaBuilder
+          ref={builderRef}
+          defaultValue={initialSchema}
+          onChange={setSchema}
+        />
       </div>
+
+      {snapshot && (
+        <div style={{ marginTop: 20 }}>
+          <p>Current Schema Snapshot:</p>
+          <pre style={{ fontSize: 10, maxHeight: 240, overflow: 'auto' }}>
+            {JSON.stringify(snapshot, null, 2)}
+          </pre>
+        </div>
+      )}
 
       {/* 
       // Preview is now inside SchemaBuilder

@@ -1,9 +1,10 @@
 import '@testing-library/jest-dom'
 import React from 'react'
-import { act, fireEvent, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { DynamicForm } from '../DynamicForm'
 import type { ExtendedJSONSchema } from '../types/schema'
 import {
+  refreshLinkage,
   renderDynamicForm,
   setupDynamicFormTest,
   waitForFormReady,
@@ -12,6 +13,166 @@ import {
 beforeAll(setupDynamicFormTest)
 
 describe('DynamicForm 字段变更事件契约', () => {
+  it('自定义字段切换 options 并清空 Select 后，Select 后续变更仍应派发 onChange', async () => {
+    const onChange = jest.fn()
+    const CustomWidget = React.forwardRef<
+      HTMLButtonElement,
+      { onChange?: (value: unknown) => void }
+    >(({ onChange: handleChange }, ref) => (
+      <button
+        ref={ref}
+        type="button"
+        data-testid="custom-widget"
+        onClick={() => handleChange?.('next')}
+      >
+        Change source
+      </button>
+    ))
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        source: {
+          type: 'string',
+          title: 'Source',
+          ui: { widget: 'custom-widget' },
+        },
+        choice: {
+          type: 'string',
+          title: 'Choice',
+          ui: {
+            widget: 'select',
+            linkages: [
+              {
+                type: 'options',
+                dependencies: ['#/properties/source'],
+                when: { field: 'source', operator: '==', value: 'next' },
+                fulfill: { options: [{ label: 'New option', value: 'new' }] },
+                otherwise: {
+                  options: [{ label: 'Old option', value: 'old' }],
+                },
+              },
+            ],
+          },
+        },
+      },
+    }
+    const { formRef, container } = renderDynamicForm({
+      props: {
+        schema,
+        onChange,
+        defaultValues: { source: 'old', choice: 'old' },
+        widgets: { 'custom-widget': CustomWidget },
+      },
+    })
+    await waitForFormReady({ formRef })
+    await refreshLinkage({ formRef })
+    onChange.mockClear()
+
+    fireEvent.click(container.querySelector('[data-testid="custom-widget"]')!)
+    await waitFor(() =>
+      expect(formRef.current!.getValue('choice')).toBeUndefined(),
+    )
+    await waitFor(() => expect(onChange).toHaveBeenCalled())
+    onChange.mockClear()
+
+    fireEvent.click(document.querySelector('.select-trigger')!)
+    fireEvent.click(screen.getByText('New option'))
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1))
+    expect(onChange.mock.calls[0][0]).toEqual({ source: 'next', choice: 'new' })
+  })
+
+  it('自定义 Widget 变更后，下方 Select 仍应持续触发 DynamicForm onChange', async () => {
+    const onChange = jest.fn()
+    const CustomWidget = React.forwardRef<
+      HTMLButtonElement,
+      { name: string; onChange?: (value: unknown) => void }
+    >(({ name, onChange: handleChange }, ref) => (
+      <button
+        ref={ref}
+        type="button"
+        data-testid="custom-widget"
+        onClick={() => handleChange?.({ id: 'custom-value' })}
+      >
+        {name}
+      </button>
+    ))
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        custom: {
+          type: 'object',
+          title: 'Custom',
+          ui: { widget: 'custom-widget' },
+        },
+        choice: {
+          type: 'string',
+          title: 'Choice',
+          enum: ['a', 'b', 'c'],
+          enumNames: ['Option A', 'Option B', 'Option C'],
+          ui: { widget: 'select' },
+        },
+      },
+    }
+    const { formRef, container } = renderDynamicForm({
+      props: { schema, onChange, widgets: { 'custom-widget': CustomWidget } },
+    })
+    await waitForFormReady({ formRef })
+    onChange.mockClear()
+
+    fireEvent.click(container.querySelector('[data-testid="custom-widget"]')!)
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1))
+
+    const openSelect = async () => {
+      fireEvent.click(document.querySelector('.select-trigger')!)
+      await waitFor(() =>
+        expect(document.querySelector('.select-dropdown')).toBeInTheDocument(),
+      )
+    }
+    await openSelect()
+    fireEvent.click(screen.getByText('Option A'))
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(2))
+
+    fireEvent.click(document.querySelector('.select-trigger')!)
+    fireEvent.click(screen.getByText('Option B'))
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(3))
+    expect(onChange.mock.calls.map(([data]) => data)).toEqual([
+      { custom: { id: 'custom-value' } },
+      { custom: { id: 'custom-value' }, choice: 'a' },
+      { custom: { id: 'custom-value' }, choice: 'b' },
+    ])
+  })
+
+  it('Widget 自定义 onChange 仍应触发 DynamicForm 的 onChange', async () => {
+    const onChange = jest.fn()
+    const widgetOnChange = jest.fn()
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          title: 'Name',
+          ui: { widgetProps: { onChange: widgetOnChange } },
+        },
+      },
+    }
+    const { formRef, container } = renderDynamicForm({
+      props: { schema, onChange },
+    })
+    await waitForFormReady({ formRef })
+    onChange.mockClear()
+
+    fireEvent.change(container.querySelector('[name="name"]')!, {
+      target: { value: 'Ada' },
+    })
+
+    await waitFor(() => {
+      expect(widgetOnChange).toHaveBeenCalled()
+      expect(onChange).toHaveBeenCalledTimes(1)
+    })
+    expect(onChange.mock.calls[0][0]).toEqual({ name: 'Ada' })
+  })
+
   const contactsSchema: ExtendedJSONSchema = {
     type: 'object',
     properties: {
@@ -256,6 +417,142 @@ describe('DynamicForm 字段变更事件契约', () => {
     expect(onChange.mock.calls[0][1].changes).toEqual([
       expect.objectContaining({ path: 'profile.name', value: 'Ada' }),
     ])
+  })
+
+  it('动态嵌套 schema 中的 Select 变化应触发根表单 onChange', async () => {
+    const onChange = jest.fn()
+    const dynamicSchema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        environment: {
+          type: 'object',
+          properties: {
+            NODE_ENV: {
+              type: 'string',
+              title: 'NODE_ENV',
+              enum: ['development', 'production'],
+            },
+          },
+        },
+      },
+    }
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        actionId: { type: 'string', title: 'Action Type' },
+        content: {
+          type: 'object',
+          properties: {},
+          ui: {
+            linkages: [
+              {
+                type: 'schema',
+                dependencies: ['actionId'],
+                fulfill: { function: 'loadSchema' },
+              },
+            ],
+          },
+        },
+      },
+    }
+    const { formRef, container } = renderDynamicForm({
+      props: {
+        schema,
+        onChange,
+        linkageFunctions: {
+          loadSchema: () => dynamicSchema,
+        },
+        defaultValues: { actionId: 'runScript' },
+      },
+    })
+    await waitForFormReady({ formRef })
+    await refreshLinkage({ formRef })
+    await waitFor(() =>
+      expect(screen.getByText('NODE_ENV')).toBeInTheDocument(),
+    )
+    onChange.mockClear()
+
+    fireEvent.click(container.querySelectorAll('.select-trigger')[0])
+    fireEvent.click(screen.getByText('production'))
+
+    await waitFor(() => expect(onChange).toHaveBeenCalled())
+    expect(
+      onChange.mock.calls[onChange.mock.calls.length - 1]?.[0],
+    ).toMatchObject({
+      content: { environment: { NODE_ENV: 'production' } },
+    })
+  })
+
+  it('异步加载的 Run Script 环境变量 Select 变化应触发根表单 onChange', async () => {
+    const onChange = jest.fn()
+    const runScriptSchema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        environment: {
+          type: 'object',
+          title: 'Environment Variables',
+          properties: {
+            NODE_ENV: {
+              type: 'string',
+              title: 'NODE_ENV',
+              enum: ['development', 'production', 'test'],
+              default: 'development',
+            },
+          },
+        },
+      },
+    }
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        actionId: {
+          type: 'string',
+          title: 'Action Type',
+          enum: ['runScript'],
+        },
+        content: {
+          type: 'object',
+          properties: {},
+          ui: {
+            linkages: [
+              {
+                type: 'schema',
+                dependencies: ['actionId'],
+                when: { field: 'actionId', operator: 'isNotEmpty' },
+                fulfill: { function: 'loadSchema' },
+              },
+            ],
+          },
+        },
+      },
+    }
+    const { container } = renderDynamicForm({
+      props: {
+        schema,
+        onChange,
+        linkageFunctions: {
+          loadSchema: async () => {
+            await new Promise((resolve) => setTimeout(resolve, 20))
+            return runScriptSchema
+          },
+        },
+      },
+    })
+    await waitFor(() =>
+      expect(container.querySelectorAll('.select-trigger').length).toBe(1),
+    )
+    fireEvent.click(container.querySelector('.select-trigger')!)
+    fireEvent.click(screen.getByText('runScript'))
+    await waitFor(() =>
+      expect(screen.getByText('NODE_ENV')).toBeInTheDocument(),
+    )
+    onChange.mockClear()
+
+    const selectTriggers = container.querySelectorAll('.select-trigger')
+    fireEvent.click(selectTriggers[1])
+    fireEvent.click(screen.getByText('production'))
+
+    await waitFor(() => expect(onChange).toHaveBeenCalled())
   })
 
   it('数组项 asNestedForm 的联动应归属根表单同一批次', async () => {
@@ -1268,7 +1565,7 @@ describe('DynamicForm 字段变更事件契约', () => {
     ])
   })
 
-  it('无参数 reset 应按 schema 空值报告所有实际变化字段', async () => {
+  it('clear 应按 schema 空值报告所有实际变化字段', async () => {
     const onChange = jest.fn()
     const schema: ExtendedJSONSchema = {
       type: 'object',
@@ -1287,7 +1584,7 @@ describe('DynamicForm 字段变更事件契约', () => {
     })
     onChange.mockClear()
     await act(async () => {
-      formRef.current!.reset()
+      formRef.current!.clear()
       await new Promise((resolve) => setTimeout(resolve, 20))
     })
     expect(onChange).toHaveBeenCalledTimes(1)

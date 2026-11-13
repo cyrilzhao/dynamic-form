@@ -400,7 +400,7 @@ describe('DynamicForm', () => {
     })
   })
 
-  it('reset 空值时应该按 schema 类型清空字段', async () => {
+  it('clear 应该按 schema 类型清空字段', async () => {
     const schema: ExtendedJSONSchema = {
       type: 'object',
       properties: {
@@ -434,7 +434,7 @@ describe('DynamicForm', () => {
         enabled: true,
         address: { street: 'Main Street' },
       })
-      formRef.current!.reset()
+      formRef.current!.clear()
     })
 
     expect(getInputByName({ container, name: 'title' })).toHaveValue('')
@@ -442,6 +442,45 @@ describe('DynamicForm', () => {
     expect(getInputByName({ container, name: 'address.street' })).toHaveValue(
       '',
     )
+  })
+
+  it('reset 未提供值时应该恢复 schema 默认值和 defaultValues', async () => {
+    const schema: ExtendedJSONSchema = {
+      type: 'object',
+      properties: {
+        name: { type: 'string', title: 'Name', default: 'Schema name' },
+        settings: {
+          type: 'object',
+          title: 'Settings',
+          properties: {
+            theme: { type: 'string', title: 'Theme', default: 'dark' },
+          },
+        },
+      },
+    }
+    const { formRef, container } = renderDynamicForm({
+      props: { schema, defaultValues: { name: 'Provided name' } },
+    })
+    await waitForFormReady({ formRef })
+
+    await act(async () => {
+      formRef.current!.setValues({
+        name: 'Changed',
+        settings: { theme: 'light' },
+      })
+      formRef.current!.reset()
+    })
+
+    expect(getInputByName({ container, name: 'name' })).toHaveValue(
+      'Provided name',
+    )
+    expect(getInputByName({ container, name: 'settings.theme' })).toHaveValue(
+      'dark',
+    )
+    expect(formRef.current!.getValues()).toEqual({
+      name: 'Provided name',
+      settings: { theme: 'dark' },
+    })
   })
 
   it('ref API 应该对 setValue/getValue/getValues 应用字段 transform', async () => {

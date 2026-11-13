@@ -226,24 +226,24 @@ export interface DynamicFormRef {
   ) => void
 
   /**
-   * 重置表单到初始值或指定值
+   * 重置表单到初始默认值或指定值
    *
    * 注意事项：
    * - 如果提供 `values` 参数，会重置到指定值
-   * - 如果不提供参数或提供空对象，会重置为类型恰当的空值（避免受控组件变为非受控组件）
+   * - 如果不提供参数或提供空对象，会恢复 schema 默认值与 DynamicForm.defaultValues
    * - 会清除表单的脏状态、错误状态和触摸状态
    * - 会应用字段的 `reverseCallback` 转换
    * - 会递归设置所有嵌套字段
    *
-   * @param values - 可选的重置目标值（存储域值）。不提供则重置为空值
+   * @param values - 可选的重置目标值（存储域值）。不提供则恢复初始默认值
    *
    * @example
    * ```tsx
    * // 重置为初始值（defaultValues）
    * formRef.current?.reset();
    *
-   * // 重置为空值
-   * formRef.current?.reset({});
+   * // 清空所有字段
+   * formRef.current?.clear();
    *
    * // 重置为指定值
    * formRef.current?.reset({
@@ -255,6 +255,20 @@ export interface DynamicFormRef {
    * ```
    */
   reset: (values?: Record<string, any>) => void
+
+  /**
+   * 清空表单中的所有字段值，并将字段设置为符合其 Schema 类型的空值，
+   * 例如字符串为 `''`、数组为 `[]`；不会恢复 Schema 默认值或 `defaultValues`。
+   *
+   * 与 `reset()` 一样，会清除表单的脏状态、错误状态和触摸状态，
+   * 并递归更新嵌套字段；若需要恢复初始默认值，请使用 `reset()`。
+   *
+   * @example
+   * ```tsx
+   * formRef.current?.clear();
+   * ```
+   */
+  clear: () => void
 
   /**
    * 触发表单验证
@@ -474,8 +488,26 @@ export interface DynamicFormProps {
 
   // 自定义配置
   widgets?: Record<string, React.ComponentType<any>>
-  linkageFunctions?: Record<string, LinkageFunction> // 联动函数（详见 UI_LINKAGE_DESIGN.md）
-  linkageContext?: Record<string, any> // 联动函数的外部上下文数据（如页面级 state、API 数据等）
+  /**
+   * 联动函数注册表（详见 UI_LINKAGE_DESIGN.md）。
+   *
+   * 函数签名：`({ formData, context, helpers }) => any | Promise<any>`
+   * - `formData`：当前表单的全量值
+   * - `context.fieldPath / arrayIndex / arrayPath`：联动引擎注入的字段位置信息
+   * - `context.externalData`：来自 linkageContext prop 的响应式外部数据
+   * - `helpers`：来自 helpers prop 的工具库（ofetch、lodash、zod 及用户自定义）
+   */
+  linkageFunctions?: Record<string, LinkageFunction>
+  /**
+   * 联动函数的外部上下文数据（如页面级 state、API 数据等）
+   *
+   * 在联动函数中通过 context.externalData 访问。
+   *
+   * 注意：linkageContext 的变化会自动触发联动重新计算（refreshLinkage），
+   * 因此适合放入需要在变化时驱动联动重算的响应式数据；
+   * 若数据变化不需要触发重算（如稳定工具函数、常量映射表），请改用 helpers。
+   */
+  linkageContext?: Record<string, any>
   /**
    * 回调函数注册表，用于 Widget callbacks、Transform、Validators
    *
@@ -512,23 +544,50 @@ export interface DynamicFormProps {
   customFormats?: Record<string, (value: string) => boolean> // 自定义格式验证器
 
   /**
-   * 帮助函数和工具库，可在 inline script 和 callbacks 中使用
+   * 工具库与全局常量，注入到所有 callback（transform、validator、widget callback）
+   * 和联动函数（linkageFunctions）的 `helpers` 参数中。
    *
-   * 内置 helpers:
-   * - ofetch: 跨浏览器和 Node.js 环境的请求能力
-   * - _: lodash 完整功能
-   * - z: Zod 校验工具
+   * 适合挂载的内容：
+   * - **工具函数 / 库**：日期处理、格式化、加密、自定义业务工具函数等
+   * - **全局常量 / 映射表**：枚举值映射、静态配置、单位换算表等不需要驱动联动重算的数据
+   * - **服务实例**：已初始化的 API client、i18n 实例等
    *
-   * 用户可以注入自定义 helpers，会与内置 helpers 合并
+   * 注意：helpers 的变化**不会**自动触发联动重新计算。
+   * 若需要数据变化时自动重算联动，请改用 linkageContext（在联动函数中通过 context.externalData 访问）。
+   *
+   * 内置 helpers（用户传入的同名 key 会覆盖内置值）：
+   * - `ofetch`：跨浏览器和 Node.js 环境的 HTTP 请求库
+   * - `_`：lodash 完整功能
+   * - `z`：Zod 校验工具
    *
    * @example
    * ```tsx
    * import dayjs from 'dayjs';
+   * import { myApiClient } from './api';
+   *
+   * const STATUS_MAP = { 1: 'Active', 0: 'Inactive' };
+   *
    * <DynamicForm
    *   schema={schema}
    *   helpers={{
-   *     dayjs,        // 日期处理库
-   *     myUtils,      // 自定义工具函数
+   *     dayjs,                 // 工具库：在 transform 中格式化日期
+   *     api: myApiClient,      // 服务实例：在 validator/linkage 中发起请求
+   *     STATUS_MAP,            // 常量映射表：在 transform 中做枚举转换
+   *     formatCurrency: (n: number) => `¥${n.toFixed(2)}`,  // 自定义工具函数
+   *   }}
+   *   callbacks={{
+   *     // transform：用 helpers 中的映射表做枚举转换
+   *     statusToLabel: ({ value, helpers }) => helpers.STATUS_MAP[value] ?? value,
+   *     // validator：用 helpers 中的 api 发起异步校验
+   *     checkUsername: async ({ value, helpers }) => {
+   *       const taken = await helpers.api.checkUsername(value);
+   *       return taken ? 'Username already exists' : null;
+   *     },
+   *   }}
+   *   linkageFunctions={{
+   *     // linkageFunction：用 helpers 中的工具函数计算联动结果
+   *     calcExpiry: ({ formData, helpers }) =>
+   *       helpers.dayjs(formData.startDate).add(30, 'day').format('YYYY-MM-DD'),
    *   }}
    * />
    * ```

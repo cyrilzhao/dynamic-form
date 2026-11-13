@@ -6,10 +6,12 @@ import { useSearch } from './hooks/useSearch'
 import { useKeyboardNav } from './hooks/useKeyboardNav'
 import type { SelectProps, SelectOption } from './types'
 
+const EMPTY_OPTIONS: SelectOption[] = []
+
 export const Select: React.FC<SelectProps> = ({
   value,
   onChange,
-  options,
+  options = EMPTY_OPTIONS,
   placeholder,
   disabled = false,
   multiple = false,
@@ -21,10 +23,13 @@ export const Select: React.FC<SelectProps> = ({
   dropdownClassName,
   maxHeight,
   minWidth,
+  positionUpdateKey,
   searchPlaceholder,
   onSearch,
   renderValue,
   renderTrigger,
+  renderOption,
+  renderEmpty,
 }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -131,7 +136,7 @@ export const Select: React.FC<SelectProps> = ({
         }
       }
     },
-    [onSearch]
+    [onSearch],
   )
 
   // 本地过滤（无 onSearch 时生效）
@@ -155,7 +160,7 @@ export const Select: React.FC<SelectProps> = ({
   // 获取选中的选项对象，从 knownOptions 推导以支持异步选项
   const selectedOptions = useMemo(() => {
     return knownOptions.filter((opt) =>
-      selectedValues.some((v) => v == opt.value)
+      selectedValues.some((v) => v == opt.value),
     )
   }, [knownOptions, selectedValues])
   selectedOptionsRef.current = selectedOptions
@@ -173,7 +178,7 @@ export const Select: React.FC<SelectProps> = ({
         setIsOpen(false) // isOpen effect 会自动重置 searchTerm 和 asyncOptions
       }
     },
-    [multiple, selectedValues, onChange]
+    [multiple, selectedValues, onChange],
   )
 
   // 键盘导航
@@ -205,7 +210,7 @@ export const Select: React.FC<SelectProps> = ({
       const newValues = selectedValues.filter((v) => v != tagValue)
       onChange?.(newValues)
     },
-    [selectedValues, onChange]
+    [selectedValues, onChange],
   )
 
   return (
@@ -225,7 +230,7 @@ export const Select: React.FC<SelectProps> = ({
             onClick: handleToggle,
             'aria-expanded': isOpen,
             'aria-disabled': disabled || loading,
-          }
+          },
         )
       ) : (
         <Trigger
@@ -258,7 +263,10 @@ export const Select: React.FC<SelectProps> = ({
         className={dropdownClassName}
         maxHeight={maxHeight}
         minWidth={minWidth}
+        positionUpdateKey={positionUpdateKey}
         loading={isSearchLoading}
+        renderOption={renderOption}
+        renderEmpty={renderEmpty}
       />
     </div>
   )

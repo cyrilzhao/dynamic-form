@@ -43,7 +43,7 @@ function resolveCallbackProps(
   callbackProps: Record<string, CallbackPropRef> | undefined,
   callbacks: Record<string, (...args: any[]) => any>,
   helpers: Record<string, any>,
-  widgetProps?: Record<string, any>
+  widgetProps?: Record<string, any>,
 ): Record<string, (...args: any[]) => any> {
   if (!callbackProps) {
     return {}
@@ -57,7 +57,7 @@ function resolveCallbackProps(
       fn = callbacks[callbackRef]
       if (!fn && process.env.NODE_ENV !== 'production') {
         console.warn(
-          `[DynamicForm] callbacks missing: "${callbackRef}" (used by callbackProps.${propName})`
+          `[DynamicForm] callbacks missing: "${callbackRef}" (used by callbackProps.${propName})`,
         )
         hasWarned = true
       }
@@ -73,7 +73,7 @@ function resolveCallbackProps(
       } catch (e) {
         if (process.env.NODE_ENV !== 'production') {
           console.warn(
-            `[DynamicForm] callbackProps.${propName} script error: ${(e as Error).message}`
+            `[DynamicForm] callbackProps.${propName} script error: ${(e as Error).message}`,
           )
           hasWarned = true
         }
@@ -84,7 +84,7 @@ function resolveCallbackProps(
       if (process.env.NODE_ENV !== 'production') {
         if (!hasWarned) {
           console.warn(
-            `[DynamicForm] callbackProps.${propName} function not configured`
+            `[DynamicForm] callbackProps.${propName} function not configured`,
           )
         }
       }
@@ -108,7 +108,7 @@ function resolveCallbackProps(
       propName in widgetProps
     ) {
       console.warn(
-        `[DynamicForm] callbackProps key "${propName}" overrides widgetProps`
+        `[DynamicForm] callbackProps key "${propName}" overrides widgetProps`,
       )
     }
     result[propName] = wrappedFn
@@ -136,6 +136,7 @@ interface WidgetWithTransformProps {
   helpers: Record<string, any>
   hideConvertedValue?: boolean
   widgetProps: Record<string, any>
+  onChange?: (value: any) => void
 }
 
 const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
@@ -145,9 +146,10 @@ const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
   helpers,
   hideConvertedValue = false,
   widgetProps,
+  onChange: widgetOnChange,
 }) => {
   const [displayValue, setDisplayValue] = useState(
-    () => controllerField.value ?? ''
+    () => controllerField.value ?? '',
   )
   const [transformedPreview, setTransformedPreview] = useState<string | null>(
     () => {
@@ -160,7 +162,7 @@ const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
         }
       }
       return null
-    }
+    },
   )
 
   // 每次渲染更新 ref，确保 handleChange/handleBlur 的闭包始终访问最新引用
@@ -188,7 +190,7 @@ const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
               return null
             }
           })()
-        : null
+        : null,
     )
   }, [controllerField.value, helpers])
 
@@ -204,10 +206,11 @@ const WidgetWithTransform: React.FC<WidgetWithTransformProps> = ({
       } catch {
         preview = undefined
       }
+      widgetOnChange?.(val)
       controllerFieldRef.current.onChange(val)
       setTransformedPreview(preview != null ? String(preview) : null)
     },
-    [helpers]
+    [helpers, widgetOnChange],
   )
 
   const handleBlur = useCallback((e: any) => {
@@ -357,7 +360,7 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
     field.schema?.ui?.callbackProps,
     callbacks,
     helpers,
-    widgetProps
+    widgetProps,
   )
 
   const transformConfig = field.schema?.ui?.transform
@@ -392,7 +395,12 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
         event,
       })
     },
-    [field.name, onTextFieldFocus, resolvedCallbacks.onFocus, widgetProps?.onFocus]
+    [
+      field.name,
+      onTextFieldFocus,
+      resolvedCallbacks.onFocus,
+      widgetProps?.onFocus,
+    ],
   )
 
   const textFieldFocusProps =
@@ -437,10 +445,16 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
           rules={field.validation}
           render={({ field: controllerField, fieldState }) => {
             const error = fieldState.error?.message
-            const valueWidgetProps = {
+            const valueWidgetProps: Record<string, any> = {
               error,
               ...commonWidgetProps,
               ...textFieldFocusProps,
+            }
+            const { onChange: widgetOnChange, ...widgetPropsWithoutOnChange } =
+              valueWidgetProps
+            const handleWidgetChange = (value: any) => {
+              widgetOnChange?.(value)
+              controllerField.onChange(value)
             }
 
             return (
@@ -453,12 +467,14 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
                       transformFn={transformFn}
                       helpers={helpers}
                       hideConvertedValue={transformConfig.hideConvertedValue}
-                      widgetProps={valueWidgetProps}
+                      widgetProps={widgetPropsWithoutOnChange}
+                      onChange={widgetOnChange}
                     />
                   ) : (
                     <WidgetComponent
                       {...controllerField}
-                      {...valueWidgetProps}
+                      {...widgetPropsWithoutOnChange}
+                      onChange={handleWidgetChange}
                     />
                   )}
                 </FormGroup>
@@ -482,7 +498,7 @@ const FormFieldComponent: React.FC<FormFieldProps> = ({
  */
 export function arePropsEqual(
   prevProps: FormFieldProps,
-  nextProps: FormFieldProps
+  nextProps: FormFieldProps,
 ): boolean {
   // 比较 field 的关键属性
   if (

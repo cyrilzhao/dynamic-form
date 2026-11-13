@@ -1,48 +1,48 @@
-import type { JSONSchema7 } from "json-schema";
-import type { LinkageConfig } from "./linkage";
+import type { JSONSchema7 } from 'json-schema'
+import type { LinkageConfig } from './linkage'
 
 // 重新导出联动相关类型，方便其他模块使用
-export type { LinkageConfig, ConditionExpression } from "./linkage";
+export type { LinkageConfig, ConditionExpression } from './linkage'
 
 /**
  * Widget 类型
  */
 export type WidgetType =
-  | "text"
-  | "textarea"
-  | "password"
-  | "email"
-  | "url"
-  | "number"
-  | "select"
-  | "radio"
-  | "checkbox"
-  | "checkboxes"
-  | "switch"
-  | "date"
-  | "datetime"
-  | "time"
-  | "range"
-  | "color"
-  | "file"
-  | "nested-form"
-  | "array";
+  | 'text'
+  | 'textarea'
+  | 'password'
+  | 'email'
+  | 'url'
+  | 'number'
+  | 'select'
+  | 'radio'
+  | 'checkbox'
+  | 'checkboxes'
+  | 'switch'
+  | 'date'
+  | 'datetime'
+  | 'time'
+  | 'range'
+  | 'color'
+  | 'file'
+  | 'nested-form'
+  | 'array'
 
 /**
  * 错误信息配置
  */
 export interface ErrorMessages {
-  required?: string;
-  minLength?: string;
-  maxLength?: string;
-  min?: string;
-  max?: string;
+  required?: string
+  minLength?: string
+  maxLength?: string
+  min?: string
+  max?: string
   /** key 与 SchemaValidator 的规则名对应，用于覆盖默认提示。 */
-  exclusiveMinimum?: string;
-  exclusiveMaximum?: string;
-  multipleOf?: string;
-  pattern?: string;
-  [key: string]: string | undefined;
+  exclusiveMinimum?: string
+  exclusiveMaximum?: string
+  multipleOf?: string
+  pattern?: string
+  [key: string]: string | undefined
 }
 
 /**
@@ -53,7 +53,7 @@ export interface ErrorMessages {
  *
  * ⚠️ 内联 script 仅适用于受信任的内部工具环境
  */
-export type CallbackPropRef = string | { type: "script"; code: string };
+export type CallbackPropRef = string | { type: 'script'; code: string }
 
 /**
  * Script 校验器：执行自定义 JS 函数进行验证
@@ -74,85 +74,90 @@ export type CallbackPropRef = string | { type: "script"; code: string };
  * ⚠️ 内联 script 仅适用于受信任的内部工具环境
  */
 export interface ScriptValidator {
-  type: "script";
-  callback: CallbackPropRef;
+  type: 'script'
+  callback: CallbackPropRef
 }
 
-export type ValidatorRule = ScriptValidator;
+export type ValidatorRule = ScriptValidator
 
 /** 多类型字段的单个编辑模式配置。模式之间默认相互独立，不隐式转换值。 */
 export interface FieldVariant {
   /** Variant 的稳定名称，用于 defaultVariant 和运行时展示。 */
-  name: string;
+  name: string
   /** 可选的用户界面标签。 */
-  label?: string;
+  label?: string
   /** 当前 Variant 的 JSON Schema 类型。 */
   type:
-    | "string"
-    | "number"
-    | "integer"
-    | "boolean"
-    | "array"
-    | "object"
-    | "null";
+    | 'string'
+    | 'number'
+    | 'integer'
+    | 'boolean'
+    | 'array'
+    | 'object'
+    | 'null'
   /** 当前 Variant 使用的 Widget。 */
-  widget?: WidgetType | string;
+  widget?: WidgetType | string
   /** 覆盖基础字段的 schema 配置。 */
-  schema?: ExtendedJSONSchema;
+  schema?: ExtendedJSONSchema
   /** 注册函数名或 inline script，接收 { value, formData, context, helpers }，truthy 表示匹配。 */
-  detect?: { callback: CallbackPropRef };
+  detect?: { callback: CallbackPropRef }
 }
 
 export interface UIConfig {
-  widget?: WidgetType | string;
-  placeholder?: string;
-  disabled?: boolean;
-  readonly?: boolean;
-  hidden?: boolean;
-  help?: string;
-  className?: string;
-  style?: React.CSSProperties;
-  order?: string[];
-  errorMessages?: ErrorMessages;
+  widget?: WidgetType | string
+  placeholder?: string
+  disabled?: boolean
+  readonly?: boolean
+  hidden?: boolean
+  help?: string
+  className?: string
+  style?: React.CSSProperties
+  order?: string[]
+  errorMessages?: ErrorMessages
   /** 同一字段可选的独立编辑模式，由 VariantWidget 在运行时选择。 */
-  variants?: FieldVariant[];
+  variants?: FieldVariant[]
   /** 空值或无法自动识别时使用的模式名称。 */
-  defaultVariant?: string;
-  linkages?: LinkageConfig[]; // 联动配置（支持多个联动规则）
-  labelWidth?: number | string; // 标签宽度（仅在 horizontal layout 下生效）
-  layout?: "vertical" | "horizontal" | "inline"; // 布局方式（优先级高于全局配置）
-  prefixLabel?: string; // 字段标签前缀（由 flattenPrefix 场景写入）
+  defaultVariant?: string
+  linkages?: LinkageConfig[] // 联动配置（支持多个联动规则）
+  labelWidth?: number | string // 标签宽度（仅在 horizontal layout 下生效）
+  layout?: 'vertical' | 'horizontal' | 'inline' // 布局方式（优先级高于全局配置）
+  prefixLabel?: string // 字段标签前缀（由 flattenPrefix 场景写入）
 
   // 多列布局
-  columnsCount?: number; // object 类型字段的多列布局列数（默认 1）
-  colSpan?: number; // 在多列布局下，该字段占用的列数（默认 1）
+  columnsCount?: number // object 类型字段的多列布局列数（默认 1）
+  colSpan?: number // 在多列布局下，该字段占用的列数（默认 1）
 
   // 字段透明化渲染配置
-  flattenPath?: boolean; // 是否将嵌套对象的子字段提升到当前层级渲染
-  flattenPrefix?: boolean; // 是否在字段标签前添加父级标题作为前缀
+  flattenPath?: boolean // 是否将嵌套对象的子字段提升到当前层级渲染
+  flattenPrefix?: boolean // 是否在字段标签前添加父级标题作为前缀
 
   // 数组特有配置
-  arrayMode?: "dynamic" | "static"; // 渲染模式：dynamic 可增删，static 不可增删
-  showAddButton?: boolean; // 是否显示添加按钮
-  showRemoveButton?: boolean; // 是否显示删除按钮
-  showMoveButtons?: boolean; // 是否显示移动按钮
-  enableDragSort?: boolean; // 是否启用拖拽排序
-  addButtonText?: string; // 添加按钮文本
-  removeButtonText?: string; // 删除按钮文本
-  emptyText?: string; // 空数组提示文本
-  itemLayout?: "vertical" | "horizontal" | "inline"; // 数组项布局
-  itemClassName?: string; // 数组项自定义类名
-  itemStyle?: React.CSSProperties; // 数组项自定义样式
-  autogenerate?: "uuid";
+  arrayMode?: 'dynamic' | 'static' // 渲染模式：dynamic 可增删，static 不可增删
+  showAddButton?: boolean // 是否显示添加按钮
+  showRemoveButton?: boolean // 是否显示删除按钮
+  showMoveButtons?: boolean // 是否显示移动按钮
+  enableDragSort?: boolean // 是否启用拖拽排序
+  addButtonText?: string // 添加按钮文本
+  removeButtonText?: string // 删除按钮文本
+  emptyText?: string // 空数组提示文本
+  itemLayout?: 'vertical' | 'horizontal' | 'inline' // 数组项布局
+  itemClassName?: string // 数组项自定义类名
+  itemStyle?: React.CSSProperties // 数组项自定义样式
+  autogenerate?: 'uuid'
 
   // 自定义 widget 额外参数，会被直接展开传递给 widget 组件
-  widgetProps?: Record<string, any>;
+  widgetProps?: Record<string, any>
+
+  /** SchemaBuilder 内部维护的 Widget 配置缓存，不参与 Widget 运行时参数。 */
+  __schemaBuilder?: {
+    widgetPropsByWidget?: Record<string, Record<string, any>>
+  }
 
   // Widget 回调函数引用（key=prop名，value=函数名或内联脚本，运行时解析为函数）
-  callbackProps?: Record<string, CallbackPropRef>;
+  callbackProps?: Record<string, CallbackPropRef>
 
   // 字段级自定义校验规则（由 SchemaBuilder 用户配置，运行时执行）
-  validators?: ValidatorRule[];
+  validators?: ValidatorRule[]
 
   /**
    * 字段值转换配置
@@ -167,64 +172,64 @@ export interface UIConfig {
    */
   transform?: {
     // 可以是 callbacks 注册表中的函数名（string），也可以是内联完整 JS 函数（CallbackPropRef）
-    callback: CallbackPropRef;
-    reverseCallback?: CallbackPropRef;
-    hideConvertedValue?: boolean;
-  };
+    callback: CallbackPropRef
+    reverseCallback?: CallbackPropRef
+    hideConvertedValue?: boolean
+  }
 }
 
 /**
  * 扩展的 JSON Schema 类型
  */
 export interface ExtendedJSONSchema extends JSONSchema7 {
-  ui?: UIConfig;
-  enumNames?: string[];
-  dependencies?: Record<string, any>;
-  properties?: Record<string, ExtendedJSONSchema>;
-  items?: ExtendedJSONSchema | ExtendedJSONSchema[];
+  ui?: UIConfig
+  enumNames?: string[]
+  dependencies?: Record<string, any>
+  properties?: Record<string, ExtendedJSONSchema>
+  items?: ExtendedJSONSchema | ExtendedJSONSchema[]
 }
 
 /**
  * 字段选项
  */
 export interface FieldOption {
-  label: string;
-  value: any;
-  disabled?: boolean;
+  label: string
+  value: any
+  disabled?: boolean
 }
 
 /**
  * 验证规则
  */
 export interface ValidationRules {
-  required?: string | boolean;
-  minLength?: { value: number; message: string };
-  maxLength?: { value: number; message: string };
-  min?: { value: number; message: string };
-  max?: { value: number; message: string };
-  pattern?: { value: RegExp; message: string };
-  validate?: Record<string, (value: any) => boolean | string>;
+  required?: string | boolean
+  minLength?: { value: number; message: string }
+  maxLength?: { value: number; message: string }
+  min?: { value: number; message: string }
+  max?: { value: number; message: string }
+  pattern?: { value: RegExp; message: string }
+  validate?: Record<string, (value: any) => boolean | string>
 }
 
 /**
  * 字段配置
  */
 export interface FieldConfig {
-  name: string;
-  type: string;
-  widget: string;
-  label?: string;
-  placeholder?: string;
-  description?: string;
-  defaultValue?: any;
-  required?: boolean;
-  disabled?: boolean;
-  readonly?: boolean;
-  hidden?: boolean;
-  validation?: ValidationRules;
-  options?: FieldOption[];
-  dependencies?: any;
-  schema?: ExtendedJSONSchema;
+  name: string
+  type: string
+  widget: string
+  label?: string
+  placeholder?: string
+  description?: string
+  defaultValue?: any
+  required?: boolean
+  disabled?: boolean
+  readonly?: boolean
+  hidden?: boolean
+  validation?: ValidationRules
+  options?: FieldOption[]
+  dependencies?: any
+  schema?: ExtendedJSONSchema
 }
 
 // const schema: ExtendedJSONSchema = {
